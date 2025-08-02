@@ -1,4 +1,212 @@
 // Simple game classes
+
+// Deterministic random number generator for consistent world generation
+class SeededRandom {
+    constructor(seed) {
+        this.seed = seed % 2147483647;
+        if (this.seed <= 0) this.seed += 2147483646;
+    }
+
+    next() {
+        this.seed = (this.seed * 16807) % 2147483647;
+        return (this.seed - 1) / 2147483646;
+    }
+
+    nextInt(min, max) {
+        return Math.floor(this.next() * (max - min + 1)) + min;
+    }
+
+    nextFloat(min, max) {
+        return this.next() * (max - min) + min;
+    }
+
+    choice(array) {
+        return array[this.nextInt(0, array.length - 1)];
+    }
+}
+
+// Global universe seed for consistent world generation
+let UNIVERSE_SEED = 0;
+
+// Hash function for deterministic position-based seeds
+function hashPosition(x, y) {
+    const chunkX = Math.floor(x / 1000);
+    const chunkY = Math.floor(y / 1000);
+    
+    // Combine universe seed with chunk coordinates for unique but consistent generation
+    let hash = UNIVERSE_SEED;
+    const str = `${chunkX},${chunkY}`;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+}
+
+// Get seed from URL parameter or generate random one
+function initializeUniverseSeed() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const seedParam = urlParams.get('seed');
+    
+    if (seedParam) {
+        // Use seed from URL
+        UNIVERSE_SEED = parseInt(seedParam, 10);
+        if (isNaN(UNIVERSE_SEED)) {
+            // If invalid seed, use hash of the string
+            UNIVERSE_SEED = 0;
+            for (let i = 0; i < seedParam.length; i++) {
+                const char = seedParam.charCodeAt(i);
+                UNIVERSE_SEED = ((UNIVERSE_SEED << 5) - UNIVERSE_SEED) + char;
+                UNIVERSE_SEED = UNIVERSE_SEED & UNIVERSE_SEED;
+            }
+            UNIVERSE_SEED = Math.abs(UNIVERSE_SEED);
+        }
+        console.log(`🌌 Universe loaded from seed: ${UNIVERSE_SEED} (from URL parameter)`);
+    } else {
+        // Generate random seed
+        UNIVERSE_SEED = Math.floor(Math.random() * 2147483647);
+        console.log(`🌌 Universe generated with seed: ${UNIVERSE_SEED}`);
+    }
+    
+    console.log(`🔗 Share this universe: ${window.location.origin}${window.location.pathname}?seed=${UNIVERSE_SEED}`);
+    return UNIVERSE_SEED;
+}
+
+// Chunk-based world management for infinite generation
+class ChunkManager {
+    constructor() {
+        this.chunkSize = 1000; // 1000x1000 pixel chunks
+        this.loadRadius = 1; // Load chunks in 3x3 grid around player
+        this.activeChunks = new Map(); // Key: "x,y", Value: chunk data
+        this.discoveredObjects = new Map(); // Key: "objId", Value: discovery state
+    }
+
+    getChunkCoords(worldX, worldY) {
+        return {
+            x: Math.floor(worldX / this.chunkSize),
+            y: Math.floor(worldY / this.chunkSize)
+        };
+    }
+
+    getChunkKey(chunkX, chunkY) {
+        return `${chunkX},${chunkY}`;
+    }
+
+    getObjectId(x, y, type) {
+        return `${type}_${Math.floor(x)}_${Math.floor(y)}`;
+    }
+
+    generateChunk(chunkX, chunkY) {
+        const chunkKey = this.getChunkKey(chunkX, chunkY);
+        if (this.activeChunks.has(chunkKey)) {
+            return this.activeChunks.get(chunkKey);
+        }
+
+        const chunk = {
+            x: chunkX,
+            y: chunkY,
+            stars: [],
+            planets: []
+        };
+
+        // Generate stars for this chunk
+        const starSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) + 1;
+        const starRng = new SeededRandom(starSeed);
+        const starCount = starRng.nextInt(40, 80); // 40-80 stars per chunk
+
+        for (let i = 0; i < starCount; i++) {
+            const x = chunkX * this.chunkSize + starRng.nextFloat(0, this.chunkSize);
+            const y = chunkY * this.chunkSize + starRng.nextFloat(0, this.chunkSize);
+            
+            chunk.stars.push({
+                x: x,
+                y: y,
+                brightness: starRng.nextFloat(0.2, 1.0),
+                size: starRng.next() > 0.9 ? 2 : 1,
+                color: starRng.choice(['#ffffff', '#ffddaa', '#aaddff', '#ffaa88', '#88aaff'])
+            });
+        }
+
+        // Generate planets for this chunk (rarer than stars)
+        const planetSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) + 2;
+        const planetRng = new SeededRandom(planetSeed);
+        const planetCount = planetRng.nextInt(0, 3); // 0-3 planets per chunk
+
+        for (let i = 0; i < planetCount; i++) {
+            const x = chunkX * this.chunkSize + planetRng.nextFloat(100, this.chunkSize - 100);
+            const y = chunkY * this.chunkSize + planetRng.nextFloat(100, this.chunkSize - 100);
+            
+            const planet = new Planet(x, y);
+            // Ensure planet uses the seeded random for consistent properties
+            planet.initWithSeed(planetRng);
+            
+            chunk.planets.push(planet);
+        }
+
+        this.activeChunks.set(chunkKey, chunk);
+        return chunk;
+    }
+
+    updateActiveChunks(playerX, playerY) {
+        const playerChunk = this.getChunkCoords(playerX, playerY);
+        const requiredChunks = new Set();
+
+        // Determine which chunks should be loaded
+        for (let dx = -this.loadRadius; dx <= this.loadRadius; dx++) {
+            for (let dy = -this.loadRadius; dy <= this.loadRadius; dy++) {
+                const chunkX = playerChunk.x + dx;
+                const chunkY = playerChunk.y + dy;
+                const chunkKey = this.getChunkKey(chunkX, chunkY);
+                requiredChunks.add(chunkKey);
+                
+                // Generate chunk if it doesn't exist
+                this.generateChunk(chunkX, chunkY);
+            }
+        }
+
+        // Unload distant chunks to save memory
+        for (const [chunkKey] of this.activeChunks) {
+            if (!requiredChunks.has(chunkKey)) {
+                this.activeChunks.delete(chunkKey);
+            }
+        }
+    }
+
+    getAllActiveObjects() {
+        const objects = { stars: [], planets: [] };
+        
+        for (const chunk of this.activeChunks.values()) {
+            objects.stars.push(...chunk.stars);
+            objects.planets.push(...chunk.planets);
+        }
+
+        return objects;
+    }
+
+    markObjectDiscovered(object) {
+        const objId = this.getObjectId(object.x, object.y, object.type);
+        this.discoveredObjects.set(objId, {
+            discovered: true,
+            timestamp: Date.now()
+        });
+        object.discovered = true;
+    }
+
+    isObjectDiscovered(object) {
+        const objId = this.getObjectId(object.x, object.y, object.type);
+        return this.discoveredObjects.has(objId);
+    }
+
+    restoreDiscoveryState(objects) {
+        for (const obj of objects) {
+            if (this.isObjectDiscovered(obj)) {
+                obj.discovered = true;
+            }
+        }
+    }
+}
+
 class Renderer {
     constructor(canvas) {
         this.canvas = canvas;
@@ -74,6 +282,8 @@ class Input {
         this.keys = new Set();
         this.keyHoldTimes = new Map(); // Track how long keys have been held
         this.mousePressed = false;
+        this.rightMousePressed = false;
+        this.touchStartTime = null;
         this.mouseX = 0;
         this.mouseY = 0;
         this.setupEventListeners();
@@ -93,37 +303,67 @@ class Input {
             this.keyHoldTimes.delete(e.code);
         });
 
-        // Mouse events
-        window.addEventListener('mousedown', (e) => {
-            this.mousePressed = true;
-            this.updateMousePosition(e.clientX, e.clientY);
-        });
-
-        window.addEventListener('mouseup', () => {
-            this.mousePressed = false;
-        });
 
         window.addEventListener('mousemove', (e) => {
             this.updateMousePosition(e.clientX, e.clientY);
         });
 
+        // Mouse brake (right-click)
+        window.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Prevent context menu
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) { // Left click
+                this.mousePressed = true;
+                this.rightMousePressed = false;
+            } else if (e.button === 2) { // Right click
+                this.rightMousePressed = true;
+                this.mousePressed = false;
+            }
+            this.updateMousePosition(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                this.mousePressed = false;
+            } else if (e.button === 2) {
+                this.rightMousePressed = false;
+            }
+        });
+
         // Touch events for mobile
         window.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            this.mousePressed = true;
+            if (e.touches.length === 1) {
+                this.mousePressed = true;
+                this.rightMousePressed = false;
+                this.touchStartTime = Date.now();
+            }
             const touch = e.touches[0];
             this.updateMousePosition(touch.clientX, touch.clientY);
         });
 
         window.addEventListener('touchend', (e) => {
             e.preventDefault();
+            // Check for long press (brake)
+            if (this.touchStartTime && Date.now() - this.touchStartTime > 500) {
+                this.rightMousePressed = false;
+            }
             this.mousePressed = false;
+            this.touchStartTime = null;
         });
 
         window.addEventListener('touchmove', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
             this.updateMousePosition(touch.clientX, touch.clientY);
+            
+            // Convert long press to brake
+            if (this.touchStartTime && Date.now() - this.touchStartTime > 500) {
+                this.mousePressed = false;
+                this.rightMousePressed = true;
+            }
         });
     }
 
@@ -199,6 +439,14 @@ class Input {
         );
     }
 
+    get isBraking() {
+        return this.isPressed('Space');
+    }
+
+    get brakingIntensity() {
+        return this.getThrustIntensity('Space');
+    }
+
     // Mouse/touch input for direction
     getMouseDirection(canvasWidth, canvasHeight) {
         if (!this.mousePressed) return null;
@@ -222,6 +470,29 @@ class Input {
             intensity: intensity
         };
     }
+
+    // Mouse/touch braking input
+    getMouseBrake(canvasWidth, canvasHeight) {
+        if (!this.rightMousePressed) return null;
+        
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+        const dx = this.mouseX - centerX;
+        const dy = this.mouseY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Brake toward mouse position or just brake in place if close to center
+        if (distance < 20) {
+            return { mode: 'stop' }; // Stop in place
+        } else {
+            return { 
+                mode: 'toward',
+                x: dx / distance,
+                y: dy / distance,
+                intensity: Math.min(distance / (Math.min(canvasWidth, canvasHeight) / 3), 1.0)
+            };
+        }
+    }
 }
 
 class Camera {
@@ -242,21 +513,50 @@ class Camera {
         this.rotationSpeed = 8; // How fast to rotate (radians per second)
     }
 
-    update(input, deltaTime, canvasWidth, canvasHeight) {
+    update(input, deltaTime, canvasWidth, canvasHeight, celestialObjects = []) {
         // Calculate thrust direction and intensity
         let thrustX = 0;
         let thrustY = 0;
         let isThrusting = false;
+        let isBraking = false;
         let thrustIntensity = 1.0;
 
-        // Check for mouse/touch input first
-        const mouseDirection = input.getMouseDirection(canvasWidth, canvasHeight);
-        if (mouseDirection) {
-            thrustX = mouseDirection.x;
-            thrustY = mouseDirection.y;
-            thrustIntensity = mouseDirection.intensity;
-            isThrusting = true;
+        // Check for braking input first
+        const mouseBrake = input.getMouseBrake(canvasWidth, canvasHeight);
+        if (mouseBrake) {
+            isBraking = true;
+            if (mouseBrake.mode === 'stop') {
+                // Brake directly opposite to current velocity
+                const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                if (currentSpeed > 0) {
+                    thrustX = -this.velocityX / currentSpeed;
+                    thrustY = -this.velocityY / currentSpeed;
+                    thrustIntensity = 2.0; // Extra strong braking
+                }
+            } else {
+                // Brake toward target position
+                thrustX = mouseBrake.x;
+                thrustY = mouseBrake.y;
+                thrustIntensity = mouseBrake.intensity * 1.5; // Stronger for braking
+            }
+        } else if (input.isBraking) {
+            // Keyboard braking (spacebar)
+            isBraking = true;
+            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+            if (currentSpeed > 0) {
+                thrustX = -this.velocityX / currentSpeed;
+                thrustY = -this.velocityY / currentSpeed;
+                thrustIntensity = input.brakingIntensity * 2.0; // Strong braking
+            }
         } else {
+            // Check for mouse/touch input
+            const mouseDirection = input.getMouseDirection(canvasWidth, canvasHeight);
+            if (mouseDirection) {
+                thrustX = mouseDirection.x;
+                thrustY = mouseDirection.y;
+                thrustIntensity = mouseDirection.intensity;
+                isThrusting = true;
+            } else {
             // Fall back to keyboard input with variable intensity
             if (input.moveLeft) { 
                 thrustX -= input.leftIntensity; 
@@ -291,10 +591,31 @@ class Camera {
                 thrustX /= length;
                 thrustY /= length;
             }
+            }
+        }
+
+        // Auto-brake near celestial objects (more aggressive)
+        if (!isBraking && !isThrusting) {
+            for (const obj of celestialObjects) {
+                const distance = obj.distanceToShip(this);
+                const brakeDistance = obj.discoveryDistance + 80; // Start braking earlier
+                
+                if (distance < brakeDistance) {
+                    const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                    if (currentSpeed > 20) { // Only brake if moving fast enough
+                        const brakeIntensity = Math.min(1.0, (brakeDistance - distance) / brakeDistance);
+                        thrustX = -this.velocityX / currentSpeed;
+                        thrustY = -this.velocityY / currentSpeed;
+                        thrustIntensity = brakeIntensity * 3.0; // Very aggressive auto-braking
+                        isBraking = true;
+                        break; // Only brake for the closest object
+                    }
+                }
+            }
         }
 
         // Apply acceleration with variable intensity
-        if (isThrusting) {
+        if (isThrusting || isBraking) {
             this.velocityX += thrustX * this.acceleration * thrustIntensity * deltaTime;
             this.velocityY += thrustY * this.acceleration * thrustIntensity * deltaTime;
             
@@ -321,7 +642,8 @@ class Camera {
         this.smoothRotate(deltaTime);
         
         // Store thrust state for particle system
-        this.isThrusting = isThrusting;
+        this.isThrusting = isThrusting || isBraking;
+        this.isBraking = isBraking;
         this.thrustDirection = { x: thrustX, y: thrustY };
     }
 
@@ -349,37 +671,24 @@ class Camera {
     }
 }
 
-class StarField {
-    constructor() {
-        this.stars = [];
-        this.starCount = 500;
-        this.viewDistance = 2000;
-        this.generateStars();
-    }
-
-    generateStars() {
-        const colors = ['#ffffff', '#ffddaa', '#aaddff', '#ffaa88', '#88aaff'];
-
-        for (let i = 0; i < this.starCount; i++) {
-            this.stars.push({
-                x: (Math.random() - 0.5) * this.viewDistance * 4,
-                y: (Math.random() - 0.5) * this.viewDistance * 4,
-                brightness: Math.random() * 0.8 + 0.2,
-                size: Math.random() > 0.9 ? 2 : 1,
-                color: colors[Math.floor(Math.random() * colors.length)]
-            });
-        }
+// Infinite starfield using chunk-based generation
+class InfiniteStarField {
+    constructor(chunkManager) {
+        this.chunkManager = chunkManager;
     }
 
     render(renderer, camera) {
         const { canvas } = renderer;
+        const activeObjects = this.chunkManager.getAllActiveObjects();
         
-        for (const star of this.stars) {
+        for (const star of activeObjects.stars) {
             const [screenX, screenY] = camera.worldToScreen(star.x, star.y, canvas.width, canvas.height);
             
+            // Only render stars that are on screen (with some margin)
             if (screenX >= -10 && screenX <= canvas.width + 10 && 
                 screenY >= -10 && screenY <= canvas.height + 10) {
                 
+                // Calculate alpha based on brightness
                 const alpha = Math.floor(star.brightness * 255).toString(16).padStart(2, '0');
                 const colorWithAlpha = star.color + alpha;
                 
@@ -416,6 +725,142 @@ class Ship {
         );
         
         renderer.drawSprite(centerX, centerY, coloredSprite, this.scale, rotation);
+    }
+}
+
+class CelestialObject {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.discovered = false;
+        this.discoveryDistance = 50; // How close ship needs to be for discovery
+    }
+
+    distanceToShip(camera) {
+        const dx = this.x - camera.x;
+        const dy = this.y - camera.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    checkDiscovery(camera) {
+        if (!this.discovered && this.distanceToShip(camera) <= this.discoveryDistance) {
+            this.discovered = true;
+            return true; // Newly discovered
+        }
+        return false;
+    }
+
+    render(renderer, camera) {
+        // To be overridden by subclasses
+    }
+}
+
+class Planet extends CelestialObject {
+    constructor(x, y) {
+        super(x, y, 'planet');
+        
+        // Default properties (will be overridden by initWithSeed if used)
+        this.radius = 8 + Math.random() * 12; // 8-20 pixels
+        this.discoveryDistance = this.radius + 30;
+        
+        // Random planet colors - realistic space colors
+        const planetColors = [
+            '#8B4513', // Brown (rocky)
+            '#4169E1', // Blue (water world)
+            '#DC143C', // Red (Mars-like)
+            '#9ACD32', // Green (Earth-like)
+            '#FFE4B5', // Tan (desert)
+            '#708090', // Gray (moon-like)
+            '#FF6347', // Orange (volcanic)
+            '#DA70D6'  // Purple (exotic)
+        ];
+        
+        this.color = planetColors[Math.floor(Math.random() * planetColors.length)];
+        
+        // Simple terrain pattern (optional stripes for variety)
+        this.hasStripes = Math.random() > 0.7;
+        if (this.hasStripes) {
+            // Darker shade for stripes
+            const baseColor = this.color;
+            this.stripeColor = this.darkenColor(baseColor, 0.3);
+        }
+    }
+
+    // Initialize planet with seeded random for deterministic generation
+    initWithSeed(rng) {
+        // Procedural planet properties using seeded random
+        this.radius = rng.nextFloat(8, 20); // 8-20 pixels
+        this.discoveryDistance = this.radius + 30;
+        
+        // Planet colors - realistic space colors
+        const planetColors = [
+            '#8B4513', // Brown (rocky)
+            '#4169E1', // Blue (water world)
+            '#DC143C', // Red (Mars-like)
+            '#9ACD32', // Green (Earth-like)
+            '#FFE4B5', // Tan (desert)
+            '#708090', // Gray (moon-like)
+            '#FF6347', // Orange (volcanic)
+            '#DA70D6'  // Purple (exotic)
+        ];
+        
+        this.color = rng.choice(planetColors);
+        
+        // Simple terrain pattern (optional stripes for variety)
+        this.hasStripes = rng.next() > 0.7;
+        if (this.hasStripes) {
+            // Darker shade for stripes
+            const baseColor = this.color;
+            this.stripeColor = this.darkenColor(baseColor, 0.3);
+        }
+    }
+
+    darkenColor(hex, amount) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.max(0, Math.floor((num >> 16) * (1 - amount)));
+        const g = Math.max(0, Math.floor(((num >> 8) & 0x00FF) * (1 - amount)));
+        const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - amount)));
+        return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+    }
+
+    render(renderer, camera) {
+        const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
+        
+        // Only render if on screen
+        if (screenX >= -this.radius && screenX <= renderer.canvas.width + this.radius && 
+            screenY >= -this.radius && screenY <= renderer.canvas.height + this.radius) {
+            
+            // Draw planet
+            renderer.drawCircle(screenX, screenY, this.radius, this.color);
+            
+            // Draw simple stripes if planet has them
+            if (this.hasStripes) {
+                for (let i = 0; i < 3; i++) {
+                    const stripeY = screenY - this.radius + (this.radius * 2 / 4) * (i + 1);
+                    const stripeWidth = Math.sqrt(this.radius * this.radius - Math.pow(stripeY - screenY, 2)) * 2;
+                    
+                    if (stripeWidth > 0) {
+                        renderer.ctx.fillStyle = this.stripeColor;
+                        renderer.ctx.fillRect(
+                            screenX - stripeWidth / 2, 
+                            stripeY - 1, 
+                            stripeWidth, 
+                            2
+                        );
+                    }
+                }
+            }
+            
+            // Visual indicator if discovered
+            if (this.discovered) {
+                renderer.ctx.strokeStyle = '#00ff88';
+                renderer.ctx.lineWidth = 2;
+                renderer.ctx.beginPath();
+                renderer.ctx.arc(screenX, screenY, this.radius + 5, 0, Math.PI * 2);
+                renderer.ctx.stroke();
+            }
+        }
     }
 }
 
@@ -470,6 +915,12 @@ class ThrusterParticles {
             const thrusterX = rotatedX * scale;
             const thrusterY = rotatedY * scale;
 
+            // Choose particle color based on braking
+            const isBraking = camera.isBraking;
+            const particleColor = isBraking 
+                ? (Math.random() > 0.7 ? '#ff6666' : '#ff4444') // Red for braking
+                : (Math.random() > 0.7 ? '#00ffaa' : '#00ff88'); // Green for thrusting
+
             // Spawn particle
             this.particles.push({
                 x: thrusterX,
@@ -479,7 +930,7 @@ class ThrusterParticles {
                 life: 0.5 + Math.random() * 0.3,
                 maxLife: 0.8,
                 alpha: 1.0,
-                color: Math.random() > 0.7 ? '#00ffaa' : '#00ff88'
+                color: particleColor
             });
         });
     }
@@ -507,13 +958,17 @@ class Game {
         this.renderer = new Renderer(canvas);
         this.input = new Input();
         this.camera = new Camera();
-        this.starField = new StarField();
+        this.chunkManager = new ChunkManager();
+        this.starField = new InfiniteStarField(this.chunkManager);
         this.ship = new Ship();
         this.thrusterParticles = new ThrusterParticles();
         this.lastTime = 0;
         this.animationId = 0;
         
         this.setupCanvas();
+        
+        // Initialize chunks around starting position
+        this.chunkManager.updateActiveChunks(0, 0);
     }
 
     setupCanvas() {
@@ -542,13 +997,39 @@ class Game {
 
     update(deltaTime) {
         this.input.update(deltaTime);
-        this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height);
+        
+        // Update chunk loading based on camera position
+        this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+        
+        // Get active celestial objects for physics and discovery
+        const activeObjects = this.chunkManager.getAllActiveObjects();
+        const celestialObjects = activeObjects.planets;
+        
+        // Restore discovery state for newly loaded objects
+        this.chunkManager.restoreDiscoveryState(celestialObjects);
+        
+        this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects);
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
+        
+        // Check for discoveries
+        for (const obj of celestialObjects) {
+            if (obj.checkDiscovery(this.camera)) {
+                console.log(`Discovered a ${obj.type}!`); // Simple discovery feedback for now
+                this.chunkManager.markObjectDiscovered(obj);
+            }
+        }
     }
 
     render() {
         this.renderer.clear();
         this.starField.render(this.renderer, this.camera);
+        
+        // Render celestial objects from active chunks
+        const activeObjects = this.chunkManager.getAllActiveObjects();
+        for (const obj of activeObjects.planets) {
+            obj.render(this.renderer, this.camera);
+        }
+        
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation);
     }
@@ -556,6 +1037,9 @@ class Game {
 
 // Initialize the game
 window.addEventListener('DOMContentLoaded', () => {
+    // Initialize universe seed before creating the game
+    initializeUniverseSeed();
+    
     const canvas = document.getElementById('gameCanvas');
     const game = new Game(canvas);
     game.start();
