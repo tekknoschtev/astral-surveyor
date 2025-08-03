@@ -7,6 +7,8 @@ class StellarMap {
         this.centerY = 0;
         this.gridSize = 2000; // Grid spacing in world units
         this.selectedStar = null;
+        this.hoveredStar = null;
+        this.namingService = null; // Will be injected
         
         // Visual settings for subtle space aesthetic
         this.backgroundColor = '#000000F0'; // More opaque for better contrast
@@ -54,6 +56,50 @@ class StellarMap {
                 }
             }
         }
+    }
+
+    handleClick(mouseX, mouseY, discoveredStars, canvas) {
+        if (!this.visible || !discoveredStars) return;
+        
+        // Calculate map bounds
+        const mapWidth = canvas.width * 0.8;
+        const mapHeight = canvas.height * 0.8;
+        const mapX = canvas.width * 0.1;
+        const mapY = canvas.height * 0.1;
+        const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
+        
+        // Check if click is within map bounds
+        if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
+            this.selectedStar = null;
+            return;
+        }
+        
+        // Find closest star to click position
+        let closestStar = null;
+        let closestDistance = Infinity;
+        const clickThreshold = 10; // pixels
+        
+        for (const star of discoveredStars) {
+            const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * worldToMapScale;
+            const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * worldToMapScale;
+            
+            // Check if star is within map bounds and click threshold
+            if (starMapX >= mapX && starMapX <= mapX + mapWidth && 
+                starMapY >= mapY && starMapY <= mapY + mapHeight) {
+                
+                const distance = Math.sqrt((mouseX - starMapX)**2 + (mouseY - starMapY)**2);
+                if (distance <= clickThreshold && distance < closestDistance) {
+                    closestStar = star;
+                    closestDistance = distance;
+                }
+            }
+        }
+        
+        this.selectedStar = closestStar;
+    }
+
+    setNamingService(namingService) {
+        this.namingService = namingService;
     }
 
     zoomIn() {
@@ -167,8 +213,38 @@ class StellarMap {
                     ctx.arc(starMapX, starMapY, 6, 0, Math.PI * 2);
                     ctx.stroke();
                 }
+                
+                // Draw star name at higher zoom levels or when selected
+                if (this.zoomLevel > 2.0 || this.selectedStar === star) {
+                    this.renderStarLabel(ctx, star, starMapX, starMapY);
+                }
             }
         }
+    }
+
+    renderStarLabel(ctx, star, starMapX, starMapY) {
+        if (!this.namingService) return;
+        
+        // Generate star name
+        const starName = this.namingService.generateDisplayName(star);
+        
+        // Set up text rendering to match game UI
+        ctx.font = '12px "Courier New", monospace';
+        ctx.fillStyle = '#b0c4d4';
+        ctx.textAlign = 'center';
+        
+        // Draw text background for readability
+        const textWidth = ctx.measureText(starName).width;
+        const bgPadding = 2;
+        ctx.fillStyle = '#000000C0';
+        ctx.fillRect(starMapX - textWidth/2 - bgPadding, starMapY - 20, textWidth + bgPadding*2, 12);
+        
+        // Draw star name above the star
+        ctx.fillStyle = '#b0c4d4';
+        ctx.fillText(starName, starMapX, starMapY - 10);
+        
+        // Reset text alignment
+        ctx.textAlign = 'left';
     }
 
     renderCurrentPosition(ctx, mapX, mapY, mapWidth, mapHeight, scale, camera) {
@@ -210,7 +286,7 @@ class StellarMap {
             '+/- - Zoom In/Out'
         ];
         
-        let y = canvas.height - 60;
+        let y = canvas.height - 80;
         for (const instruction of instructions) {
             ctx.fillText(instruction, 20, y);
             y += 15;
@@ -219,12 +295,77 @@ class StellarMap {
         // Zoom info
         const zoomText = `Zoom: ${this.zoomLevel.toFixed(1)}x`;
         const zoomWidth = ctx.measureText(zoomText).width;
-        ctx.fillText(zoomText, canvas.width - zoomWidth - 20, canvas.height - 45);
+        ctx.fillText(zoomText, canvas.width - zoomWidth - 20, canvas.height - 65);
         
         // Center coordinates
         const coordText = `Center: (${Math.round(this.centerX)}, ${Math.round(this.centerY)})`;
         const coordWidth = ctx.measureText(coordText).width;
-        ctx.fillText(coordText, canvas.width - coordWidth - 20, canvas.height - 30);
+        ctx.fillText(coordText, canvas.width - coordWidth - 20, canvas.height - 50);
+        
+        // Information panel for selected star
+        if (this.selectedStar && this.namingService) {
+            this.renderStarInfoPanel(ctx, canvas);
+        }
+    }
+
+    renderStarInfoPanel(ctx, canvas) {
+        if (!this.selectedStar || !this.namingService) return;
+        
+        // Generate full designation information
+        const fullDesignation = this.namingService.generateFullDesignation(this.selectedStar);
+        if (!fullDesignation) {
+            console.warn('Could not generate designation for star:', this.selectedStar);
+            return;
+        }
+        
+        // Panel dimensions and position
+        const panelWidth = 300;
+        const panelHeight = 120;
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel content
+        ctx.fillStyle = '#b0c4d4';
+        ctx.font = '12px "Courier New", monospace';
+        
+        let lineY = panelY + 20;
+        const lineHeight = 14;
+        
+        // Star designation
+        ctx.fillText(`Designation: ${fullDesignation.catalog}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Coordinate designation
+        ctx.fillText(`Coordinates: ${fullDesignation.coordinate}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Star type
+        ctx.fillText(`Type: ${fullDesignation.type}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Classification
+        if (fullDesignation.classification) {
+            ctx.fillText(`Class: ${fullDesignation.classification}`, panelX + 10, lineY);
+            lineY += lineHeight;
+        }
+        
+        // Position
+        ctx.fillText(`Position: (${Math.round(this.selectedStar.x)}, ${Math.round(this.selectedStar.y)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Discovery timestamp if available
+        if (this.selectedStar.timestamp) {
+            const date = new Date(this.selectedStar.timestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
     }
 }
 

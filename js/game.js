@@ -12,6 +12,10 @@ class Game {
         this.starParticles = new StarParticles();
         this.discoveryDisplay = new DiscoveryDisplay();
         this.stellarMap = new StellarMap();
+        this.namingService = new NamingService();
+        
+        // Connect naming service to stellar map
+        this.stellarMap.setNamingService(this.namingService);
         this.lastTime = 0;
         this.animationId = 0;
         
@@ -71,6 +75,12 @@ class Game {
             this.stellarMap.toggle();
         }
         
+        // Handle mouse clicks on stellar map
+        if (this.input.wasClicked() && this.stellarMap.isVisible()) {
+            const discoveredStars = this.chunkManager.getDiscoveredStars();
+            this.stellarMap.handleClick(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas);
+        }
+        
         // Update chunk loading based on camera position
         this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
         
@@ -95,22 +105,20 @@ class Game {
         // Check for discoveries
         for (const obj of celestialObjects) {
             if (obj.checkDiscovery(this.camera)) {
-                // Use specific type names for both planets and stars
-                let discoveryType;
-                if (obj.type === 'planet') {
-                    discoveryType = obj.planetTypeName;
-                } else if (obj.type === 'star') {
-                    discoveryType = obj.starTypeName;
-                } else {
-                    discoveryType = obj.type; // Fallback for other object types
-                }
-                this.discoveryDisplay.addDiscovery(discoveryType);
-                this.chunkManager.markObjectDiscovered(obj);
+                // Generate proper astronomical name for the discovery
+                const objectName = this.namingService.generateDisplayName(obj);
+                const objectType = obj.type === 'planet' ? obj.planetTypeName : obj.starTypeName;
                 
-                // Log shareable URL for rare discoveries
+                // Add discovery with proper name
+                this.discoveryDisplay.addDiscovery(objectName, objectType);
+                this.chunkManager.markObjectDiscovered(obj, objectName);
+                
+                // Log shareable URL for rare discoveries with proper designation
                 if (this.isRareDiscovery(obj)) {
                     const shareableURL = generateShareableURL(this.camera.x, this.camera.y);
-                    console.log(`🌟 RARE DISCOVERY! Share this ${discoveryType}: ${shareableURL}`);
+                    const isNotable = this.namingService.isNotableDiscovery(obj);
+                    const logPrefix = isNotable ? '🌟 RARE DISCOVERY!' : '⭐ Discovery!';
+                    console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
                 }
             }
         }
