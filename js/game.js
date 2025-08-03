@@ -11,6 +11,7 @@ class Game {
         this.thrusterParticles = new ThrusterParticles();
         this.starParticles = new StarParticles();
         this.discoveryDisplay = new DiscoveryDisplay();
+        this.stellarMap = new StellarMap();
         this.lastTime = 0;
         this.animationId = 0;
         
@@ -60,6 +61,16 @@ class Game {
             this.copyCurrentCoordinates();
         }
         
+        // Handle map toggle (M key)
+        if (this.input.wasJustPressed('KeyM')) {
+            this.stellarMap.toggle();
+        }
+        
+        // Handle map close (Escape key)
+        if (this.input.wasJustPressed('Escape') && this.stellarMap.isVisible()) {
+            this.stellarMap.toggle();
+        }
+        
         // Update chunk loading based on camera position
         this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
         
@@ -79,6 +90,7 @@ class Game {
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
         this.discoveryDisplay.update(deltaTime);
+        this.stellarMap.update(deltaTime, this.camera, this.input);
         
         // Check for discoveries
         for (const obj of celestialObjects) {
@@ -164,6 +176,10 @@ class Game {
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation);
         this.discoveryDisplay.render(this.renderer, this.camera);
+        
+        // Render stellar map overlay (renders on top of everything)
+        const discoveredStars = this.chunkManager.getDiscoveredStars();
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars);
     }
 }
 

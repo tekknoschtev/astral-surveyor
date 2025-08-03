@@ -88,7 +88,7 @@ class DiscoveryDisplay {
             
             // Draw discovery text
             const textAlphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
-            renderer.ctx.fillStyle = `#00ff88${textAlphaHex}`;
+            renderer.ctx.fillStyle = `#b0c4d4${textAlphaHex}`;
             renderer.ctx.font = '12px "Courier New", monospace';
             renderer.ctx.fillText(discovery.message, padding, y);
         }
@@ -120,12 +120,12 @@ class DiscoveryDisplay {
             
             // Draw background box
             const bgAlphaHex = Math.floor(alpha * 100).toString(16).padStart(2, '0');
-            renderer.ctx.fillStyle = `#004400${bgAlphaHex}`;
+            renderer.ctx.fillStyle = `#2a3a4a${bgAlphaHex}`;
             renderer.ctx.fillRect(centerX - textWidth/2 - 10, y - 18, textWidth + 20, 25);
             
             // Draw notification text
             const textAlphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
-            renderer.ctx.fillStyle = `#88ff88${textAlphaHex}`;
+            renderer.ctx.fillStyle = `#b0c4d4${textAlphaHex}`;
             renderer.ctx.fillText(notification.message, centerX - textWidth/2, y);
         }
     }
@@ -146,7 +146,7 @@ class DiscoveryDisplay {
         const rightX = renderer.canvas.width - coordWidth - padding;
         
         // Draw coordinates (minimal, no background or instructions)
-        renderer.ctx.fillStyle = '#00ff88'; // Same green as game UI
+        renderer.ctx.fillStyle = '#b0c4d4'; // Soft blue-white to match new UI
         renderer.ctx.fillText(coordText, rightX, padding + 10);
     }
 }
