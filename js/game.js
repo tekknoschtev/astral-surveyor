@@ -70,8 +70,15 @@ class Game {
         // Check for discoveries
         for (const obj of celestialObjects) {
             if (obj.checkDiscovery(this.camera)) {
-                // For planets, use the specific planet type name; for stars, use generic type
-                const discoveryType = obj.type === 'planet' ? obj.planetTypeName : obj.type;
+                // Use specific type names for both planets and stars
+                let discoveryType;
+                if (obj.type === 'planet') {
+                    discoveryType = obj.planetTypeName;
+                } else if (obj.type === 'star') {
+                    discoveryType = obj.starTypeName;
+                } else {
+                    discoveryType = obj.type; // Fallback for other object types
+                }
                 this.discoveryDisplay.addDiscovery(discoveryType);
                 this.chunkManager.markObjectDiscovered(obj);
             }

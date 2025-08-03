@@ -83,9 +83,12 @@ class ChunkManager {
             const starX = chunkX * this.chunkSize + starSystemRng.nextFloat(margin, this.chunkSize - margin);
             const starY = chunkY * this.chunkSize + starSystemRng.nextFloat(margin, this.chunkSize - margin);
             
-            // Create the star
-            const star = new Star(starX, starY);
-            star.initWithSeed(starSystemRng);
+            // Determine star type based on rarity distribution
+            const starType = this.selectStarType(starSystemRng);
+            
+            // Create the star with the selected type
+            const star = new Star(starX, starY, starType);
+            star.initWithSeed(starSystemRng, starType);
             
             // Generate planets for this star system with weighted distribution (0-12 planets)
             // Weighted to favor 2-5 planets per star for realistic systems
@@ -175,7 +178,7 @@ class ChunkManager {
         const minDistance = star.radius + 60;
         const relativeDistance = (orbitalDistance - minDistance) / 800; // Normalize to 0-1 range
         
-        // Define probabilities based on distance from star
+        // Base probabilities based on distance from star
         let probabilities = {};
         
         if (relativeDistance < 0.2) {
@@ -224,6 +227,9 @@ class ChunkManager {
             };
         }
         
+        // Apply star type modifiers to create realistic stellar systems
+        probabilities = this.applyStarTypeModifiers(probabilities, star.starType, relativeDistance);
+        
         // Apply global rarity modifiers to ensure overall distribution matches design
         const globalModifiers = {};
         for (const [typeName, typeData] of Object.entries(PlanetTypes)) {
@@ -259,6 +265,106 @@ class ChunkManager {
         
         // Fallback to rocky planet if something goes wrong
         return PlanetTypes.ROCKY;
+    }
+
+    selectStarType(rng) {
+        // Use weighted random selection based on star type rarity
+        const roll = rng.nextFloat(0, 1);
+        let cumulativeProbability = 0;
+        
+        // Order by rarity for proper cumulative distribution
+        const starTypeOrder = [
+            'G_TYPE',    // 30%
+            'K_TYPE',    // 25% 
+            'M_TYPE',    // 25%
+            'RED_GIANT', // 10%
+            'BLUE_GIANT',// 5%
+            'WHITE_DWARF',// 4%
+            'NEUTRON_STAR'// 1%
+        ];
+        
+        for (const typeName of starTypeOrder) {
+            const starType = StarTypes[typeName];
+            cumulativeProbability += starType.rarity;
+            if (roll <= cumulativeProbability) {
+                return starType;
+            }
+        }
+        
+        // Fallback to G-type star if something goes wrong
+        return StarTypes.G_TYPE;
+    }
+
+    applyStarTypeModifiers(probabilities, starType, relativeDistance) {
+        // Create a copy to avoid modifying the original
+        const modifiedProbs = { ...probabilities };
+        
+        // Apply star-specific modifiers based on temperature and characteristics
+        switch (starType) {
+            case StarTypes.BLUE_GIANT:
+                // Very hot, massive stars - harsh conditions
+                modifiedProbs.VOLCANIC *= 2.0;  // More volcanic worlds due to intense radiation
+                modifiedProbs.DESERT *= 1.5;    // More desert worlds
+                modifiedProbs.OCEAN *= 0.3;     // Much fewer ocean worlds (water boiled away)
+                modifiedProbs.FROZEN *= 0.1;    // Almost no frozen worlds
+                modifiedProbs.EXOTIC *= 1.8;    // More exotic conditions
+                break;
+                
+            case StarTypes.RED_GIANT:
+                // Evolved star - expanded habitable zone but unstable
+                modifiedProbs.ROCKY *= 0.8;     // Fewer rocky worlds (atmosphere stripped)
+                modifiedProbs.VOLCANIC *= 1.3;  // More volcanic activity from stellar variation
+                modifiedProbs.DESERT *= 1.4;    // More desert worlds
+                modifiedProbs.OCEAN *= 0.6;     // Fewer stable ocean worlds
+                modifiedProbs.EXOTIC *= 1.5;    // Unusual conditions from stellar evolution
+                break;
+                
+            case StarTypes.M_TYPE:
+                // Red dwarf - cool, stable, long-lived
+                modifiedProbs.OCEAN *= 1.4;     // More stable ocean worlds
+                modifiedProbs.FROZEN *= 1.3;    // Extended frozen zone
+                modifiedProbs.VOLCANIC *= 0.7;  // Less volcanic activity
+                modifiedProbs.DESERT *= 0.8;    // Fewer desert worlds
+                if (relativeDistance > 0.3) {   // In outer regions especially
+                    modifiedProbs.FROZEN *= 1.8;
+                }
+                break;
+                
+            case StarTypes.WHITE_DWARF:
+                // Dense, hot remnant - unique conditions
+                modifiedProbs.ROCKY *= 1.5;     // More rocky survivors
+                modifiedProbs.EXOTIC *= 3.0;    // Much more exotic conditions
+                modifiedProbs.OCEAN *= 0.2;     // Very few ocean worlds
+                modifiedProbs.GAS_GIANT *= 0.1; // Gas giants mostly dispersed
+                modifiedProbs.VOLCANIC *= 0.5;  // Less active volcanism
+                break;
+                
+            case StarTypes.NEUTRON_STAR:
+                // Extreme conditions - mostly exotic/rocky survivors
+                modifiedProbs.EXOTIC *= 5.0;    // Extreme exotic conditions
+                modifiedProbs.ROCKY *= 2.0;     // Dense rocky survivors
+                modifiedProbs.OCEAN *= 0.05;    // Almost no oceans survive
+                modifiedProbs.GAS_GIANT *= 0.02; // Gas giants stripped away
+                modifiedProbs.FROZEN *= 0.1;    // Radiation prevents freezing
+                modifiedProbs.VOLCANIC *= 0.3;  // Limited volcanic activity
+                modifiedProbs.DESERT *= 0.3;    // Surfaces modified by radiation
+                break;
+                
+            case StarTypes.K_TYPE:
+                // Orange dwarf - stable, slightly cooler than sun
+                modifiedProbs.OCEAN *= 1.2;     // Slightly more ocean worlds
+                modifiedProbs.FROZEN *= 1.1;    // Slightly more frozen worlds
+                modifiedProbs.VOLCANIC *= 0.9;  // Slightly less volcanic
+                break;
+                
+            case StarTypes.G_TYPE:
+            default:
+                // Sun-like star - baseline, no major modifications
+                // This is our reference case
+                break;
+        }
+        
+        return modifiedProbs;
     }
 
     updateActiveChunks(playerX, playerY) {
