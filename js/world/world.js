@@ -406,10 +406,19 @@ class ChunkManager {
 
     markObjectDiscovered(object) {
         const objId = this.getObjectId(object.x, object.y, object.type, object);
-        this.discoveredObjects.set(objId, {
+        const discoveryData = {
             discovered: true,
             timestamp: Date.now()
-        });
+        };
+        
+        // Store type information for persistent display
+        if (object.type === 'star' && object.starTypeName) {
+            discoveryData.starTypeName = object.starTypeName;
+        } else if (object.type === 'planet' && object.planetTypeName) {
+            discoveryData.planetTypeName = object.planetTypeName;
+        }
+        
+        this.discoveredObjects.set(objId, discoveryData);
         object.discovered = true;
     }
 
@@ -424,6 +433,68 @@ class ChunkManager {
                 obj.discovered = true;
             }
         }
+    }
+
+    getDiscoveredStars() {
+        const discoveredStars = [];
+        
+        // Get all discovered objects that are stars
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('star_')) {
+                // Extract coordinates from object ID
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const x = parseFloat(parts[1]);
+                    const y = parseFloat(parts[2]);
+                    
+                    // Find the star in active chunks or reconstruct minimal data
+                    let starData = null;
+                    
+                    // Check if star is in currently active chunks
+                    for (const chunk of this.activeChunks.values()) {
+                        for (const star of chunk.celestialStars) {
+                            if (Math.floor(star.x) === Math.floor(x) && Math.floor(star.y) === Math.floor(y)) {
+                                starData = {
+                                    x: star.x,
+                                    y: star.y,
+                                    starTypeName: star.starTypeName,
+                                    timestamp: discoveryData.timestamp
+                                };
+                                break;
+                            }
+                        }
+                        if (starData) break;
+                    }
+                    
+                    // If not in active chunks, use stored discovery data
+                    if (!starData) {
+                        // Use stored star type from discovery data, fallback to regeneration if not available
+                        let starTypeName = discoveryData.starTypeName;
+                        
+                        if (!starTypeName) {
+                            // Fallback: regenerate star type deterministically
+                            const chunkX = Math.floor(x / this.chunkSize);
+                            const chunkY = Math.floor(y / this.chunkSize);
+                            const starSystemSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) + 2;
+                            const starSystemRng = new SeededRandom(starSystemSeed);
+                            const starType = this.selectStarType(starSystemRng);
+                            starTypeName = starType.name;
+                        }
+                        
+                        starData = {
+                            x: x,
+                            y: y,
+                            starTypeName: starTypeName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    discoveredStars.push(starData);
+                }
+            }
+        }
+        
+        return discoveredStars;
     }
 }
 
