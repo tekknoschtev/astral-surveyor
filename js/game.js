@@ -54,6 +54,11 @@ class Game {
         const activeObjects = this.chunkManager.getAllActiveObjects();
         const celestialObjects = [...activeObjects.planets, ...activeObjects.celestialStars];
         
+        // Update orbital positions for all planets
+        for (const planet of activeObjects.planets) {
+            planet.updatePosition(deltaTime);
+        }
+        
         // Restore discovery state for newly loaded objects
         this.chunkManager.restoreDiscoveryState(celestialObjects);
         

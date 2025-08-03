@@ -27,8 +27,14 @@ class CelestialObject {
 }
 
 class Planet extends CelestialObject {
-    constructor(x, y) {
+    constructor(x, y, parentStar = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0) {
         super(x, y, 'planet');
+        
+        // Orbital properties
+        this.parentStar = parentStar;
+        this.orbitalDistance = orbitalDistance;
+        this.orbitalAngle = orbitalAngle; // Current angle in radians
+        this.orbitalSpeed = orbitalSpeed; // Radians per second
         
         // Default properties (will be overridden by initWithSeed if used)
         this.radius = 8 + Math.random() * 12; // 8-20 pixels
@@ -58,7 +64,15 @@ class Planet extends CelestialObject {
     }
 
     // Initialize planet with seeded random for deterministic generation
-    initWithSeed(rng) {
+    initWithSeed(rng, parentStar = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0) {
+        // Update orbital properties if provided
+        if (parentStar) {
+            this.parentStar = parentStar;
+            this.orbitalDistance = orbitalDistance;
+            this.orbitalAngle = orbitalAngle;
+            this.orbitalSpeed = orbitalSpeed;
+        }
+        
         // Procedural planet properties using seeded random
         this.radius = rng.nextFloat(8, 20); // 8-20 pixels
         this.discoveryDistance = this.radius + 30;
@@ -83,6 +97,23 @@ class Planet extends CelestialObject {
             // Darker shade for stripes
             const baseColor = this.color;
             this.stripeColor = this.darkenColor(baseColor, 0.3);
+        }
+    }
+
+    updatePosition(deltaTime) {
+        // Update orbital position if planet has a parent star
+        if (this.parentStar && this.orbitalDistance > 0) {
+            // Update orbital angle based on orbital speed
+            this.orbitalAngle += this.orbitalSpeed * deltaTime;
+            
+            // Keep angle within 0 to 2π range
+            if (this.orbitalAngle >= Math.PI * 2) {
+                this.orbitalAngle -= Math.PI * 2;
+            }
+            
+            // Calculate new position based on orbital parameters
+            this.x = this.parentStar.x + Math.cos(this.orbitalAngle) * this.orbitalDistance;
+            this.y = this.parentStar.y + Math.sin(this.orbitalAngle) * this.orbitalDistance;
         }
     }
 
@@ -138,8 +169,11 @@ class Star extends CelestialObject {
     constructor(x, y) {
         super(x, y, 'star');
         
+        // Array to track planets orbiting this star
+        this.planets = [];
+        
         // Default properties (will be overridden by initWithSeed if used)
-        this.radius = 60 + Math.random() * 40; // 60-100 pixels (MUCH larger than planets 8-20px)
+        this.radius = 80 + Math.random() * 60; // 80-140 pixels (much more prominent than planets 8-20px)
         this.discoveryDistance = this.radius + 80;
         
         // Simple star color - single bright color
@@ -154,13 +188,13 @@ class Star extends CelestialObject {
         
         if (starType > 0.95) {
             // Supergiant stars (5% chance) - absolutely massive!
-            this.radius = rng.nextFloat(120, 180);
+            this.radius = rng.nextFloat(160, 220);
         } else if (starType > 0.85) {
             // Giant stars (10% chance) - very large
-            this.radius = rng.nextFloat(80, 120);
+            this.radius = rng.nextFloat(120, 160);
         } else {
-            // Main sequence stars (85% chance) - still much larger than planets
-            this.radius = rng.nextFloat(50, 90);
+            // Main sequence stars (85% chance) - much more prominent and impressive
+            this.radius = rng.nextFloat(80, 120);
         }
         
         this.discoveryDistance = this.radius + 80;
@@ -176,6 +210,10 @@ class Star extends CelestialObject {
         
         this.color = rng.choice(starColors);
         this.brightness = 1.0; // Full brightness for all stars
+    }
+
+    addPlanet(planet) {
+        this.planets.push(planet);
     }
 
     render(renderer, camera) {
