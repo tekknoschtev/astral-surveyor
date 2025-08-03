@@ -13,6 +13,7 @@ class Game {
         this.discoveryDisplay = new DiscoveryDisplay();
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
+        this.touchUI = new TouchUI();
         
         // Connect naming service to stellar map
         this.stellarMap.setNamingService(this.namingService);
@@ -76,9 +77,25 @@ class Game {
         }
         
         // Handle mouse clicks on stellar map
-        if (this.input.wasClicked() && this.stellarMap.isVisible()) {
-            const discoveredStars = this.chunkManager.getDiscoveredStars();
-            this.stellarMap.handleClick(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas);
+        if (this.input.wasClicked()) {
+            // Check if touch hit any TouchUI buttons first
+            const touchAction = this.touchUI.handleTouch(this.input.mouseX, this.input.mouseY);
+            if (touchAction) {
+                this.handleTouchAction(touchAction);
+                // Prevent the touch from affecting ship movement
+                this.input.consumeTouch();
+            } else if (this.stellarMap.isVisible()) {
+                // Handle stellar map interactions
+                const discoveredStars = this.chunkManager.getDiscoveredStars();
+                this.stellarMap.handleClick(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas);
+            }
+        }
+        
+        // Handle pinch-to-zoom gestures on stellar map
+        if (this.input.hasPinchZoomIn() && this.stellarMap.isVisible()) {
+            this.stellarMap.zoomIn();
+        } else if (this.input.hasPinchZoomOut() && this.stellarMap.isVisible()) {
+            this.stellarMap.zoomOut();
         }
         
         // Update chunk loading based on camera position
@@ -101,6 +118,7 @@ class Game {
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
         this.discoveryDisplay.update(deltaTime);
         this.stellarMap.update(deltaTime, this.camera, this.input);
+        this.touchUI.update(deltaTime, this.renderer.canvas, this.stellarMap);
         
         // Check for discoveries
         for (const obj of celestialObjects) {
@@ -167,6 +185,32 @@ class Game {
         return false;
     }
 
+    handleTouchAction(action) {
+        switch (action) {
+            case 'toggleMap':
+                this.stellarMap.toggle();
+                if (this.stellarMap.isVisible()) {
+                    this.touchUI.showMapControls(this.renderer.canvas);
+                } else {
+                    this.touchUI.hideMapControls();
+                }
+                break;
+                
+            case 'closeMap':
+                this.stellarMap.toggle();
+                this.touchUI.hideMapControls();
+                break;
+                
+            case 'zoomIn':
+                this.stellarMap.zoomIn();
+                break;
+                
+            case 'zoomOut':
+                this.stellarMap.zoomOut();
+                break;
+        }
+    }
+
     render() {
         this.renderer.clear();
         this.starField.render(this.renderer, this.camera);
@@ -188,6 +232,9 @@ class Game {
         // Render stellar map overlay (renders on top of everything)
         const discoveredStars = this.chunkManager.getDiscoveredStars();
         this.stellarMap.render(this.renderer, this.camera, discoveredStars);
+        
+        // Render touch UI (renders on top of everything else)
+        this.touchUI.render(this.renderer);
     }
 }
 
