@@ -10,6 +10,7 @@ class Game {
         this.ship = new Ship();
         this.thrusterParticles = new ThrusterParticles();
         this.starParticles = new StarParticles();
+        this.discoveryDisplay = new DiscoveryDisplay();
         this.lastTime = 0;
         this.animationId = 0;
         
@@ -59,11 +60,12 @@ class Game {
         this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects);
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
+        this.discoveryDisplay.update(deltaTime);
         
         // Check for discoveries
         for (const obj of celestialObjects) {
             if (obj.checkDiscovery(this.camera)) {
-                console.log(`Discovered a ${obj.type}!`); // Simple discovery feedback for now
+                this.discoveryDisplay.addDiscovery(obj.type);
                 this.chunkManager.markObjectDiscovered(obj);
             }
         }
@@ -85,6 +87,7 @@ class Game {
         this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation);
+        this.discoveryDisplay.render(this.renderer);
     }
 }
 
