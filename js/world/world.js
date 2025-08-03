@@ -151,9 +151,12 @@ class ChunkManager {
                 const planetX = starX + Math.cos(orbitalAngle) * orbitalDistance;
                 const planetY = starY + Math.sin(orbitalAngle) * orbitalDistance;
                 
-                // Create the planet with orbital properties
-                const planet = new Planet(planetX, planetY, star, orbitalDistance, orbitalAngle, orbitalSpeed);
-                planet.initWithSeed(starSystemRng, star, orbitalDistance, orbitalAngle, orbitalSpeed);
+                // Determine planet type based on orbital distance and star characteristics
+                const planetType = this.selectPlanetType(starSystemRng, orbitalDistance, star);
+                
+                // Create the planet with orbital properties and type
+                const planet = new Planet(planetX, planetY, star, orbitalDistance, orbitalAngle, orbitalSpeed, planetType);
+                planet.initWithSeed(starSystemRng, star, orbitalDistance, orbitalAngle, orbitalSpeed, planetType);
                 
                 // Add planet to both the star's planet list and the chunk
                 star.addPlanet(planet);
@@ -165,6 +168,97 @@ class ChunkManager {
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
+    }
+
+    selectPlanetType(rng, orbitalDistance, star) {
+        // Create weighted selection based on orbital distance and star characteristics
+        const minDistance = star.radius + 60;
+        const relativeDistance = (orbitalDistance - minDistance) / 800; // Normalize to 0-1 range
+        
+        // Define probabilities based on distance from star
+        let probabilities = {};
+        
+        if (relativeDistance < 0.2) {
+            // Very close to star - hot planets more likely
+            probabilities = {
+                ROCKY: 0.5,
+                VOLCANIC: 0.25,
+                DESERT: 0.2,
+                OCEAN: 0.03,
+                FROZEN: 0.01,
+                GAS_GIANT: 0.01,
+                EXOTIC: 0.001
+            };
+        } else if (relativeDistance < 0.4) {
+            // Close to star - temperate zone
+            probabilities = {
+                ROCKY: 0.35,
+                OCEAN: 0.25,
+                DESERT: 0.2,
+                VOLCANIC: 0.1,
+                GAS_GIANT: 0.05,
+                FROZEN: 0.03,
+                EXOTIC: 0.02
+            };
+        } else if (relativeDistance < 0.7) {
+            // Medium distance - gas giants more common
+            probabilities = {
+                GAS_GIANT: 0.3,
+                ROCKY: 0.25,
+                OCEAN: 0.15,
+                FROZEN: 0.15,
+                DESERT: 0.1,
+                VOLCANIC: 0.03,
+                EXOTIC: 0.02
+            };
+        } else {
+            // Far from star - frozen worlds dominate
+            probabilities = {
+                FROZEN: 0.4,
+                GAS_GIANT: 0.25,
+                ROCKY: 0.2,
+                OCEAN: 0.1,
+                DESERT: 0.02,
+                VOLCANIC: 0.01,
+                EXOTIC: 0.02
+            };
+        }
+        
+        // Apply global rarity modifiers to ensure overall distribution matches design
+        const globalModifiers = {};
+        for (const [typeName, typeData] of Object.entries(PlanetTypes)) {
+            globalModifiers[typeName] = typeData.rarity;
+        }
+        
+        // Combine distance-based probabilities with global rarity
+        const finalProbabilities = {};
+        let totalWeight = 0;
+        
+        for (const typeName of Object.keys(PlanetTypes)) {
+            const distanceProb = probabilities[typeName] || 0.01;
+            const globalRarity = globalModifiers[typeName];
+            finalProbabilities[typeName] = distanceProb * globalRarity;
+            totalWeight += finalProbabilities[typeName];
+        }
+        
+        // Normalize probabilities
+        for (const typeName of Object.keys(finalProbabilities)) {
+            finalProbabilities[typeName] /= totalWeight;
+        }
+        
+        // Select planet type using weighted random selection
+        const roll = rng.nextFloat(0, 1);
+        let cumulativeProbability = 0;
+        
+        for (const [typeName, probability] of Object.entries(finalProbabilities)) {
+            cumulativeProbability += probability;
+            if (roll <= cumulativeProbability) {
+                return PlanetTypes[typeName];
+            }
+        }
+        
+        // Fallback to rocky planet if something goes wrong
+        return PlanetTypes.ROCKY;
     }
 
     updateActiveChunks(playerX, playerY) {
