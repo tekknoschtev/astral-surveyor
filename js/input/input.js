@@ -2,6 +2,7 @@ class Input {
     constructor() {
         this.keys = new Set();
         this.keyHoldTimes = new Map(); // Track how long keys have been held
+        this.keyPressed = new Map(); // Track single key presses
         this.mousePressed = false;
         this.rightMousePressed = false;
         this.touchStartTime = null;
@@ -16,12 +17,14 @@ class Input {
             if (!this.keys.has(e.code)) {
                 this.keys.add(e.code);
                 this.keyHoldTimes.set(e.code, 0); // Start tracking hold time
+                this.keyPressed.set(e.code, true); // Mark as just pressed
             }
         });
 
         window.addEventListener('keyup', (e) => {
             this.keys.delete(e.code);
             this.keyHoldTimes.delete(e.code);
+            this.keyPressed.delete(e.code);
         });
 
 
@@ -100,8 +103,17 @@ class Input {
         }
     }
 
+    // Call this at the end of the game loop to clear single-frame key presses
+    clearFrameState() {
+        this.keyPressed.clear();
+    }
+
     isPressed(key) {
         return this.keys.has(key);
+    }
+
+    wasJustPressed(key) {
+        return this.keyPressed.has(key);
     }
 
     getKeyHoldTime(key) {

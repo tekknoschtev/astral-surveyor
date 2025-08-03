@@ -26,6 +26,9 @@ class SeededRandom {
 // Global universe seed for consistent world generation
 let UNIVERSE_SEED = 0;
 
+// Global starting coordinates from URL parameters (if provided)
+let STARTING_COORDINATES = null;
+
 // Hash function for deterministic position-based seeds
 function hashPosition(x, y) {
     const chunkX = Math.floor(x / 1000);
@@ -42,10 +45,22 @@ function hashPosition(x, y) {
     return Math.abs(hash);
 }
 
-// Get seed from URL parameter or generate random one
+// Get seed and coordinates from URL parameters or generate random seed
 function initializeUniverseSeed() {
     const urlParams = new URLSearchParams(window.location.search);
     const seedParam = urlParams.get('seed');
+    const xParam = urlParams.get('x');
+    const yParam = urlParams.get('y');
+    
+    // Parse coordinates if provided
+    if (xParam !== null && yParam !== null) {
+        const x = parseFloat(xParam);
+        const y = parseFloat(yParam);
+        if (!isNaN(x) && !isNaN(y)) {
+            STARTING_COORDINATES = { x, y };
+            console.log(`📍 Starting coordinates loaded: (${x}, ${y})`);
+        }
+    }
     
     if (seedParam) {
         // Use seed from URL
@@ -67,8 +82,38 @@ function initializeUniverseSeed() {
         console.log(`🌌 Universe generated with seed: ${UNIVERSE_SEED}`);
     }
     
-    console.log(`🔗 Share this universe: ${window.location.origin}${window.location.pathname}?seed=${UNIVERSE_SEED}`);
+    // Generate shareable URL using the same logic as generateShareableURL
+    let baseUrl;
+    if (window.location.origin && window.location.origin !== 'null') {
+        // Hosted scenario (http/https)
+        baseUrl = `${window.location.origin}${window.location.pathname}`;
+    } else {
+        // Local file scenario (file://)
+        baseUrl = window.location.href.split('?')[0];
+    }
+    
+    if (STARTING_COORDINATES) {
+        console.log(`🔗 Share this location: ${baseUrl}?seed=${UNIVERSE_SEED}&x=${STARTING_COORDINATES.x}&y=${STARTING_COORDINATES.y}`);
+    } else {
+        console.log(`🔗 Share this universe: ${baseUrl}?seed=${UNIVERSE_SEED}`);
+    }
+    
     return UNIVERSE_SEED;
+}
+
+// Generate shareable URL with current coordinates
+function generateShareableURL(currentX, currentY) {
+    // Handle both local file:// and hosted http:// scenarios
+    let baseUrl;
+    if (window.location.origin && window.location.origin !== 'null') {
+        // Hosted scenario (http/https)
+        baseUrl = `${window.location.origin}${window.location.pathname}`;
+    } else {
+        // Local file scenario (file://)
+        baseUrl = window.location.href.split('?')[0]; // Remove any existing query params
+    }
+    
+    return `${baseUrl}?seed=${UNIVERSE_SEED}&x=${Math.round(currentX)}&y=${Math.round(currentY)}`;
 }
 
 // Export for use in other modules
@@ -76,3 +121,5 @@ window.SeededRandom = SeededRandom;
 window.hashPosition = hashPosition;
 window.initializeUniverseSeed = initializeUniverseSeed;
 window.getUniverseSeed = () => UNIVERSE_SEED;
+window.getStartingCoordinates = () => STARTING_COORDINATES;
+window.generateShareableURL = generateShareableURL;

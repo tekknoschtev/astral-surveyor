@@ -1,8 +1,10 @@
 class DiscoveryDisplay {
     constructor() {
         this.discoveries = [];
+        this.notifications = [];
         this.maxDisplayed = 5; // Show last 5 discoveries
         this.displayDuration = 15000; // 15 seconds per discovery
+        this.notificationDuration = 3000; // 3 seconds for notifications
     }
 
     addDiscovery(objectType) {
@@ -28,6 +30,16 @@ class DiscoveryDisplay {
         }
     }
 
+    addNotification(message) {
+        const notification = {
+            message: message,
+            timestamp: Date.now(),
+            id: Math.random().toString(36).substr(2, 9)
+        };
+        
+        this.notifications.push(notification);
+    }
+
     update(deltaTime) {
         const currentTime = Date.now();
         
@@ -35,9 +47,22 @@ class DiscoveryDisplay {
         this.discoveries = this.discoveries.filter(discovery => 
             currentTime - discovery.timestamp < this.displayDuration
         );
+        
+        // Remove expired notifications
+        this.notifications = this.notifications.filter(notification => 
+            currentTime - notification.timestamp < this.notificationDuration
+        );
     }
 
-    render(renderer) {
+    render(renderer, camera = null) {
+        this.renderDiscoveries(renderer);
+        this.renderNotifications(renderer);
+        if (camera) {
+            this.renderCoordinates(renderer, camera);
+        }
+    }
+
+    renderDiscoveries(renderer) {
         const padding = 20;
         const lineHeight = 24;
         const startY = renderer.canvas.height - padding - (this.discoveries.length * lineHeight);
@@ -64,9 +89,65 @@ class DiscoveryDisplay {
             // Draw discovery text
             const textAlphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
             renderer.ctx.fillStyle = `#00ff88${textAlphaHex}`;
-            renderer.ctx.font = '14px monospace';
+            renderer.ctx.font = '12px "Courier New", monospace';
             renderer.ctx.fillText(discovery.message, padding, y);
         }
+    }
+
+    renderNotifications(renderer) {
+        const padding = 20;
+        const lineHeight = 30;
+        const centerX = renderer.canvas.width / 2;
+        const topY = 100;
+        
+        for (let i = 0; i < this.notifications.length; i++) {
+            const notification = this.notifications[i];
+            const age = Date.now() - notification.timestamp;
+            const fadeProgress = age / this.notificationDuration;
+            
+            // Calculate alpha for fade effect
+            let alpha = 1.0;
+            if (fadeProgress > 0.7) {
+                alpha = 1.0 - ((fadeProgress - 0.7) / 0.3);
+            }
+            alpha = Math.max(0, Math.min(1, alpha));
+            
+            const y = topY + (i * lineHeight);
+            
+            // Measure text width for centering
+            renderer.ctx.font = '12px "Courier New", monospace';
+            const textWidth = renderer.ctx.measureText(notification.message).width;
+            
+            // Draw background box
+            const bgAlphaHex = Math.floor(alpha * 100).toString(16).padStart(2, '0');
+            renderer.ctx.fillStyle = `#004400${bgAlphaHex}`;
+            renderer.ctx.fillRect(centerX - textWidth/2 - 10, y - 18, textWidth + 20, 25);
+            
+            // Draw notification text
+            const textAlphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+            renderer.ctx.fillStyle = `#88ff88${textAlphaHex}`;
+            renderer.ctx.fillText(notification.message, centerX - textWidth/2, y);
+        }
+    }
+
+    renderCoordinates(renderer, camera) {
+        const padding = 20;
+        const x = Math.round(camera.x);
+        const y = Math.round(camera.y);
+        const coordText = `Position: (${x}, ${y})`;
+        
+        // Set up font to match game UI (Courier New, 12px)
+        renderer.ctx.font = '12px "Courier New", monospace';
+        
+        // Calculate width for right alignment
+        const coordWidth = renderer.ctx.measureText(coordText).width;
+        
+        // Position on the right side of screen
+        const rightX = renderer.canvas.width - coordWidth - padding;
+        
+        // Draw coordinates (minimal, no background or instructions)
+        renderer.ctx.fillStyle = '#00ff88'; // Same green as game UI
+        renderer.ctx.fillText(coordText, rightX, padding + 10);
     }
 }
 
