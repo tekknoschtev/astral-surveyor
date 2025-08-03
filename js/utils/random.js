@@ -29,19 +29,32 @@ let UNIVERSE_SEED = 0;
 // Global starting coordinates from URL parameters (if provided)
 let STARTING_COORDINATES = null;
 
-// Hash function for deterministic position-based seeds
+// Improved hash function for deterministic position-based seeds
+// Uses proper bit mixing to eliminate patterns and artifacts
 function hashPosition(x, y) {
-    const chunkX = Math.floor(x / 1000);
-    const chunkY = Math.floor(y / 1000);
+    // Use coordinates directly without re-chunking (they're already chunked by caller)
+    // Convert to integers to ensure consistent hashing
+    const coordX = Math.floor(x);
+    const coordY = Math.floor(y);
     
-    // Combine universe seed with chunk coordinates for unique but consistent generation
-    let hash = UNIVERSE_SEED;
-    const str = `${chunkX},${chunkY}`;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-    }
+    // Start with universe seed for consistency
+    let hash = UNIVERSE_SEED >>> 0; // Ensure unsigned 32-bit
+    
+    // Mix in X coordinate using bit manipulation (FNV-1a inspired)
+    hash ^= coordX;
+    hash = (hash * 0x9e3779b9) >>> 0; // Golden ratio based multiplier
+    
+    // Mix in Y coordinate with different multiplier
+    hash ^= coordY;
+    hash = (hash * 0x85ebca6b) >>> 0; // Different prime-like multiplier
+    
+    // Final mixing to eliminate patterns
+    hash ^= hash >>> 16;
+    hash = (hash * 0xc2b2ae35) >>> 0;
+    hash ^= hash >>> 13;
+    hash = (hash * 0xc2b2ae35) >>> 0;
+    hash ^= hash >>> 16;
+    
     return Math.abs(hash);
 }
 

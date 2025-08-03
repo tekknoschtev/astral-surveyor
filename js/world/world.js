@@ -46,7 +46,7 @@ class ChunkManager {
         };
 
         // Generate stars for this chunk
-        const starSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) + 1;
+        const starSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x12345678;
         const starRng = new SeededRandom(starSeed);
         const starCount = starRng.nextInt(40, 80); // 40-80 stars per chunk
 
@@ -64,7 +64,7 @@ class ChunkManager {
         }
 
         // Generate star systems for this chunk (stars with orbiting planets)
-        const starSystemSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) + 2;
+        const starSystemSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x87654321;
         const starSystemRng = new SeededRandom(starSystemSeed);
         // Reduce star system density for more exploration - most chunks will be empty space
         const starSystemRoll = starSystemRng.nextFloat(0, 1);
@@ -136,7 +136,7 @@ class ChunkManager {
                 
                 // Individual orbital speed calculation with fresh randomness for each planet
                 // Kepler's laws: closer planets orbit significantly faster
-                const planetSeed = starSystemSeed + j + 100; // Unique seed for each planet
+                const planetSeed = starSystemSeed ^ (j * 0xA5A5A5A5) ^ 0xDEADBEEF; // Unique seed for each planet
                 const planetRng = new SeededRandom(planetSeed);
                 
                 const baseSpeed = 0.08; // radians per second (more perceptible motion)
