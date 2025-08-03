@@ -66,6 +66,7 @@ class Renderer {
             this.ctx.restore();
         }
     }
+
 }
 
 // Export for use in other modules

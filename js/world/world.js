@@ -32,7 +32,8 @@ class ChunkManager {
             x: chunkX,
             y: chunkY,
             stars: [],
-            planets: []
+            planets: [],
+            celestialStars: [] // Discoverable stars (different from background stars)
         };
 
         // Generate stars for this chunk
@@ -69,6 +70,22 @@ class ChunkManager {
             chunk.planets.push(planet);
         }
 
+        // Generate discoverable stars for this chunk (much rarer than planets)
+        const celestialStarSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) + 3;
+        const celestialStarRng = new SeededRandom(celestialStarSeed);
+        const celestialStarCount = celestialStarRng.nextInt(0, 1); // 0-1 stars per chunk (very rare)
+
+        for (let i = 0; i < celestialStarCount; i++) {
+            const x = chunkX * this.chunkSize + celestialStarRng.nextFloat(200, this.chunkSize - 200);
+            const y = chunkY * this.chunkSize + celestialStarRng.nextFloat(200, this.chunkSize - 200);
+            
+            const star = new Star(x, y);
+            // Ensure star uses the seeded random for consistent properties
+            star.initWithSeed(celestialStarRng);
+            
+            chunk.celestialStars.push(star);
+        }
+
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
     }
@@ -99,11 +116,12 @@ class ChunkManager {
     }
 
     getAllActiveObjects() {
-        const objects = { stars: [], planets: [] };
+        const objects = { stars: [], planets: [], celestialStars: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
             objects.planets.push(...chunk.planets);
+            objects.celestialStars.push(...chunk.celestialStars);
         }
 
         return objects;

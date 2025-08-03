@@ -9,6 +9,7 @@ class Game {
         this.starField = new InfiniteStarField(this.chunkManager);
         this.ship = new Ship();
         this.thrusterParticles = new ThrusterParticles();
+        this.starParticles = new StarParticles();
         this.lastTime = 0;
         this.animationId = 0;
         
@@ -50,13 +51,14 @@ class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects = activeObjects.planets;
+        const celestialObjects = [...activeObjects.planets, ...activeObjects.celestialStars];
         
         // Restore discovery state for newly loaded objects
         this.chunkManager.restoreDiscoveryState(celestialObjects);
         
         this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects);
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
+        this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
         
         // Check for discoveries
         for (const obj of celestialObjects) {
@@ -76,7 +78,11 @@ class Game {
         for (const obj of activeObjects.planets) {
             obj.render(this.renderer, this.camera);
         }
+        for (const obj of activeObjects.celestialStars) {
+            obj.render(this.renderer, this.camera);
+        }
         
+        this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation);
     }
