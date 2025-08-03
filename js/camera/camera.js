@@ -7,8 +7,12 @@ class Camera {
         this.velocityX = 0;
         this.velocityY = 0;
         this.acceleration = 200; // Thrust power (pixels/sec^2)
-        this.maxSpeed = 150; // Maximum velocity (pixels/sec)
-        this.friction = 0.998; // Minimal space friction (0-1, closer to 1 = less friction)
+        this.maxSpeed = 250; // Maximum velocity (pixels/sec) - increased for faster exploration
+        this.friction = 0.9999; // Nearly 0% friction for true space coasting
+        this.coastingFriction = 1.0; // No friction when coasting
+        
+        // Coasting state
+        this.isCoasting = false;
         
         // Rotation properties
         this.rotation = 0; // Current rotation in radians
@@ -97,19 +101,23 @@ class Camera {
             }
         }
 
-        // Auto-brake near celestial objects (more aggressive)
-        if (!isBraking && !isThrusting) {
+        // Detect coasting state (not actively controlling)
+        this.isCoasting = !isBraking && !isThrusting;
+        
+        // Simple auto-braking for all celestial objects when coasting
+        if (this.isCoasting) {
             for (const obj of celestialObjects) {
                 const distance = obj.distanceToShip(this);
-                const brakeDistance = obj.discoveryDistance + 80; // Start braking earlier
+                const brakeDistance = obj.discoveryDistance + 40; // Start braking closer for natural approach
                 
                 if (distance < brakeDistance) {
                     const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-                    if (currentSpeed > 20) { // Only brake if moving fast enough
+                    if (currentSpeed > 35) { // Only brake if moving fairly fast
+                        // Simple braking - slow down in the direction opposite to velocity
                         const brakeIntensity = Math.min(1.0, (brakeDistance - distance) / brakeDistance);
                         thrustX = -this.velocityX / currentSpeed;
                         thrustY = -this.velocityY / currentSpeed;
-                        thrustIntensity = brakeIntensity * 3.0; // Very aggressive auto-braking
+                        thrustIntensity = brakeIntensity * 2.0; // Smoother auto-braking
                         isBraking = true;
                         break; // Only brake for the closest object
                     }
@@ -133,9 +141,10 @@ class Camera {
             this.velocityY = (this.velocityY / currentSpeed) * this.maxSpeed;
         }
 
-        // Apply friction (space drag for chill gameplay)
-        this.velocityX *= this.friction;
-        this.velocityY *= this.friction;
+        // Apply friction - no friction when coasting, minimal when actively controlling
+        const activeFriction = this.isCoasting ? this.coastingFriction : this.friction;
+        this.velocityX *= activeFriction;
+        this.velocityY *= activeFriction;
 
         // Update position based on velocity
         this.x += this.velocityX * deltaTime;
@@ -149,6 +158,7 @@ class Camera {
         this.isBraking = isBraking;
         this.thrustDirection = { x: thrustX, y: thrustY };
     }
+
 
     smoothRotate(deltaTime) {
         // Calculate the shortest rotation direction
