@@ -467,19 +467,8 @@ class Star extends CelestialObject {
             // Draw type-specific visual effects before the main star
             this.renderVisualEffects(renderer, screenX, screenY);
             
-            // Draw the main star
-            let starColor = this.color;
-            
-            // Apply pulsing effect if applicable
-            if (this.visualEffects.hasPulsing) {
-                const time = Date.now() * 0.001; // Convert to seconds
-                const pulseSpeed = this.visualEffects.pulseSpeed || 1.0;
-                const pulse = Math.sin(time * pulseSpeed) * 0.03 + 0.97; // Much more subtle: oscillate between 0.94 and 1.0
-                const pulsedRadius = this.radius * pulse;
-                renderer.drawCircle(screenX, screenY, pulsedRadius, starColor);
-            } else {
-                renderer.drawCircle(screenX, screenY, this.radius, starColor);
-            }
+            // Draw the main star with enhanced luminosity
+            this.drawStarWithLuminosity(renderer, screenX, screenY, this.radius);
             
             // Visual indicator if discovered
             if (this.discovered) {
@@ -550,6 +539,90 @@ class Star extends CelestialObject {
             ctx.arc(screenX, screenY, this.radius * 0.8, 0, Math.PI * 2);
             ctx.stroke();
         }
+        
+        // Draw swirling effects for dynamic stars
+        if (this.visualEffects.hasSwirling && this.visualEffects.swirlSpeed > 0) {
+            const time = Date.now() * 0.001;
+            const swirlSpeed = this.visualEffects.swirlSpeed;
+            
+            // Create multiple swirling layers for depth
+            for (let layer = 0; layer < 3; layer++) {
+                const layerOffset = layer * Math.PI * 0.67; // Offset each layer
+                const layerRadius = this.radius * (0.3 + layer * 0.2); // Inner to outer layers
+                const rotationSpeed = swirlSpeed * (1 + layer * 0.3); // Different speeds per layer
+                
+                // Draw swirling arcs
+                for (let i = 0; i < 6; i++) {
+                    const angleOffset = (i / 6) * Math.PI * 2;
+                    const rotation = time * rotationSpeed + angleOffset + layerOffset;
+                    
+                    // Calculate swirl path
+                    const startAngle = rotation;
+                    const endAngle = rotation + Math.PI * 0.4; // Arc length
+                    
+                    // Vary opacity based on time for undulating effect
+                    const opacity = (Math.sin(time * 2 + angleOffset + layerOffset) * 0.3 + 0.7) * (0.2 - layer * 0.05);
+                    const opacityHex = Math.floor(opacity * 255).toString(16).padStart(2, '0');
+                    
+                    // Use a brighter version of the star color for swirls
+                    const swirlColor = this.lightenColor(this.color, 0.3) + opacityHex;
+                    
+                    ctx.strokeStyle = swirlColor;
+                    ctx.lineWidth = 2 - layer * 0.3; // Thinner for outer layers
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, layerRadius, startAngle, endAngle);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+    
+    // Helper method for lightening colors
+    lightenColor(hex, amount) {
+        // Parse hex color
+        const colorNum = parseInt(hex.replace('#', ''), 16);
+        const r = (colorNum >> 16) & 255;
+        const g = (colorNum >> 8) & 255;
+        const b = colorNum & 255;
+        
+        // Lighten by moving towards white
+        const newR = Math.min(255, Math.floor(r + (255 - r) * amount));
+        const newG = Math.min(255, Math.floor(g + (255 - g) * amount));
+        const newB = Math.min(255, Math.floor(b + (255 - b) * amount));
+        
+        return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+    }
+    
+    // Enhanced star rendering with simple solid colors and pulsing
+    drawStarWithLuminosity(renderer, screenX, screenY, baseRadius) {
+        const time = Date.now() * 0.001;
+        
+        // Calculate effective radius (with pulsing if applicable)
+        let effectiveRadius = baseRadius;
+        if (this.visualEffects.hasPulsing) {
+            const pulseSpeed = this.visualEffects.pulseSpeed || 1.0;
+            const pulse = Math.sin(time * pulseSpeed) * 0.03 + 0.97;
+            effectiveRadius = baseRadius * pulse;
+        }
+        
+        // Draw simple solid star - no gradients or luminosity effects
+        renderer.drawCircle(screenX, screenY, effectiveRadius, this.color);
+    }
+    
+    // Helper method for darkening colors
+    darkenColor(hex, amount) {
+        // Parse hex color
+        const colorNum = parseInt(hex.replace('#', ''), 16);
+        const r = (colorNum >> 16) & 255;
+        const g = (colorNum >> 8) & 255;
+        const b = colorNum & 255;
+        
+        // Darken by moving towards black
+        const newR = Math.max(0, Math.floor(r * (1 - amount)));
+        const newG = Math.max(0, Math.floor(g * (1 - amount)));
+        const newB = Math.max(0, Math.floor(b * (1 - amount)));
+        
+        return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
     }
 }
 
@@ -663,7 +736,9 @@ const StarTypes = {
             hasCorona: true,
             hasPulsing: false,
             hasRadiation: false,
-            coronaSize: 1.2
+            coronaSize: 1.2,
+            hasSwirling: true,
+            swirlSpeed: 0.3
         }
     },
     K_TYPE: {
@@ -678,7 +753,9 @@ const StarTypes = {
             hasCorona: true,
             hasPulsing: false,
             hasRadiation: false,
-            coronaSize: 1.1
+            coronaSize: 1.1,
+            hasSwirling: true,
+            swirlSpeed: 0.25
         }
     },
     M_TYPE: {
@@ -693,7 +770,9 @@ const StarTypes = {
             hasCorona: false, // Dimmer corona
             hasPulsing: false,
             hasRadiation: false,
-            coronaSize: 1.0
+            coronaSize: 1.0,
+            hasSwirling: true,
+            swirlSpeed: 0.2
         }
     },
     RED_GIANT: {
@@ -709,7 +788,9 @@ const StarTypes = {
             hasPulsing: true, // Variable star
             hasRadiation: false,
             coronaSize: 1.5,
-            pulseSpeed: 0.5 // Much slower, more tranquil
+            pulseSpeed: 0.5, // Much slower, more tranquil
+            hasSwirling: true,
+            swirlSpeed: 0.15 // Slow, majestic swirls
         }
     },
     BLUE_GIANT: {
@@ -725,7 +806,9 @@ const StarTypes = {
             hasPulsing: false,
             hasRadiation: true, // Strong stellar wind
             coronaSize: 1.8,
-            radiationIntensity: 0.3
+            radiationIntensity: 0.3,
+            hasSwirling: true,
+            swirlSpeed: 0.5 // Fast, energetic swirls
         }
     },
     WHITE_DWARF: {
@@ -741,7 +824,9 @@ const StarTypes = {
             hasPulsing: false,
             hasRadiation: false,
             coronaSize: 0.8,
-            hasShimmer: true // Hot surface effects
+            hasShimmer: true, // Hot surface effects
+            hasSwirling: false, // Too small for visible swirls
+            swirlSpeed: 0
         }
     },
     NEUTRON_STAR: {
@@ -758,7 +843,9 @@ const StarTypes = {
             hasRadiation: true, // Intense radiation
             coronaSize: 0.5,
             pulseSpeed: 1.2, // Still faster than others but much more gentle
-            radiationIntensity: 0.8
+            radiationIntensity: 0.8,
+            hasSwirling: false, // Too small and too extreme
+            swirlSpeed: 0
         }
     }
 };
