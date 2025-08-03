@@ -39,6 +39,13 @@ Avoid relying on side effects or global state - keep behavior predictable.
 * Save/load uses **localStorage** or **IndexedDB** - respect user privacy and don't transmit data.
 * Keep bundle size reasonable to support offline use
 
+## Project Context to Remember
+- Game focuses on tranquil, non-violent exploration
+- Browser-based with localStorage saves
+- Uses deterministic seeded generation for consistent universes
+- Chunk-based loading for infinite world generation
+- Core values: testability, simplicity, emergent wonder
+
 # Not YUet Prioritized 
 Some things that **are not** priorities right now:
 * Multiplayer or networking

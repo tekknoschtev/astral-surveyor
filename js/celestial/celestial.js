@@ -378,50 +378,76 @@ class Planet extends CelestialObject {
 }
 
 class Star extends CelestialObject {
-    constructor(x, y) {
+    constructor(x, y, starType = null) {
         super(x, y, 'star');
         
         // Array to track planets orbiting this star
         this.planets = [];
         
-        // Default properties (will be overridden by initWithSeed if used)
-        this.radius = 80 + Math.random() * 60; // 80-140 pixels (much more prominent than planets 8-20px)
+        // Star type and properties
+        this.starType = starType || StarTypes.G_TYPE; // Default to G-type if not specified
+        this.starTypeName = this.starType.name;
+        
+        // Initialize properties based on star type
+        this.initializeStarProperties();
+    }
+    
+    initializeStarProperties() {
+        // Set size based on star type
+        const baseRadius = 80 + Math.random() * 60; // 80-140 pixels base
+        this.radius = baseRadius * this.starType.sizeMultiplier;
         this.discoveryDistance = this.radius + 80;
         
-        // Simple star color - single bright color
-        this.color = '#ffaa44'; // Default orange
-        this.brightness = 1.0; // Full brightness
+        // Set color from star type's color palette
+        this.color = this.starType.colors[Math.floor(Math.random() * this.starType.colors.length)];
+        
+        // Set visual effects based on star type
+        this.visualEffects = { ...this.starType.visualEffects };
+        
+        // Full brightness for all stars
+        this.brightness = 1.0;
     }
 
     // Initialize star with seeded random for deterministic generation
-    initWithSeed(rng) {
-        // Procedural star properties using seeded random
-        const starType = rng.next();
-        
-        if (starType > 0.95) {
-            // Supergiant stars (5% chance) - absolutely massive!
-            this.radius = rng.nextFloat(160, 220);
-        } else if (starType > 0.85) {
-            // Giant stars (10% chance) - very large
-            this.radius = rng.nextFloat(120, 160);
-        } else {
-            // Main sequence stars (85% chance) - much more prominent and impressive
-            this.radius = rng.nextFloat(80, 120);
+    initWithSeed(rng, starType = null) {
+        // Update star type if provided
+        if (starType) {
+            this.starType = starType;
+            this.starTypeName = this.starType.name;
         }
         
+        // Generate unique identifier for this star
+        this.uniqueId = this.generateUniqueId();
+        
+        // Set size based on star type using seeded random
+        const baseRadius = rng.nextFloat(80, 140); // 80-140 pixels base
+        this.radius = baseRadius * this.starType.sizeMultiplier;
         this.discoveryDistance = this.radius + 80;
         
-        // Simple star colors - single bright colors
-        const starColors = [
-            '#ffaa44', // Orange (most common)
-            '#ffdd88', // Yellow
-            '#ff6644', // Red
-            '#88ddff', // Blue
-            '#ffffff'  // White
-        ];
+        // Set color from star type's color palette using seeded random
+        this.color = rng.choice(this.starType.colors);
         
-        this.color = rng.choice(starColors);
-        this.brightness = 1.0; // Full brightness for all stars
+        // Set visual effects based on star type
+        this.visualEffects = { ...this.starType.visualEffects };
+        
+        // Full brightness for all stars
+        this.brightness = 1.0;
+    }
+
+    generateUniqueId() {
+        // Create unique identifier for this star based on position
+        return `star_${Math.floor(this.x)}_${Math.floor(this.y)}`;
+    }
+
+    // Simple hash function to convert string ID to numeric seed (same as planets)
+    hashStringToNumber(str, offset = 0) {
+        let hash = offset;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return Math.abs(hash) % 1000000; // Return positive number
     }
 
     addPlanet(planet) {
@@ -431,12 +457,29 @@ class Star extends CelestialObject {
     render(renderer, camera) {
         const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
         
+        // Expand render bounds for corona and radiation effects
+        const renderBounds = this.radius + 30;
+        
         // Only render if on screen
-        if (screenX >= -this.radius - 10 && screenX <= renderer.canvas.width + this.radius + 10 && 
-            screenY >= -this.radius - 10 && screenY <= renderer.canvas.height + this.radius + 10) {
+        if (screenX >= -renderBounds && screenX <= renderer.canvas.width + renderBounds && 
+            screenY >= -renderBounds && screenY <= renderer.canvas.height + renderBounds) {
             
-            // Draw the star as a simple solid circle
-            renderer.drawCircle(screenX, screenY, this.radius, this.color);
+            // Draw type-specific visual effects before the main star
+            this.renderVisualEffects(renderer, screenX, screenY);
+            
+            // Draw the main star
+            let starColor = this.color;
+            
+            // Apply pulsing effect if applicable
+            if (this.visualEffects.hasPulsing) {
+                const time = Date.now() * 0.001; // Convert to seconds
+                const pulseSpeed = this.visualEffects.pulseSpeed || 1.0;
+                const pulse = Math.sin(time * pulseSpeed) * 0.03 + 0.97; // Much more subtle: oscillate between 0.94 and 1.0
+                const pulsedRadius = this.radius * pulse;
+                renderer.drawCircle(screenX, screenY, pulsedRadius, starColor);
+            } else {
+                renderer.drawCircle(screenX, screenY, this.radius, starColor);
+            }
             
             // Visual indicator if discovered
             if (this.discovered) {
@@ -446,6 +489,66 @@ class Star extends CelestialObject {
                 renderer.ctx.arc(screenX, screenY, this.radius + 8, 0, Math.PI * 2);
                 renderer.ctx.stroke();
             }
+        }
+    }
+
+    renderVisualEffects(renderer, screenX, screenY) {
+        const ctx = renderer.ctx;
+        
+        // Draw corona effect
+        if (this.visualEffects.hasCorona) {
+            const coronaRadius = this.radius * this.visualEffects.coronaSize;
+            const gradient = ctx.createRadialGradient(
+                screenX, screenY, this.radius,
+                screenX, screenY, coronaRadius
+            );
+            gradient.addColorStop(0, this.color + '20'); // Semi-transparent
+            gradient.addColorStop(1, this.color + '00'); // Fully transparent
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, coronaRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Draw radiation effects for high-energy stars
+        if (this.visualEffects.hasRadiation) {
+            const intensity = this.visualEffects.radiationIntensity || 0.3;
+            const radiationRadius = this.radius + 15;
+            
+            // Create multiple radiation rings
+            for (let i = 0; i < 3; i++) {
+                const time = Date.now() * 0.001;
+                const offset = i * Math.PI * 0.67; // Offset each ring
+                const alpha = (Math.sin(time * 2 + offset) * 0.3 + 0.7) * intensity;
+                const alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+                
+                ctx.strokeStyle = this.color + alphaHex;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, radiationRadius + i * 5, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+        
+        // Draw shimmer effect for white dwarfs
+        if (this.visualEffects.hasShimmer) {
+            const time = Date.now() * 0.001;
+            const shimmerAlpha = Math.sin(time * 3) * 0.2 + 0.8; // Oscillate between 0.6 and 1.0
+            const alphaHex = Math.floor(shimmerAlpha * 255).toString(16).padStart(2, '0');
+            
+            ctx.strokeStyle = '#ffffff' + alphaHex;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, this.radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Additional inner shimmer
+            ctx.strokeStyle = this.color + alphaHex;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, this.radius * 0.8, 0, Math.PI * 2);
+            ctx.stroke();
         }
     }
 }
@@ -546,7 +649,122 @@ const PlanetTypes = {
     }
 };
 
+// Star type definitions with properties and visual characteristics
+const StarTypes = {
+    G_TYPE: {
+        name: 'G-Type Star',
+        description: 'Sun-like yellow star',
+        colors: ['#ffdd88', '#ffaa44', '#ffcc66'], // Yellow variants
+        sizeMultiplier: 1.0, // Average size
+        temperature: 'medium', // Affects planet type distributions
+        discoveryValue: 1,
+        rarity: 0.30, // 30% - most common along with K-type
+        visualEffects: {
+            hasCorona: true,
+            hasPulsing: false,
+            hasRadiation: false,
+            coronaSize: 1.2
+        }
+    },
+    K_TYPE: {
+        name: 'K-Type Star',
+        description: 'Orange dwarf star',
+        colors: ['#ffaa44', '#ff8844', '#ff9955'], // Orange variants
+        sizeMultiplier: 0.9, // Slightly smaller
+        temperature: 'medium-cool',
+        discoveryValue: 1,
+        rarity: 0.25, // 25% - very common and stable
+        visualEffects: {
+            hasCorona: true,
+            hasPulsing: false,
+            hasRadiation: false,
+            coronaSize: 1.1
+        }
+    },
+    M_TYPE: {
+        name: 'M-Type Star',
+        description: 'Red dwarf star',
+        colors: ['#ff6644', '#ff4422', '#cc3311'], // Red variants
+        sizeMultiplier: 0.7, // Smaller but common
+        temperature: 'cool',
+        discoveryValue: 1,
+        rarity: 0.25, // 25% - very common in reality
+        visualEffects: {
+            hasCorona: false, // Dimmer corona
+            hasPulsing: false,
+            hasRadiation: false,
+            coronaSize: 1.0
+        }
+    },
+    RED_GIANT: {
+        name: 'Red Giant',
+        description: 'Evolved red giant star',
+        colors: ['#ff4422', '#ff6644', '#ff5533'], // Deep red variants
+        sizeMultiplier: 1.6, // Much larger
+        temperature: 'cool-surface-hot-core',
+        discoveryValue: 3,
+        rarity: 0.10, // 10% - evolved stars
+        visualEffects: {
+            hasCorona: true,
+            hasPulsing: true, // Variable star
+            hasRadiation: false,
+            coronaSize: 1.5,
+            pulseSpeed: 0.5 // Much slower, more tranquil
+        }
+    },
+    BLUE_GIANT: {
+        name: 'Blue Giant',
+        description: 'Massive blue giant star',
+        colors: ['#88ddff', '#66ccff', '#aaeeff'], // Blue-white variants
+        sizeMultiplier: 1.8, // Very large and massive
+        temperature: 'very-hot',
+        discoveryValue: 4,
+        rarity: 0.05, // 5% - rare massive stars
+        visualEffects: {
+            hasCorona: true,
+            hasPulsing: false,
+            hasRadiation: true, // Strong stellar wind
+            coronaSize: 1.8,
+            radiationIntensity: 0.3
+        }
+    },
+    WHITE_DWARF: {
+        name: 'White Dwarf',
+        description: 'Dense white dwarf remnant',
+        colors: ['#ffffff', '#eeeeff', '#ddddff'], // White/blue-white
+        sizeMultiplier: 0.4, // Very small but dense
+        temperature: 'very-hot-surface',
+        discoveryValue: 3,
+        rarity: 0.04, // 4% - stellar remnants
+        visualEffects: {
+            hasCorona: false,
+            hasPulsing: false,
+            hasRadiation: false,
+            coronaSize: 0.8,
+            hasShimmer: true // Hot surface effects
+        }
+    },
+    NEUTRON_STAR: {
+        name: 'Neutron Star',
+        description: 'Ultra-dense neutron star',
+        colors: ['#ddddff', '#bbbbff', '#9999ff'], // Blue-white with purple tint
+        sizeMultiplier: 0.2, // Extremely small but ultra-dense
+        temperature: 'extreme',
+        discoveryValue: 5,
+        rarity: 0.01, // 1% - ultra-rare stellar remnants
+        visualEffects: {
+            hasCorona: false,
+            hasPulsing: true, // Pulsar effects
+            hasRadiation: true, // Intense radiation
+            coronaSize: 0.5,
+            pulseSpeed: 1.2, // Still faster than others but much more gentle
+            radiationIntensity: 0.8
+        }
+    }
+};
+
 // Export for use in other modules
+window.StarTypes = StarTypes;
 window.PlanetTypes = PlanetTypes;
 window.CelestialObject = CelestialObject;
 window.Planet = Planet;
