@@ -5,6 +5,7 @@ class Input {
         this.keyPressed = new Map(); // Track single key presses
         this.mousePressed = false;
         this.rightMousePressed = false;
+        this.mouseClicked = false; // Single click detection
         this.touchStartTime = null;
         this.mouseX = 0;
         this.mouseY = 0;
@@ -51,6 +52,7 @@ class Input {
         window.addEventListener('mouseup', (e) => {
             if (e.button === 0) {
                 this.mousePressed = false;
+                this.mouseClicked = true; // Register click on mouse up
             } else if (e.button === 2) {
                 this.rightMousePressed = false;
             }
@@ -106,6 +108,11 @@ class Input {
     // Call this at the end of the game loop to clear single-frame key presses
     clearFrameState() {
         this.keyPressed.clear();
+        this.mouseClicked = false;
+    }
+
+    wasClicked() {
+        return this.mouseClicked;
     }
 
     isPressed(key) {

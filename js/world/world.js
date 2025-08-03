@@ -404,7 +404,7 @@ class ChunkManager {
         return objects;
     }
 
-    markObjectDiscovered(object) {
+    markObjectDiscovered(object, objectName = null) {
         const objId = this.getObjectId(object.x, object.y, object.type, object);
         const discoveryData = {
             discovered: true,
@@ -416,6 +416,11 @@ class ChunkManager {
             discoveryData.starTypeName = object.starTypeName;
         } else if (object.type === 'planet' && object.planetTypeName) {
             discoveryData.planetTypeName = object.planetTypeName;
+        }
+        
+        // Store the generated name if provided
+        if (objectName) {
+            discoveryData.objectName = objectName;
         }
         
         this.discoveredObjects.set(objId, discoveryData);

@@ -7,7 +7,7 @@ class DiscoveryDisplay {
         this.notificationDuration = 3000; // 3 seconds for notifications
     }
 
-    addDiscovery(objectType) {
+    addDiscovery(objectName, objectType) {
         const now = new Date();
         const timestamp = now.getFullYear() + '-' + 
                          String(now.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -17,9 +17,11 @@ class DiscoveryDisplay {
                          String(now.getSeconds()).padStart(2, '0');
         
         const discovery = {
-            message: `${timestamp} - New ${objectType} discovered!`,
+            message: `${timestamp} - ${objectName} (${objectType}) discovered!`,
             timestamp: Date.now(),
-            id: Math.random().toString(36).substr(2, 9)
+            id: Math.random().toString(36).substr(2, 9),
+            objectName: objectName,
+            objectType: objectType
         };
         
         this.discoveries.push(discovery); // Add to end (newest at bottom)
