@@ -7,8 +7,14 @@ class Input {
         this.rightMousePressed = false;
         this.mouseClicked = false; // Single click detection
         this.touchStartTime = null;
+        this.touchConsumed = false; // Track if touch was consumed by UI
         this.mouseX = 0;
         this.mouseY = 0;
+        
+        // Multi-touch gesture support
+        this.touches = new Map(); // Track multiple touches
+        this.lastPinchDistance = 0;
+        this.pinchGesture = null; // 'in' or 'out' or null
         this.setupEventListeners();
     }
 
@@ -58,37 +64,62 @@ class Input {
             }
         });
 
-        // Touch events for mobile
+        // Enhanced touch events for mobile with multi-touch support
         window.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            this.updateTouches(e.touches);
+            
             if (e.touches.length === 1) {
                 this.mousePressed = true;
                 this.rightMousePressed = false;
                 this.touchStartTime = Date.now();
+                const touch = e.touches[0];
+                this.updateMousePosition(touch.clientX, touch.clientY);
+            } else if (e.touches.length === 2) {
+                // Start pinch gesture tracking
+                this.initPinchGesture(e.touches);
             }
-            const touch = e.touches[0];
-            this.updateMousePosition(touch.clientX, touch.clientY);
         });
 
         window.addEventListener('touchend', (e) => {
             e.preventDefault();
-            // Check for long press (brake)
-            if (this.touchStartTime && Date.now() - this.touchStartTime > 500) {
-                this.rightMousePressed = false;
+            this.updateTouches(e.touches);
+            
+            if (e.touches.length === 0) {
+                // All touches ended
+                if (this.touchStartTime && Date.now() - this.touchStartTime > 500) {
+                    this.rightMousePressed = false;
+                }
+                this.mousePressed = false;
+                this.mouseClicked = true; // Register touch as click
+                this.touchStartTime = null;
+                this.pinchGesture = null;
+                this.lastPinchDistance = 0;
+            } else if (e.touches.length === 1) {
+                // Multi-touch ended, back to single touch
+                this.pinchGesture = null;
+                this.lastPinchDistance = 0;
+                const touch = e.touches[0];
+                this.updateMousePosition(touch.clientX, touch.clientY);
             }
-            this.mousePressed = false;
-            this.touchStartTime = null;
         });
 
         window.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            const touch = e.touches[0];
-            this.updateMousePosition(touch.clientX, touch.clientY);
+            this.updateTouches(e.touches);
             
-            // Convert long press to brake
-            if (this.touchStartTime && Date.now() - this.touchStartTime > 500) {
-                this.mousePressed = false;
-                this.rightMousePressed = true;
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                this.updateMousePosition(touch.clientX, touch.clientY);
+                
+                // Convert long press to brake
+                if (this.touchStartTime && Date.now() - this.touchStartTime > 500) {
+                    this.mousePressed = false;
+                    this.rightMousePressed = true;
+                }
+            } else if (e.touches.length === 2) {
+                // Handle pinch gesture
+                this.updatePinchGesture(e.touches);
             }
         });
     }
@@ -109,10 +140,81 @@ class Input {
     clearFrameState() {
         this.keyPressed.clear();
         this.mouseClicked = false;
+        this.pinchGesture = null; // Clear pinch gesture each frame
+        this.touchConsumed = false; // Reset touch consumption flag
     }
 
     wasClicked() {
         return this.mouseClicked;
+    }
+
+    // Multi-touch gesture methods
+    updateTouches(touches) {
+        this.touches.clear();
+        for (let i = 0; i < touches.length; i++) {
+            const touch = touches[i];
+            this.touches.set(touch.identifier, {
+                x: touch.clientX,
+                y: touch.clientY
+            });
+        }
+    }
+
+    initPinchGesture(touches) {
+        if (touches.length >= 2) {
+            const touch1 = touches[0];
+            const touch2 = touches[1];
+            this.lastPinchDistance = this.calculateDistance(
+                touch1.clientX, touch1.clientY,
+                touch2.clientX, touch2.clientY
+            );
+        }
+    }
+
+    updatePinchGesture(touches) {
+        if (touches.length >= 2) {
+            const touch1 = touches[0];
+            const touch2 = touches[1];
+            const currentDistance = this.calculateDistance(
+                touch1.clientX, touch1.clientY,
+                touch2.clientX, touch2.clientY
+            );
+
+            if (this.lastPinchDistance > 0) {
+                const threshold = 10; // Minimum distance change to register gesture
+                const distanceChange = currentDistance - this.lastPinchDistance;
+                
+                if (Math.abs(distanceChange) > threshold) {
+                    this.pinchGesture = distanceChange > 0 ? 'out' : 'in';
+                }
+            }
+
+            this.lastPinchDistance = currentDistance;
+        }
+    }
+
+    calculateDistance(x1, y1, x2, y2) {
+        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    }
+
+    getPinchGesture() {
+        return this.pinchGesture;
+    }
+
+    hasPinchZoomOut() {
+        return this.pinchGesture === 'out';
+    }
+
+    hasPinchZoomIn() {
+        return this.pinchGesture === 'in';
+    }
+
+    consumeTouch() {
+        // Prevent current touch from affecting other systems (like ship movement)
+        this.mousePressed = false;
+        this.rightMousePressed = false;
+        this.mouseClicked = false;
+        this.touchConsumed = true; // Flag to indicate touch was consumed
     }
 
     isPressed(key) {
@@ -189,7 +291,7 @@ class Input {
 
     // Mouse/touch input for direction
     getMouseDirection(canvasWidth, canvasHeight) {
-        if (!this.mousePressed) return null;
+        if (!this.mousePressed || this.touchConsumed) return null;
         
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
@@ -213,7 +315,7 @@ class Input {
 
     // Mouse/touch braking input
     getMouseBrake(canvasWidth, canvasHeight) {
-        if (!this.rightMousePressed) return null;
+        if (!this.rightMousePressed || this.touchConsumed) return null;
         
         const centerX = canvasWidth / 2;
         const centerY = canvasHeight / 2;
