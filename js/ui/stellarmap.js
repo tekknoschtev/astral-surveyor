@@ -122,11 +122,23 @@ class StellarMap {
         ctx.fillStyle = this.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Set up coordinate system for map
-        const mapWidth = canvas.width * 0.8; // Leave margins
-        const mapHeight = canvas.height * 0.8;
-        const mapX = canvas.width * 0.1;
-        const mapY = canvas.height * 0.1;
+        // Set up coordinate system for map - responsive sizing
+        let mapWidthRatio = 0.8;
+        let mapHeightRatio = 0.8;
+        let marginRatio = 0.1;
+        
+        // Adjust for mobile devices (smaller screens need more space)
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (isTouchDevice) {
+            mapWidthRatio = 0.95; // Use more screen space on mobile
+            mapHeightRatio = 0.85; // Account for touch UI buttons
+            marginRatio = 0.025;
+        }
+        
+        const mapWidth = canvas.width * mapWidthRatio;
+        const mapHeight = canvas.height * mapHeightRatio;
+        const mapX = canvas.width * marginRatio;
+        const mapY = canvas.height * marginRatio;
         
         // Calculate world-to-map coordinate conversion
         const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
@@ -275,16 +287,30 @@ class StellarMap {
         ctx.fillStyle = '#b0c4d4'; // Soft blue-white for text
         
         // Title
-        const title = 'STELLAR CARTOGRAPHY';
+        const title = 'Stellar Map';
         const titleWidth = ctx.measureText(title).width;
         ctx.fillText(title, (canvas.width - titleWidth) / 2, 30);
         
-        // Instructions
-        const instructions = [
-            'M - Toggle Map',
-            'ESC - Close Map',
-            '+/- - Zoom In/Out'
-        ];
+        // Instructions - adapt for device type
+        let instructions = [];
+        // More specific touch device detection - check for mobile user agent patterns
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const hasTouchPoints = navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+        const isTouchDevice = isMobile || (hasTouchPoints && window.screen.width < 1024);
+        
+        if (isTouchDevice) {
+            instructions = [
+                'Pinch - Zoom In/Out',
+                'Tap Star - Select',
+                'Tap Outside - Close'
+            ];
+        } else {
+            instructions = [
+                'M - Toggle Map',
+                'ESC - Close Map',
+                '+/- - Zoom In/Out'
+            ];
+        }
         
         let y = canvas.height - 80;
         for (const instruction of instructions) {
