@@ -77,18 +77,71 @@ class ChunkManager {
         }
 
         for (let i = 0; i < starSystemCount; i++) {
-            // Center star systems more in chunks to create better spacing and exploration feel
-            // With 92% empty chunks and larger orbital distances (up to 800px), we need adequate margins
-            const margin = 250; // Margin adjusted for larger star systems with epic outer planet orbits
-            const starX = chunkX * this.chunkSize + starSystemRng.nextFloat(margin, this.chunkSize - margin);
-            const starY = chunkY * this.chunkSize + starSystemRng.nextFloat(margin, this.chunkSize - margin);
+            // Improved star system placement to eliminate vertical line patterns
+            const margin = 250; // Margin for larger star systems with epic outer planet orbits
+            
+            // Use separate RNG instances for X and Y to break correlation
+            const positionSeed = starSystemSeed + i * 1000000; // Unique seed per star system
+            const xRng = new SeededRandom(positionSeed ^ 0xAAAA5555); // XOR for X coordinate
+            const yRng = new SeededRandom(positionSeed ^ 0x5555AAAA); // Different XOR for Y coordinate
+            
+            // Generate multiple candidate positions and select the best one
+            let bestX, bestY, bestScore = -1;
+            const candidates = 3; // Try 3 different positions
+            
+            for (let attempt = 0; attempt < candidates; attempt++) {
+                // Add extra randomization to break patterns
+                const subSeed = attempt * 12345;
+                xRng.seed = (positionSeed ^ 0xAAAA5555 ^ subSeed) % 2147483647;
+                yRng.seed = (positionSeed ^ 0x5555AAAA ^ subSeed) % 2147483647;
+                
+                const candidateX = chunkX * this.chunkSize + xRng.nextFloat(margin, this.chunkSize - margin);
+                const candidateY = chunkY * this.chunkSize + yRng.nextFloat(margin, this.chunkSize - margin);
+                
+                // Score this position based on distance from other star systems
+                const score = this.scoreStarSystemPosition(candidateX, candidateY, chunkX, chunkY);
+                
+                if (score > bestScore) {
+                    bestX = candidateX;
+                    bestY = candidateY;
+                    bestScore = score;
+                }
+            }
+            
+            const starX = bestX;
+            const starY = bestY;
             
             // Determine star type based on rarity distribution
             const starType = this.selectStarType(starSystemRng);
             
-            // Create the star with the selected type
+            // Check for binary system generation (10% chance)
+            const binaryChance = starSystemRng.nextFloat(0, 1);
+            const isBinary = binaryChance < 0.10; // 10% chance for binary systems
+            
+            // Create the primary star with the selected type
             const star = new Star(starX, starY, starType);
             star.initWithSeed(starSystemRng, starType);
+            
+            // Add binary companion if this is a binary system
+            if (isBinary) {
+                // Generate companion star properties
+                const companionDistance = starSystemRng.nextFloat(150, 300); // Distance between stars
+                const companionAngle = starSystemRng.nextFloat(0, Math.PI * 2); // Random angle
+                const companionX = starX + Math.cos(companionAngle) * companionDistance;
+                const companionY = starY + Math.sin(companionAngle) * companionDistance;
+                
+                // Companion is usually smaller/different type
+                const companionType = this.selectCompanionStarType(starSystemRng, starType);
+                const companionStar = new Star(companionX, companionY, companionType);
+                companionStar.initWithSeed(starSystemRng, companionType);
+                
+                // Add both stars to the chunk
+                chunk.celestialStars.push(star);
+                chunk.celestialStars.push(companionStar);
+            } else {
+                // Single star system
+                chunk.celestialStars.push(star);
+            }
             
             // Generate planets for this star system with weighted distribution (0-12 planets)
             // Weighted to favor 2-5 planets per star for realistic systems
@@ -165,8 +218,6 @@ class ChunkManager {
                 star.addPlanet(planet);
                 chunk.planets.push(planet);
             }
-            
-            chunk.celestialStars.push(star);
         }
 
         this.activeChunks.set(chunkKey, chunk);
@@ -500,6 +551,100 @@ class ChunkManager {
         }
         
         return discoveredStars;
+    }
+    
+    // Score a potential star system position based on distance from existing systems
+    scoreStarSystemPosition(x, y, currentChunkX, currentChunkY) {
+        const minDistance = 1200; // Minimum distance between star systems
+        const preferredDistance = 1800; // Preferred distance for optimal spacing
+        
+        let score = 1.0; // Start with perfect score
+        
+        // Check neighboring chunks for existing star systems
+        for (let dx = -2; dx <= 2; dx++) {
+            for (let dy = -2; dy <= 2; dy++) {
+                const neighborChunkX = currentChunkX + dx;
+                const neighborChunkY = currentChunkY + dy;
+                const chunkKey = this.getChunkKey(neighborChunkX, neighborChunkY);
+                const chunk = this.activeChunks.get(chunkKey);
+                
+                // If chunk exists, check distances to its star systems
+                if (chunk && chunk.celestialStars) {
+                    for (const star of chunk.celestialStars) {
+                        const distance = Math.sqrt(Math.pow(x - star.x, 2) + Math.pow(y - star.y, 2));
+                        
+                        // Penalize positions too close to existing systems
+                        if (distance < minDistance) {
+                            score *= 0.1; // Heavy penalty for violating minimum distance
+                        } else if (distance < preferredDistance) {
+                            // Gradual penalty for being closer than preferred
+                            const penalty = (distance - minDistance) / (preferredDistance - minDistance);
+                            score *= (0.3 + 0.7 * penalty);
+                        }
+                        // Positions at preferred distance or farther get no penalty
+                    }
+                }
+            }
+        }
+        
+        return score;
+    }
+    
+    // Select appropriate companion star type for binary systems
+    selectCompanionStarType(rng, primaryStarType) {
+        // Import star types for reference
+        const StarTypes = window.StarTypes;
+        
+        // Companion stars are typically smaller than the primary
+        // Create weighted distribution favoring smaller star types
+        const companionWeights = [];
+        
+        // If primary is a giant, companion is usually a dwarf
+        if (primaryStarType === StarTypes.RED_GIANT || primaryStarType === StarTypes.BLUE_GIANT) {
+            companionWeights.push(
+                { type: StarTypes.M_TYPE, weight: 0.4 },
+                { type: StarTypes.K_TYPE, weight: 0.3 },
+                { type: StarTypes.G_TYPE, weight: 0.2 },
+                { type: StarTypes.WHITE_DWARF, weight: 0.1 }
+            );
+        }
+        // If primary is main sequence, companion can be similar or smaller
+        else if (primaryStarType === StarTypes.G_TYPE || primaryStarType === StarTypes.K_TYPE) {
+            companionWeights.push(
+                { type: StarTypes.M_TYPE, weight: 0.5 },
+                { type: StarTypes.K_TYPE, weight: 0.3 },
+                { type: StarTypes.G_TYPE, weight: 0.2 }
+            );
+        }
+        // If primary is M-type, companion is usually also M-type or white dwarf
+        else if (primaryStarType === StarTypes.M_TYPE) {
+            companionWeights.push(
+                { type: StarTypes.M_TYPE, weight: 0.7 },
+                { type: StarTypes.WHITE_DWARF, weight: 0.3 }
+            );
+        }
+        // For exotic primaries, use diverse companions
+        else {
+            companionWeights.push(
+                { type: StarTypes.M_TYPE, weight: 0.4 },
+                { type: StarTypes.K_TYPE, weight: 0.3 },
+                { type: StarTypes.WHITE_DWARF, weight: 0.3 }
+            );
+        }
+        
+        // Select companion based on weighted distribution
+        const totalWeight = companionWeights.reduce((sum, item) => sum + item.weight, 0);
+        let randomValue = rng.nextFloat(0, totalWeight);
+        
+        for (const item of companionWeights) {
+            randomValue -= item.weight;
+            if (randomValue <= 0) {
+                return item.type;
+            }
+        }
+        
+        // Fallback to M-type if something goes wrong
+        return StarTypes.M_TYPE;
     }
 }
 
