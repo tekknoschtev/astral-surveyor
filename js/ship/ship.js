@@ -10,14 +10,76 @@ class Ship {
             '#': '#00ff88'  // Nice green color matching the UI
         };
         this.scale = 2;
+        this.normalColor = '#00ff88';  // Store normal color for silhouette calculations
+        this.silhouetteColor = '#000000';  // Dark silhouette color
     }
 
-    render(renderer, rotation = 0) {
+    // Calculate silhouette effect when ship passes in front of stars
+    calculateSilhouetteEffect(cameraX, cameraY, activeStars) {
+        let maxDarkeningFactor = 0.0;
+        
+        // Check each active celestial star
+        for (const star of activeStars) {
+            // Calculate distance from ship (camera position) to star center
+            const dx = cameraX - star.x;
+            const dy = cameraY - star.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Start darkening effect when approaching star edge (extend radius by 30%)
+            const effectRadius = star.radius * 1.3;
+            
+            // If ship is within the extended effect radius, calculate darkening
+            if (distance < effectRadius) {
+                // Calculate proximity factor (0.0 at effect edge, 1.0 at star center)
+                const proximityFactor = Math.max(0.0, (effectRadius - distance) / effectRadius);
+                
+                // Apply more aggressive darkening curve for earlier effect
+                const darkeningFactor = Math.pow(proximityFactor, 0.5); // Faster darkening as ship approaches
+                
+                // Use the strongest darkening effect if multiple stars overlap
+                maxDarkeningFactor = Math.max(maxDarkeningFactor, darkeningFactor);
+            }
+        }
+        
+        return Math.min(1.0, maxDarkeningFactor); // Clamp to [0.0, 1.0]
+    }
+
+    // Interpolate between two hex colors
+    interpolateColor(color1, color2, factor) {
+        // Parse hex colors
+        const hex1 = color1.replace('#', '');
+        const hex2 = color2.replace('#', '');
+        
+        const r1 = parseInt(hex1.substr(0, 2), 16);
+        const g1 = parseInt(hex1.substr(2, 2), 16);
+        const b1 = parseInt(hex1.substr(4, 2), 16);
+        
+        const r2 = parseInt(hex2.substr(0, 2), 16);
+        const g2 = parseInt(hex2.substr(2, 2), 16);
+        const b2 = parseInt(hex2.substr(4, 2), 16);
+        
+        // Interpolate each component
+        const r = Math.round(r1 + (r2 - r1) * factor);
+        const g = Math.round(g1 + (g2 - g1) * factor);
+        const b = Math.round(b1 + (b2 - b1) * factor);
+        
+        // Convert back to hex
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+
+    render(renderer, rotation = 0, cameraX = 0, cameraY = 0, activeStars = []) {
         const centerX = Math.floor(renderer.canvas.width / 2) - 2 * this.scale;
         const centerY = Math.floor(renderer.canvas.height / 2) - 2 * this.scale;
         
+        // Calculate silhouette effect based on proximity to stars
+        const silhouetteFactor = this.calculateSilhouetteEffect(cameraX, cameraY, activeStars);
+        
+        // Determine the ship color based on silhouette effect
+        const shipColor = this.interpolateColor(this.normalColor, this.silhouetteColor, silhouetteFactor);
+        
+        // Create sprite with current color (normal or silhouetted)
         const coloredSprite = this.sprite.map(row => 
-            row.split('').map(char => this.colors[char] || char)
+            row.split('').map(char => char === '#' ? shipColor : char)
         );
         
         renderer.drawSprite(centerX, centerY, coloredSprite, this.scale, rotation);
