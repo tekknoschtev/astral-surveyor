@@ -396,7 +396,7 @@ class Star extends CelestialObject {
         // Set size based on star type
         const baseRadius = 80 + Math.random() * 60; // 80-140 pixels base
         this.radius = baseRadius * this.starType.sizeMultiplier;
-        this.discoveryDistance = this.radius + 80;
+        this.discoveryDistance = this.radius + 400;
         
         // Set color from star type's color palette
         this.color = this.starType.colors[Math.floor(Math.random() * this.starType.colors.length)];
@@ -422,7 +422,7 @@ class Star extends CelestialObject {
         // Set size based on star type using seeded random
         const baseRadius = rng.nextFloat(80, 140); // 80-140 pixels base
         this.radius = baseRadius * this.starType.sizeMultiplier;
-        this.discoveryDistance = this.radius + 80;
+        this.discoveryDistance = this.radius + 400;
         
         // Set color from star type's color palette using seeded random
         this.color = rng.choice(this.starType.colors);
