@@ -234,6 +234,7 @@ class StellarMap {
         }
     }
 
+
     renderStarLabel(ctx, star, starMapX, starMapY) {
         if (!this.namingService) return;
         
