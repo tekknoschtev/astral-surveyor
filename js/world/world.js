@@ -753,13 +753,134 @@ class ChunkManager {
     }
 }
 
-// Infinite starfield using chunk-based generation
+// Infinite starfield using chunk-based generation with parallax layers
 class InfiniteStarField {
     constructor(chunkManager) {
         this.chunkManager = chunkManager;
+        
+        // Initialize parallax layers with different depths and movement speeds
+        this.parallaxLayers = [
+            {
+                stars: new Map(), // Key: "x,y", Value: star array for that position
+                depth: 0.1,       // Very distant stars, move 10% of camera speed
+                density: 0.3,     // Lower density for distant stars
+                brightnesRange: [0.1, 0.3], // Dimmer distant stars
+                sizeRange: [1, 1], // Small distant stars
+                colors: ['#666688', '#555577', '#444466'] // Dimmer colors
+            },
+            {
+                stars: new Map(),
+                depth: 0.3,       // Mid-distance stars, move 30% of camera speed
+                density: 0.5,
+                brightnesRange: [0.2, 0.5],
+                sizeRange: [1, 1],
+                colors: ['#888899', '#7788aa', '#6677bb']
+            },
+            {
+                stars: new Map(),
+                depth: 0.6,       // Closer stars, move 60% of camera speed
+                density: 0.7,
+                brightnesRange: [0.3, 0.7],
+                sizeRange: [1, 2],
+                colors: ['#aabbcc', '#99aadd', '#88bbee']
+            }
+        ];
+        
+        // Track camera position for parallax calculations
+        this.lastCameraX = 0;
+        this.lastCameraY = 0;
+    }
+
+    // Generate parallax stars for a given screen region
+    generateParallaxStars(layer, regionX, regionY, regionSize) {
+        const regionKey = `${regionX},${regionY}`;
+        
+        if (layer.stars.has(regionKey)) {
+            return layer.stars.get(regionKey);
+        }
+        
+        // Use seeded random based on region position and layer depth
+        const seed = hashPosition(regionX, regionY) ^ Math.floor(layer.depth * 1000000);
+        const rng = new SeededRandom(seed);
+        
+        const stars = [];
+        const starCount = Math.floor(regionSize * regionSize * layer.density / 100000); // Density per 100k pixels
+        
+        for (let i = 0; i < starCount; i++) {
+            stars.push({
+                x: regionX + rng.nextFloat(0, regionSize),
+                y: regionY + rng.nextFloat(0, regionSize),
+                brightness: rng.nextFloat(layer.brightnesRange[0], layer.brightnesRange[1]),
+                size: rng.nextInt(layer.sizeRange[0], layer.sizeRange[1]),
+                color: rng.choice(layer.colors)
+            });
+        }
+        
+        layer.stars.set(regionKey, stars);
+        return stars;
     }
 
     render(renderer, camera) {
+        const { canvas } = renderer;
+        
+        // Render parallax background layers first (back to front)
+        this.renderParallaxLayers(renderer, camera);
+        
+        // Then render the original chunk-based stars (these are "foreground" stars)
+        this.renderChunkStars(renderer, camera);
+        
+        // Update camera tracking
+        this.lastCameraX = camera.x;
+        this.lastCameraY = camera.y;
+    }
+    
+    renderParallaxLayers(renderer, camera) {
+        const { canvas } = renderer;
+        const regionSize = 2000; // Size of each parallax region
+        
+        // Calculate which regions we need to cover the screen for each parallax layer
+        for (const layer of this.parallaxLayers) {
+            // Calculate effective camera position for this depth layer
+            const effectiveCameraX = camera.x * layer.depth;
+            const effectiveCameraY = camera.y * layer.depth;
+            
+            // Determine region bounds to cover screen
+            const leftRegion = Math.floor((effectiveCameraX - canvas.width * 0.5) / regionSize) * regionSize;
+            const rightRegion = Math.floor((effectiveCameraX + canvas.width * 0.5) / regionSize) * regionSize;
+            const topRegion = Math.floor((effectiveCameraY - canvas.height * 0.5) / regionSize) * regionSize;
+            const bottomRegion = Math.floor((effectiveCameraY + canvas.height * 0.5) / regionSize) * regionSize;
+            
+            // Generate and render stars for each needed region
+            for (let regionX = leftRegion; regionX <= rightRegion; regionX += regionSize) {
+                for (let regionY = topRegion; regionY <= bottomRegion; regionY += regionSize) {
+                    const stars = this.generateParallaxStars(layer, regionX, regionY, regionSize);
+                    
+                    for (const star of stars) {
+                        // Convert star world position to screen position using effective camera
+                        const screenX = canvas.width * 0.5 + (star.x - effectiveCameraX);
+                        const screenY = canvas.height * 0.5 + (star.y - effectiveCameraY);
+                        
+                        // Only render stars that are on screen (with margin)
+                        if (screenX >= -10 && screenX <= canvas.width + 10 && 
+                            screenY >= -10 && screenY <= canvas.height + 10) {
+                            
+                            // Calculate alpha based on brightness
+                            const alpha = Math.floor(star.brightness * 255).toString(16).padStart(2, '0');
+                            const colorWithAlpha = star.color + alpha;
+                            
+                            if (star.size > 1) {
+                                renderer.drawCircle(screenX, screenY, star.size, colorWithAlpha);
+                            } else {
+                                renderer.drawPixel(screenX, screenY, colorWithAlpha);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    renderChunkStars(renderer, camera) {
         const { canvas } = renderer;
         const activeObjects = this.chunkManager.getAllActiveObjects();
         
