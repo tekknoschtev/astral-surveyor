@@ -108,7 +108,8 @@ class Camera {
         if (this.isCoasting) {
             for (const obj of celestialObjects) {
                 const distance = obj.distanceToShip(this);
-                const brakeDistance = obj.discoveryDistance + 40; // Start braking closer for natural approach
+                // Use separate braking distance for stars, or fall back to discovery distance + 40 for other objects
+                const brakeDistance = obj.brakingDistance ? obj.brakingDistance + 40 : obj.discoveryDistance + 40;
                 
                 if (distance < brakeDistance) {
                     const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
