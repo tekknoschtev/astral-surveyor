@@ -144,6 +144,54 @@ class NamingService {
     }
 
     /**
+     * Generate moon designation following IAU convention
+     * Examples: "ASV-2847 b I", "ASV-2847 c II", "ASV-2847 EX I"
+     */
+    generateMoonName(moon) {
+        if (!moon.parentPlanet) {
+            return 'Unknown Moon'; // Shouldn't happen in normal gameplay
+        }
+        
+        const planetName = this.generatePlanetName(moon.parentPlanet);
+        
+        // Calculate moon index based on orbital distance from parent planet
+        const moonIndex = this.calculateMoonIndex(moon);
+        const romanNumeral = this.toRomanNumeral(moonIndex + 1); // Start from I, not 0
+        
+        return `${planetName} ${romanNumeral}`;
+    }
+
+    /**
+     * Calculate moon's index around its parent planet based on orbital distance
+     */
+    calculateMoonIndex(moon) {
+        if (!moon.parentPlanet) {
+            return 0;
+        }
+        
+        // Get all moons of the parent planet from the world manager
+        // We need to check the active chunks for other moons of the same planet
+        const parentX = Math.floor(moon.parentPlanet.x);
+        const parentY = Math.floor(moon.parentPlanet.y);
+        
+        // For now, use a simple hash-based approach for consistent ordering
+        // This ensures the same moon always gets the same index
+        const moonDistance = Math.floor(moon.orbitalDistance);
+        const hash = this.hashCoordinate(parentX + parentY + moonDistance);
+        return hash % 4; // Limit to 4 moon indices (I, II, III, IV)
+    }
+
+    /**
+     * Convert number to Roman numeral (for moon designations)
+     */
+    toRomanNumeral(num) {
+        const romanNumerals = [
+            '', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'
+        ];
+        return romanNumerals[num] || num.toString();
+    }
+
+    /**
      * Calculate planet's index in its star system based on orbital distance
      */
     calculatePlanetIndex(planet) {
@@ -167,6 +215,8 @@ class NamingService {
             return `${this.catalogPrefix}-${catalogNumber}`;
         } else if (object.type === 'planet') {
             return this.generatePlanetName(object);
+        } else if (object.type === 'moon') {
+            return this.generateMoonName(object);
         }
         
         return 'Unknown Object';

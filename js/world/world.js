@@ -42,6 +42,7 @@ class ChunkManager {
             y: chunkY,
             stars: [],
             planets: [],
+            moons: [], // Discoverable moons orbiting planets
             celestialStars: [] // Discoverable stars (different from background stars)
         };
 
@@ -217,6 +218,9 @@ class ChunkManager {
                 // Add planet to both the star's planet list and the chunk
                 star.addPlanet(planet);
                 chunk.planets.push(planet);
+                
+                // Generate moons for this planet based on rarity rules
+                this.generateMoonsForPlanet(planet, starSystemRng, chunk);
             }
         }
 
@@ -444,11 +448,12 @@ class ChunkManager {
     }
 
     getAllActiveObjects() {
-        const objects = { stars: [], planets: [], celestialStars: [] };
+        const objects = { stars: [], planets: [], moons: [], celestialStars: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
             objects.planets.push(...chunk.planets);
+            objects.moons.push(...chunk.moons);
             objects.celestialStars.push(...chunk.celestialStars);
         }
 
@@ -553,6 +558,49 @@ class ChunkManager {
         return discoveredStars;
     }
     
+    getDiscoveredMoons() {
+        const discoveredMoons = [];
+        
+        // Get all discovered objects that are moons
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('moon_')) {
+                // Extract coordinates from object ID
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const planetX = parseFloat(parts[1]);
+                    const planetY = parseFloat(parts[2]);
+                    
+                    // Find the moon in active chunks
+                    let moonData = null;
+                    
+                    for (const chunk of this.activeChunks.values()) {
+                        for (const moon of chunk.moons) {
+                            if (moon.parentPlanet && 
+                                Math.floor(moon.parentPlanet.x) === Math.floor(planetX) && 
+                                Math.floor(moon.parentPlanet.y) === Math.floor(planetY)) {
+                                moonData = {
+                                    x: moon.x,
+                                    y: moon.y,
+                                    parentPlanetX: moon.parentPlanet.x,
+                                    parentPlanetY: moon.parentPlanet.y,
+                                    timestamp: discoveryData.timestamp
+                                };
+                                break;
+                            }
+                        }
+                        if (moonData) break;
+                    }
+                    
+                    if (moonData) {
+                        discoveredMoons.push(moonData);
+                    }
+                }
+            }
+        }
+        
+        return discoveredMoons;
+    }
+    
     // Score a potential star system position based on distance from existing systems
     scoreStarSystemPosition(x, y, currentChunkX, currentChunkY) {
         const minDistance = 1200; // Minimum distance between star systems
@@ -588,6 +636,63 @@ class ChunkManager {
         }
         
         return score;
+    }
+    
+    // Generate moons for a planet based on rarity rules
+    generateMoonsForPlanet(planet, rng, chunk) {
+        // Determine moon probability based on planet type and size
+        let moonChance = 0;
+        let maxMoons = 0;
+        
+        // Gas giants have the highest chance of moons
+        if (planet.planetType === PlanetTypes.GAS_GIANT) {
+            moonChance = 0.6; // 60% chance
+            maxMoons = 4;
+        }
+        // Large rocky/ocean planets can have moons
+        else if ((planet.planetType === PlanetTypes.ROCKY || planet.planetType === PlanetTypes.OCEAN) && planet.radius > 15) {
+            moonChance = 0.25; // 25% chance for large planets
+            maxMoons = 2;
+        }
+        // Other planet types have low chance of moons
+        else {
+            moonChance = 0.10; // 10% chance
+            maxMoons = 1;
+        }
+        
+        // Roll for moon generation
+        if (rng.nextFloat(0, 1) > moonChance) {
+            return; // No moons for this planet
+        }
+        
+        // Determine number of moons
+        const moonCount = rng.nextInt(1, maxMoons);
+        
+        for (let i = 0; i < moonCount; i++) {
+            // Calculate moon orbital parameters
+            const minDistance = planet.radius + 15; // Minimum safe distance from planet
+            const maxDistance = planet.radius + 50; // Maximum distance (closer than planets)
+            const orbitalDistance = rng.nextFloat(minDistance, maxDistance);
+            
+            // Random starting angle
+            const orbitalAngle = rng.nextFloat(0, Math.PI * 2);
+            
+            // Fast orbital speed (complete orbit in 10-30 seconds)
+            const baseSpeed = 0.2; // Base speed in radians per second
+            const speedVariation = rng.nextFloat(0.7, 1.3); // ±30% variation
+            const orbitalSpeed = baseSpeed * speedVariation;
+            
+            // Calculate initial position
+            const moonX = planet.x + Math.cos(orbitalAngle) * orbitalDistance;
+            const moonY = planet.y + Math.sin(orbitalAngle) * orbitalDistance;
+            
+            // Create the moon
+            const moon = new Moon(moonX, moonY, planet, orbitalDistance, orbitalAngle, orbitalSpeed);
+            moon.initWithSeed(rng, planet, orbitalDistance, orbitalAngle, orbitalSpeed);
+            
+            // Add moon to the chunk
+            chunk.moons.push(moon);
+        }
     }
     
     // Select appropriate companion star type for binary systems

@@ -103,11 +103,14 @@ class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects = [...activeObjects.planets, ...activeObjects.celestialStars];
+        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars];
         
-        // Update orbital positions for all planets
+        // Update orbital positions for all planets and moons
         for (const planet of activeObjects.planets) {
             planet.updatePosition(deltaTime);
+        }
+        for (const moon of activeObjects.moons) {
+            moon.updatePosition(deltaTime);
         }
         
         // Restore discovery state for newly loaded objects
@@ -181,6 +184,9 @@ class Game {
             return obj.planetTypeName === 'Exotic World' || 
                    obj.planetTypeName === 'Volcanic World' || 
                    obj.planetTypeName === 'Frozen World';
+        } else if (obj.type === 'moon') {
+            // All moon discoveries are notable due to smaller discovery radius
+            return true;
         }
         return false;
     }
@@ -218,6 +224,9 @@ class Game {
         // Render celestial objects from active chunks
         const activeObjects = this.chunkManager.getAllActiveObjects();
         for (const obj of activeObjects.planets) {
+            obj.render(this.renderer, this.camera);
+        }
+        for (const obj of activeObjects.moons) {
             obj.render(this.renderer, this.camera);
         }
         for (const obj of activeObjects.celestialStars) {
