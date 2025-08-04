@@ -11,6 +11,7 @@ class Game {
         this.thrusterParticles = new ThrusterParticles();
         this.starParticles = new StarParticles();
         this.discoveryDisplay = new DiscoveryDisplay();
+        this.discoveryLogbook = new DiscoveryLogbook();
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
         this.touchUI = new TouchUI();
@@ -71,9 +72,18 @@ class Game {
             this.stellarMap.toggle();
         }
         
-        // Handle map close (Escape key)
-        if (this.input.wasJustPressed('Escape') && this.stellarMap.isVisible()) {
-            this.stellarMap.toggle();
+        // Handle logbook toggle (L key)
+        if (this.input.wasJustPressed('KeyL')) {
+            this.discoveryLogbook.toggle();
+        }
+        
+        // Handle map/logbook close (Escape key)
+        if (this.input.wasJustPressed('Escape')) {
+            if (this.stellarMap.isVisible()) {
+                this.stellarMap.toggle();
+            } else if (this.discoveryLogbook.isVisible()) {
+                this.discoveryLogbook.toggle();
+            }
         }
         
         // Handle mouse clicks on stellar map
@@ -120,18 +130,27 @@ class Game {
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
         this.discoveryDisplay.update(deltaTime);
+        this.discoveryLogbook.update(deltaTime, this.input);
         this.stellarMap.update(deltaTime, this.camera, this.input);
         this.touchUI.update(deltaTime, this.renderer.canvas, this.stellarMap);
+        
+        // Handle mouse wheel scrolling for logbook
+        const wheelDelta = this.input.getWheelDelta();
+        if (wheelDelta !== 0 && this.discoveryLogbook.isMouseOver(this.input.mouseX, this.input.mouseY, this.renderer.canvas.width, this.renderer.canvas.height)) {
+            this.discoveryLogbook.handleMouseWheel(wheelDelta);
+        }
         
         // Check for discoveries
         for (const obj of celestialObjects) {
             if (obj.checkDiscovery(this.camera)) {
                 // Generate proper astronomical name for the discovery
                 const objectName = this.namingService.generateDisplayName(obj);
-                const objectType = obj.type === 'planet' ? obj.planetTypeName : obj.starTypeName;
+                const objectType = obj.type === 'planet' ? obj.planetTypeName : 
+                                  obj.type === 'moon' ? 'Moon' : obj.starTypeName;
                 
                 // Add discovery with proper name
                 this.discoveryDisplay.addDiscovery(objectName, objectType);
+                this.discoveryLogbook.addDiscovery(objectName, objectType);
                 this.chunkManager.markObjectDiscovered(obj, objectName);
                 
                 // Log shareable URL for rare discoveries with proper designation
@@ -237,6 +256,7 @@ class Game {
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation);
         this.discoveryDisplay.render(this.renderer, this.camera);
+        this.discoveryLogbook.render(this.renderer, this.camera);
         
         // Render stellar map overlay (renders on top of everything)
         const discoveredStars = this.chunkManager.getDiscoveredStars();

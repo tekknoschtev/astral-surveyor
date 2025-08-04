@@ -10,6 +10,7 @@ class Input {
         this.touchConsumed = false; // Track if touch was consumed by UI
         this.mouseX = 0;
         this.mouseY = 0;
+        this.wheelDeltaY = 0; // Mouse wheel delta
         
         // Multi-touch gesture support
         this.touches = new Map(); // Track multiple touches
@@ -62,6 +63,11 @@ class Input {
             } else if (e.button === 2) {
                 this.rightMousePressed = false;
             }
+        });
+
+        // Mouse wheel events
+        window.addEventListener('wheel', (e) => {
+            this.wheelDeltaY = e.deltaY;
         });
 
         // Enhanced touch events for mobile with multi-touch support
@@ -142,10 +148,15 @@ class Input {
         this.mouseClicked = false;
         this.pinchGesture = null; // Clear pinch gesture each frame
         this.touchConsumed = false; // Reset touch consumption flag
+        this.wheelDeltaY = 0; // Clear wheel delta each frame
     }
 
     wasClicked() {
         return this.mouseClicked;
+    }
+
+    getWheelDelta() {
+        return this.wheelDeltaY;
     }
 
     // Multi-touch gesture methods
