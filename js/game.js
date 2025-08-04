@@ -254,7 +254,7 @@ class Game {
         
         this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
-        this.ship.render(this.renderer, this.camera.rotation);
+        this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars);
         this.discoveryDisplay.render(this.renderer, this.camera);
         this.discoveryLogbook.render(this.renderer, this.camera);
         
