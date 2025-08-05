@@ -19,12 +19,18 @@ class ChunkManager {
     }
 
     getObjectId(x, y, type, object = null) {
-        // For orbiting planets, use parent star position plus orbital distance for stable ID
-        if (object && object.type === 'planet' && object.parentStar) {
+        // For orbiting planets, use parent star position plus planet index for stable unique ID
+        if (object && object.type === 'planet' && object.parentStar && object.planetIndex !== undefined) {
             const starX = Math.floor(object.parentStar.x);
             const starY = Math.floor(object.parentStar.y);
-            const orbitalDistance = Math.floor(object.orbitalDistance);
-            return `${type}_${starX}_${starY}_orbit_${orbitalDistance}`;
+            return `${type}_${starX}_${starY}_planet_${object.planetIndex}`;
+        }
+        
+        // For orbiting moons, use parent planet position plus moon index for stable unique ID
+        if (object && object.type === 'moon' && object.parentPlanet && object.moonIndex !== undefined) {
+            const planetX = Math.floor(object.parentPlanet.x);
+            const planetY = Math.floor(object.parentPlanet.y);
+            return `${type}_${planetX}_${planetY}_moon_${object.moonIndex}`;
         }
         
         // For regular objects, use their position
@@ -213,7 +219,7 @@ class ChunkManager {
                 
                 // Create the planet with orbital properties and type
                 const planet = new Planet(planetX, planetY, star, orbitalDistance, orbitalAngle, orbitalSpeed, planetType);
-                planet.initWithSeed(starSystemRng, star, orbitalDistance, orbitalAngle, orbitalSpeed, planetType);
+                planet.initWithSeed(starSystemRng, star, orbitalDistance, orbitalAngle, orbitalSpeed, planetType, j);
                 
                 // Add planet to both the star's planet list and the chunk
                 star.addPlanet(planet);
@@ -688,7 +694,7 @@ class ChunkManager {
             
             // Create the moon
             const moon = new Moon(moonX, moonY, planet, orbitalDistance, orbitalAngle, orbitalSpeed);
-            moon.initWithSeed(rng, planet, orbitalDistance, orbitalAngle, orbitalSpeed);
+            moon.initWithSeed(rng, planet, orbitalDistance, orbitalAngle, orbitalSpeed, i);
             
             // Add moon to the chunk
             chunk.moons.push(moon);

@@ -71,13 +71,18 @@ class Planet extends CelestialObject {
     }
 
     // Initialize planet with seeded random for deterministic generation
-    initWithSeed(rng, parentStar = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, planetType = null) {
+    initWithSeed(rng, parentStar = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, planetType = null, planetIndex = null) {
         // Update orbital properties if provided
         if (parentStar) {
             this.parentStar = parentStar;
             this.orbitalDistance = orbitalDistance;
             this.orbitalAngle = orbitalAngle;
             this.orbitalSpeed = orbitalSpeed;
+        }
+        
+        // Store planet index for unique ID generation
+        if (planetIndex !== null) {
+            this.planetIndex = planetIndex;
         }
         
         // Update planet type if provided
@@ -116,11 +121,10 @@ class Planet extends CelestialObject {
 
     generateUniqueId() {
         // Use the same logic as the world manager's getObjectId for consistency
-        if (this.parentStar) {
+        if (this.parentStar && this.planetIndex !== undefined) {
             const starX = Math.floor(this.parentStar.x);
             const starY = Math.floor(this.parentStar.y);
-            const orbitalDistance = Math.floor(this.orbitalDistance);
-            return `planet_${starX}_${starY}_orbit_${orbitalDistance}`;
+            return `planet_${starX}_${starY}_planet_${this.planetIndex}`;
         }
         // Fallback for planets without parent stars
         return `planet_${Math.floor(this.x)}_${Math.floor(this.y)}`;
@@ -760,13 +764,18 @@ class Moon extends CelestialObject {
     }
 
     // Initialize moon with seeded random for deterministic generation
-    initWithSeed(rng, parentPlanet = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0) {
+    initWithSeed(rng, parentPlanet = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, moonIndex = null) {
         // Update orbital properties if provided
         if (parentPlanet) {
             this.parentPlanet = parentPlanet;
             this.orbitalDistance = orbitalDistance;
             this.orbitalAngle = orbitalAngle;
             this.orbitalSpeed = orbitalSpeed;
+        }
+        
+        // Store moon index for unique ID generation
+        if (moonIndex !== null) {
+            this.moonIndex = moonIndex;
         }
         
         // Generate unique identifier for this moon
@@ -786,12 +795,11 @@ class Moon extends CelestialObject {
     }
 
     generateUniqueId() {
-        // Use parent planet's position and orbital distance for stable ID
-        if (this.parentPlanet) {
+        // Use parent planet's position and moon index for stable unique ID
+        if (this.parentPlanet && this.moonIndex !== undefined) {
             const planetX = Math.floor(this.parentPlanet.x);
             const planetY = Math.floor(this.parentPlanet.y);
-            const orbitalDistance = Math.floor(this.orbitalDistance);
-            return `moon_${planetX}_${planetY}_orbit_${orbitalDistance}`;
+            return `moon_${planetX}_${planetY}_moon_${this.moonIndex}`;
         }
         // Fallback for moons without parent planets
         return `moon_${Math.floor(this.x)}_${Math.floor(this.y)}`;
