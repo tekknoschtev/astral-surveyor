@@ -44,11 +44,9 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/gam
 - **Emergency Controls**: Instant braking and precise maneuvering for careful exploration
 
 ### 🎵 **Immersive Audio Design**
-- **Ambient Space Atmosphere**: Subtle cosmic background that adapts to your velocity and movement state
 - **Discovery Chimes**: Unique audio signatures for each celestial object type - from deep stellar tones to delicate moon chimes
-- **Ship Audio Feedback**: Gentle thruster and braking sounds that respond to your piloting
-- **Tranquil Sound Design**: All audio designed to enhance calm exploration without overwhelming the peaceful experience
-- **Full Control**: Toggle mute instantly or customize your audio experience
+- **Tranquil Sound Design**: Peaceful discovery tones designed to enhance wonder without overwhelming the exploration experience
+- **Full Control**: Toggle mute instantly with 'H' key, settings saved automatically
 
 ## 🎮 Controls & Interface
 
