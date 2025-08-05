@@ -99,13 +99,6 @@ class DiscoveryLogbook {
 
         // Handle scroll input (only when logbook is visible)
         if (input) {
-            // Use J/K keys for scrolling (vim-style, common in many applications)
-            if (input.wasJustPressed('KeyJ')) {
-                this.handleScroll(1); // J = scroll down
-            } else if (input.wasJustPressed('KeyK')) {
-                this.handleScroll(-1); // K = scroll up
-            }
-            
             // Handle page up/down for faster scrolling
             if (input.wasJustPressed('PageUp')) {
                 this.handleScroll(-5);

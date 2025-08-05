@@ -173,7 +173,7 @@ class Game {
         this.discoveryDisplay.update(deltaTime);
         this.discoveryLogbook.update(deltaTime, this.input);
         this.stellarMap.update(deltaTime, this.camera, this.input);
-        this.touchUI.update(deltaTime, this.renderer.canvas, this.stellarMap);
+        this.touchUI.update(deltaTime, this.renderer.canvas, this.stellarMap, this.discoveryLogbook);
         
         // Handle mouse wheel scrolling for logbook
         const wheelDelta = this.input.getWheelDelta();
@@ -306,6 +306,10 @@ class Game {
                 } else {
                     this.touchUI.hideMapControls();
                 }
+                break;
+                
+            case 'toggleLogbook':
+                this.discoveryLogbook.toggle();
                 break;
                 
             case 'closeMap':

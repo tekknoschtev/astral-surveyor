@@ -22,7 +22,7 @@ class Camera {
         // Distance tracking
         this.totalDistanceTraveled = 0; // Lifetime distance traveled in pixels
         this.sessionDistanceTraveled = 0; // Per-universe distance traveled in pixels
-        this.distanceScale = 1000; // 1 pixel = 1000 meters (1 km) for faster accumulation
+        this.distanceScale = 100000; // 1 pixel = 100,000 meters (100 km) - each displayed km represents 100 km
         
         // Load saved lifetime distance
         this.loadDistanceTraveled();
