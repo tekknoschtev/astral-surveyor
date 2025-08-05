@@ -104,10 +104,10 @@ class StellarMap {
     }
 
     zoomOut() {
-        this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.1);
+        this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.01);
     }
 
-    render(renderer, camera, discoveredStars) {
+    render(renderer, camera, discoveredStars, gameStartingPosition = null) {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -151,6 +151,14 @@ class StellarMap {
         // Draw discovered stars
         this.renderDiscoveredStars(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredStars);
         
+        // Draw origin (0,0) marker
+        this.renderOriginMarker(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale);
+        
+        // Draw starting position marker (only if different from origin)
+        if (gameStartingPosition) {
+            this.renderStartingPositionMarker(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, gameStartingPosition);
+        }
+        
         // Draw current position marker
         this.renderCurrentPosition(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, camera);
         
@@ -165,12 +173,30 @@ class StellarMap {
         ctx.strokeStyle = this.gridColor;
         ctx.lineWidth = 0.5; // Even more subtle lines
         
+        // Dynamic grid size based on zoom level
+        let effectiveGridSize = this.gridSize;
+        if (this.zoomLevel < 0.1) {
+            // Galactic view: very large grid (20000 units)
+            effectiveGridSize = this.gridSize * 10;
+        } else if (this.zoomLevel < 0.5) {
+            // Sector view: large grid (10000 units)
+            effectiveGridSize = this.gridSize * 5;
+        } else if (this.zoomLevel > 5.0) {
+            // Detail view: small grid (500 units)
+            effectiveGridSize = this.gridSize / 4;
+        }
+        
         // Calculate grid line spacing on screen
-        const gridSpacing = this.gridSize * scale;
+        const gridSpacing = effectiveGridSize * scale;
+        
+        // Skip grid rendering if spacing is too small or too large
+        if (gridSpacing < 10 || gridSpacing > mapWidth) {
+            return;
+        }
         
         // Calculate offset based on map center
-        const offsetX = (this.centerX % this.gridSize) * scale;
-        const offsetY = (this.centerY % this.gridSize) * scale;
+        const offsetX = (this.centerX % effectiveGridSize) * scale;
+        const offsetY = (this.centerY % effectiveGridSize) * scale;
         
         // Draw vertical grid lines
         for (let x = mapX - offsetX; x <= mapX + mapWidth; x += gridSpacing) {
@@ -196,22 +222,28 @@ class StellarMap {
     renderDiscoveredStars(ctx, mapX, mapY, mapWidth, mapHeight, scale, discoveredStars) {
         if (!discoveredStars) return;
 
+        // Performance optimization: reduce star detail at extreme zoom out
+        const isExtremeZoomOut = this.zoomLevel < 0.1;
+        const starSize = isExtremeZoomOut ? 1 : 3;
+        const renderLabels = this.zoomLevel > 2.0 || (!isExtremeZoomOut && this.selectedStar);
+
         for (const star of discoveredStars) {
             // Convert world coordinates to map coordinates
             const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * scale;
             const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * scale;
             
-            // Only draw stars within map bounds
-            if (starMapX >= mapX && starMapX <= mapX + mapWidth && 
-                starMapY >= mapY && starMapY <= mapY + mapHeight) {
+            // Expanded bounds check for better culling at extreme zoom
+            const margin = isExtremeZoomOut ? 0 : 10; // No margin needed at extreme zoom
+            if (starMapX >= mapX - margin && starMapX <= mapX + mapWidth + margin && 
+                starMapY >= mapY - margin && starMapY <= mapY + mapHeight + margin) {
                 
                 // Get star color based on type
                 const starColor = this.starColors[star.starTypeName] || '#ffffff';
                 
-                // Draw star as small circle
+                // Draw star as circle (smaller at extreme zoom out)
                 ctx.fillStyle = starColor;
                 ctx.beginPath();
-                ctx.arc(starMapX, starMapY, 3, 0, Math.PI * 2);
+                ctx.arc(starMapX, starMapY, starSize, 0, Math.PI * 2);
                 ctx.fill();
                 
                 // Add selection highlight if this star is selected
@@ -223,8 +255,8 @@ class StellarMap {
                     ctx.stroke();
                 }
                 
-                // Draw star name at higher zoom levels or when selected
-                if (this.zoomLevel > 2.0 || this.selectedStar === star) {
+                // Draw star name at higher zoom levels or when selected (optimized)
+                if (renderLabels && (this.zoomLevel > 2.0 || this.selectedStar === star)) {
                     this.renderStarLabel(ctx, star, starMapX, starMapY);
                 }
             }
@@ -255,6 +287,118 @@ class StellarMap {
         
         // Reset text alignment
         ctx.textAlign = 'left';
+    }
+
+    renderStartingPositionMarker(ctx, mapX, mapY, mapWidth, mapHeight, scale, startingPosition) {
+        // Edge case: Don't render starting position marker if it's the same as origin (0,0)
+        if (startingPosition.x === 0 && startingPosition.y === 0) {
+            return;
+        }
+        
+        // Convert starting position to map coordinates
+        const startMapX = mapX + mapWidth/2 + (startingPosition.x - this.centerX) * scale;
+        const startMapY = mapY + mapHeight/2 + (startingPosition.y - this.centerY) * scale;
+        
+        // Only draw if starting position is within map bounds
+        if (startMapX >= mapX && startMapX <= mapX + mapWidth && 
+            startMapY >= mapY && startMapY <= mapY + mapHeight) {
+            
+            // Use blue color for starting position
+            ctx.strokeStyle = '#4488ff';
+            ctx.fillStyle = '#4488ff40'; // Semi-transparent fill
+            ctx.lineWidth = 2;
+            
+            // Scale marker size based on zoom level
+            const markerSize = Math.max(4, Math.min(10, 6 / this.zoomLevel));
+            
+            // Draw diamond shape
+            ctx.beginPath();
+            ctx.moveTo(startMapX, startMapY - markerSize); // Top
+            ctx.lineTo(startMapX + markerSize, startMapY); // Right
+            ctx.lineTo(startMapX, startMapY + markerSize); // Bottom
+            ctx.lineTo(startMapX - markerSize, startMapY); // Left
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Add label at lower zoom levels
+            if (this.zoomLevel < 0.5) {
+                ctx.fillStyle = '#4488ff';
+                ctx.font = '12px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                
+                // Draw text background for readability
+                const labelText = 'Start';
+                const textWidth = ctx.measureText(labelText).width;
+                const bgPadding = 2;
+                ctx.fillStyle = '#000000C0';
+                ctx.fillRect(startMapX - textWidth/2 - bgPadding, startMapY + markerSize + 5, textWidth + bgPadding*2, 12);
+                
+                // Draw label text
+                ctx.fillStyle = '#4488ff';
+                ctx.fillText(labelText, startMapX, startMapY + markerSize + 15);
+                
+                // Reset text alignment
+                ctx.textAlign = 'left';
+            }
+        }
+    }
+
+    renderOriginMarker(ctx, mapX, mapY, mapWidth, mapHeight, scale) {
+        // Convert origin (0,0) to map coordinates
+        const originMapX = mapX + mapWidth/2 + (0 - this.centerX) * scale;
+        const originMapY = mapY + mapHeight/2 + (0 - this.centerY) * scale;
+        
+        // Only draw if origin is within map bounds
+        if (originMapX >= mapX && originMapX <= mapX + mapWidth && 
+            originMapY >= mapY && originMapY <= mapY + mapHeight) {
+            
+            // Use distinctive red-orange color for origin
+            ctx.strokeStyle = '#ff6644';
+            ctx.fillStyle = '#ff664440'; // Semi-transparent fill
+            ctx.lineWidth = 2;
+            
+            // Scale marker size based on zoom level (larger when zoomed out)
+            const markerSize = Math.max(4, Math.min(12, 8 / this.zoomLevel));
+            const crossSize = markerSize * 1.5;
+            
+            // Draw cross/plus symbol
+            ctx.beginPath();
+            // Horizontal line
+            ctx.moveTo(originMapX - crossSize, originMapY);
+            ctx.lineTo(originMapX + crossSize, originMapY);
+            // Vertical line
+            ctx.moveTo(originMapX, originMapY - crossSize);
+            ctx.lineTo(originMapX, originMapY + crossSize);
+            ctx.stroke();
+            
+            // Draw center circle
+            ctx.beginPath();
+            ctx.arc(originMapX, originMapY, markerSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Add label at lower zoom levels (when zoomed out and origin is more significant)
+            if (this.zoomLevel < 0.5) {
+                ctx.fillStyle = '#ff6644';
+                ctx.font = '12px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                
+                // Draw text background for readability
+                const labelText = '(0,0)';
+                const textWidth = ctx.measureText(labelText).width;
+                const bgPadding = 2;
+                ctx.fillStyle = '#000000C0';
+                ctx.fillRect(originMapX - textWidth/2 - bgPadding, originMapY + crossSize + 5, textWidth + bgPadding*2, 12);
+                
+                // Draw label text
+                ctx.fillStyle = '#ff6644';
+                ctx.fillText(labelText, originMapX, originMapY + crossSize + 15);
+                
+                // Reset text alignment
+                ctx.textAlign = 'left';
+            }
+        }
     }
 
     renderCurrentPosition(ctx, mapX, mapY, mapWidth, mapHeight, scale, camera) {
@@ -316,8 +460,21 @@ class StellarMap {
             y += 15;
         }
         
-        // Zoom info
-        const zoomText = `Zoom: ${this.zoomLevel.toFixed(1)}x`;
+        // Zoom info with descriptive labels
+        let zoomLabel = '';
+        if (this.zoomLevel <= 0.05) {
+            zoomLabel = 'Galactic View';
+        } else if (this.zoomLevel <= 0.2) {
+            zoomLabel = 'Sector View';
+        } else if (this.zoomLevel <= 1.0) {
+            zoomLabel = 'Regional View';
+        } else if (this.zoomLevel <= 3.0) {
+            zoomLabel = 'Local View';
+        } else {
+            zoomLabel = 'Detail View';
+        }
+        
+        const zoomText = `Zoom: ${this.zoomLevel.toFixed(2)}x (${zoomLabel})`;
         const zoomWidth = ctx.measureText(zoomText).width;
         ctx.fillText(zoomText, canvas.width - zoomWidth - 20, canvas.height - 65);
         

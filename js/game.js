@@ -40,6 +40,12 @@ class Game {
             console.log(`📍 Camera positioned at shared coordinates: (${startingCoords.x}, ${startingCoords.y})`);
         }
         
+        // Track starting position for stellar map reference
+        this.gameStartingPosition = {
+            x: this.camera.x,
+            y: this.camera.y
+        };
+        
         // Log lifetime distance traveled
         const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
         if (lifetimeDistance !== '0 km') {
@@ -341,7 +347,7 @@ class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discoveredStars = this.chunkManager.getDiscoveredStars();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars);
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
