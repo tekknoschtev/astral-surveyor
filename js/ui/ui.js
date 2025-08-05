@@ -137,19 +137,23 @@ class DiscoveryDisplay {
         const x = Math.round(camera.x);
         const y = Math.round(camera.y);
         const coordText = `Position: (${x}, ${y})`;
+        const distanceText = `Distance: ${camera.getFormattedDistance()}`;
         
         // Set up font to match game UI (Courier New, 12px)
         renderer.ctx.font = '12px "Courier New", monospace';
         
-        // Calculate width for right alignment
+        // Calculate widths for right alignment
         const coordWidth = renderer.ctx.measureText(coordText).width;
+        const distanceWidth = renderer.ctx.measureText(distanceText).width;
+        const maxWidth = Math.max(coordWidth, distanceWidth);
         
         // Position on the right side of screen
-        const rightX = renderer.canvas.width - coordWidth - padding;
+        const rightX = renderer.canvas.width - maxWidth - padding;
         
-        // Draw coordinates (minimal, no background or instructions)
+        // Draw coordinates and distance (minimal, no background or instructions)
         renderer.ctx.fillStyle = '#b0c4d4'; // Soft blue-white to match new UI
         renderer.ctx.fillText(coordText, rightX, padding + 10);
+        renderer.ctx.fillText(distanceText, rightX, padding + 25); // 15px below coordinates
     }
 }
 

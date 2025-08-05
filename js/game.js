@@ -21,6 +21,10 @@ class Game {
         this.previousThrustState = false;
         this.previousBrakeState = false;
         
+        // Distance saving timer (save every 5 seconds)
+        this.distanceSaveTimer = 0;
+        this.distanceSaveInterval = 5.0;
+        
         // Connect naming service to stellar map
         this.stellarMap.setNamingService(this.namingService);
         this.lastTime = 0;
@@ -34,6 +38,12 @@ class Game {
             this.camera.x = startingCoords.x;
             this.camera.y = startingCoords.y;
             console.log(`📍 Camera positioned at shared coordinates: (${startingCoords.x}, ${startingCoords.y})`);
+        }
+        
+        // Log lifetime distance traveled
+        const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
+        if (lifetimeDistance !== '0 km') {
+            console.log(`🚀 Lifetime distance traveled: ${lifetimeDistance}`);
         }
         
         // Initialize chunks around starting position
@@ -189,6 +199,13 @@ class Game {
                     console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
                 }
             }
+        }
+        
+        // Periodically save distance traveled data
+        this.distanceSaveTimer += deltaTime;
+        if (this.distanceSaveTimer >= this.distanceSaveInterval) {
+            this.camera.saveDistanceTraveled();
+            this.distanceSaveTimer = 0;
         }
         
         // Clear frame state at end of update

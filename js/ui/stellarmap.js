@@ -27,9 +27,6 @@ class StellarMap {
 
     toggle() {
         this.visible = !this.visible;
-        if (this.visible) {
-            console.log('📊 Stellar Map opened');
-        }
     }
 
     isVisible() {

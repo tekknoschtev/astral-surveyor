@@ -25,7 +25,6 @@ class DiscoveryLogbook {
     toggle() {
         this.visible = !this.visible;
         if (this.visible) {
-            console.log('📖 Discovery Logbook opened');
             // Reset scroll to top when opening
             this.scrollOffset = 0;
         }

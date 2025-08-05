@@ -18,6 +18,14 @@ class Camera {
         this.rotation = 0; // Current rotation in radians
         this.targetRotation = 0; // Target rotation based on movement
         this.rotationSpeed = 8; // How fast to rotate (radians per second)
+        
+        // Distance tracking
+        this.totalDistanceTraveled = 0; // Lifetime distance traveled in pixels
+        this.sessionDistanceTraveled = 0; // Per-universe distance traveled in pixels
+        this.distanceScale = 1000; // 1 pixel = 1000 meters (1 km) for faster accumulation
+        
+        // Load saved lifetime distance
+        this.loadDistanceTraveled();
     }
 
     update(input, deltaTime, canvasWidth, canvasHeight, celestialObjects = []) {
@@ -148,8 +156,15 @@ class Camera {
         this.velocityY *= activeFriction;
 
         // Update position based on velocity
-        this.x += this.velocityX * deltaTime;
-        this.y += this.velocityY * deltaTime;
+        const deltaX = this.velocityX * deltaTime;
+        const deltaY = this.velocityY * deltaTime;
+        this.x += deltaX;
+        this.y += deltaY;
+        
+        // Track distance traveled (both session and lifetime)
+        const distanceMoved = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        this.totalDistanceTraveled += distanceMoved;
+        this.sessionDistanceTraveled += distanceMoved;
 
         // Smoothly rotate towards target rotation
         this.smoothRotate(deltaTime);
@@ -182,6 +197,102 @@ class Camera {
         const screenX = worldX - this.x + canvasWidth / 2;
         const screenY = worldY - this.y + canvasHeight / 2;
         return [screenX, screenY];
+    }
+
+    // Distance tracking and conversion methods
+    getFormattedDistance() {
+        // Convert pixels to kilometers directly (1 pixel = 1 km now) - using session distance
+        const kilometers = this.sessionDistanceTraveled * this.distanceScale / 1000;
+        
+        // Convert to AU (1 AU ≈ 149.6 million km)
+        const au = kilometers / 149597870.7;
+        
+        if (au < 0.5) {
+            // Show in whole kilometers with comma separators
+            return `${Math.round(kilometers).toLocaleString()} km`;
+        } else if (au < 50) {
+            // Show in AU with hundredths precision
+            return `${Math.round(au * 100) / 100} AU`;
+        } else {
+            // Convert to light years (1 ly ≈ 9.461 trillion km)
+            const lightYears = kilometers / 9461000000000;
+            return `${Math.round(lightYears * 100) / 100} ly`;
+        }
+    }
+
+    // Get formatted lifetime distance for console logging
+    getFormattedLifetimeDistance() {
+        // Convert pixels to kilometers directly (1 pixel = 1 km now) - using lifetime distance
+        const kilometers = this.totalDistanceTraveled * this.distanceScale / 1000;
+        
+        // Convert to AU (1 AU ≈ 149.6 million km)
+        const au = kilometers / 149597870.7;
+        
+        if (au < 0.5) {
+            // Show in whole kilometers with comma separators
+            return `${Math.round(kilometers).toLocaleString()} km`;
+        } else if (au < 50) {
+            // Show in AU with hundredths precision
+            return `${Math.round(au * 100) / 100} AU`;
+        } else {
+            // Convert to light years (1 ly ≈ 9.461 trillion km)
+            const lightYears = kilometers / 9461000000000;
+            return `${Math.round(lightYears * 100) / 100} ly`;
+        }
+    }
+
+    saveDistanceTraveled() {
+        try {
+            // Save lifetime distance with new key name
+            localStorage.setItem('astralSurveyor_lifetimeDistance', this.totalDistanceTraveled.toString());
+        } catch (error) {
+            console.warn('Could not save lifetime distance:', error);
+        }
+    }
+
+    loadDistanceTraveled() {
+        try {
+            // Try to load from new lifetime distance key first
+            let saved = localStorage.getItem('astralSurveyor_lifetimeDistance');
+            let isLegacyData = false;
+            
+            // If not found, try legacy key for backward compatibility
+            if (saved === null) {
+                saved = localStorage.getItem('astralSurveyor_distanceTraveled');
+                isLegacyData = true;
+            }
+            
+            if (saved !== null) {
+                const savedDistance = parseFloat(saved) || 0;
+                
+                // Handle legacy data conversion
+                if (isLegacyData) {
+                    const scaleVersion = localStorage.getItem('astralSurveyor_distanceScale');
+                    
+                    // Check if this is old data with the previous scale (100m/pixel)
+                    if (scaleVersion !== '1000') {
+                        // Convert old distance from 100m/pixel scale to new 1000m/pixel scale
+                        this.totalDistanceTraveled = savedDistance * 0.1;
+                    } else {
+                        this.totalDistanceTraveled = savedDistance;
+                    }
+                    
+                    // Migrate to new storage key and clean up old keys
+                    this.saveDistanceTraveled();
+                    localStorage.removeItem('astralSurveyor_distanceTraveled');
+                    localStorage.removeItem('astralSurveyor_distanceScale');
+                } else {
+                    // Normal loading from new key
+                    this.totalDistanceTraveled = savedDistance;
+                }
+            }
+            
+            // Session distance always starts at 0
+            this.sessionDistanceTraveled = 0;
+            
+        } catch (error) {
+            console.warn('Could not load lifetime distance:', error);
+        }
     }
 }
 
