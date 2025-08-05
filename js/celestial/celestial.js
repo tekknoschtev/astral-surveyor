@@ -65,6 +65,9 @@ class Planet extends CelestialObject {
         if (this.visualEffects.hasGlow) {
             this.glowColor = this.lightenColor(this.color, 0.3);
         }
+        
+        // Initialize ring system if planet has rings
+        this.hasRings = this.determineRingSystem();
     }
 
     // Initialize planet with seeded random for deterministic generation
@@ -106,6 +109,9 @@ class Planet extends CelestialObject {
         if (this.visualEffects.hasGlow) {
             this.glowColor = this.lightenColor(this.color, 0.3);
         }
+        
+        // Initialize ring system if planet has rings
+        this.hasRings = this.determineRingSystem(rng);
     }
 
     generateUniqueId() {
@@ -129,6 +135,82 @@ class Planet extends CelestialObject {
             hash = hash & hash; // Convert to 32-bit integer
         }
         return Math.abs(hash) % 1000000; // Return positive number
+    }
+
+    // Determine if this planet should have rings based on type and probability
+    determineRingSystem(rng = null) {
+        const ringChance = this.visualEffects.hasRings;
+        
+        // If hasRings is boolean true, planet always has rings
+        if (ringChance === true) return true;
+        
+        // If hasRings is a number, it's a probability
+        if (typeof ringChance === 'number') {
+            if (rng) {
+                return rng.next() < ringChance;
+            } else {
+                return Math.random() < ringChance;
+            }
+        }
+        
+        // Otherwise, no rings
+        return false;
+    }
+
+    // Render ring system around the planet
+    renderRings(renderer, screenX, screenY) {
+        if (!this.hasRings || !this.visualEffects.ringConfig) return;
+        
+        const ctx = renderer.ctx;
+        const config = this.visualEffects.ringConfig;
+        
+        // Ring dimensions
+        const innerRadius = this.radius * config.innerRadius;
+        const outerRadius = this.radius * config.outerRadius;
+        
+        // Draw rings in multiple bands for depth and realism
+        for (let band = 0; band < config.bandCount; band++) {
+            const bandProgress = band / (config.bandCount - 1); // 0.0 to 1.0
+            const currentInner = innerRadius + (outerRadius - innerRadius) * bandProgress * 0.3;
+            const currentOuter = innerRadius + (outerRadius - innerRadius) * (bandProgress * 0.7 + 0.3);
+            
+            // Calculate ring color for this band
+            const colorIndex = Math.floor(bandProgress * (config.colors.length - 1));
+            const ringColor = config.colors[colorIndex];
+            
+            // Apply opacity and shimmer effect if configured
+            let alpha = config.opacity;
+            if (config.hasShimmer) {
+                const time = Date.now() * 0.001;
+                const shimmer = Math.sin(time * 2 + band * 0.5) * 0.2 + 0.8;
+                alpha *= shimmer;
+            }
+            
+            const alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+            
+            // Draw ring segments as elliptical arcs for 3D appearance
+            ctx.strokeStyle = ringColor + alphaHex;
+            ctx.lineWidth = Math.max(1, (currentOuter - currentInner) / 3);
+            
+            // Draw multiple ring segments to create filled appearance
+            const segmentCount = 8;
+            for (let segment = 0; segment < segmentCount; segment++) {
+                const startAngle = (segment / segmentCount) * Math.PI * 2;
+                const endAngle = ((segment + 1) / segmentCount) * Math.PI * 2;
+                
+                // Draw outer ring edge
+                ctx.beginPath();
+                ctx.ellipse(screenX, screenY, currentOuter, currentOuter * 0.3, 0, startAngle, endAngle);
+                ctx.stroke();
+                
+                // Draw inner ring edge for hollow appearance
+                if (currentInner > 0) {
+                    ctx.beginPath();
+                    ctx.ellipse(screenX, screenY, currentInner, currentInner * 0.3, 0, startAngle, endAngle);
+                    ctx.stroke();
+                }
+            }
+        }
     }
 
     updatePosition(deltaTime) {
@@ -187,6 +269,17 @@ class Planet extends CelestialObject {
                 renderer.ctx.fill();
             }
             
+            // Draw back portion of rings (behind planet)
+            if (this.hasRings) {
+                renderer.ctx.save();
+                // Clip to draw only the back portion
+                renderer.ctx.beginPath();
+                renderer.ctx.rect(screenX - this.radius * 3, screenY, this.radius * 6, this.radius * 3);
+                renderer.ctx.clip();
+                this.renderRings(renderer, screenX, screenY);
+                renderer.ctx.restore();
+            }
+            
             // Draw atmosphere if planet has one
             if (this.visualEffects.hasAtmosphere) {
                 const atmosphereRadius = this.radius + 3;
@@ -203,6 +296,17 @@ class Planet extends CelestialObject {
             
             // Draw type-specific visual effects
             this.renderVisualEffects(renderer, screenX, screenY);
+            
+            // Draw front portion of rings (in front of planet)
+            if (this.hasRings) {
+                renderer.ctx.save();
+                // Clip to draw only the front portion
+                renderer.ctx.beginPath();
+                renderer.ctx.rect(screenX - this.radius * 3, screenY - this.radius * 3, this.radius * 6, this.radius * 3);
+                renderer.ctx.clip();
+                this.renderRings(renderer, screenX, screenY);
+                renderer.ctx.restore();
+            }
             
             // Visual indicator if discovered
             if (this.discovered) {
@@ -813,7 +917,15 @@ const PlanetTypes = {
             hasAtmosphere: true,
             hasCraters: false,
             hasStripes: true, // Atmospheric bands
-            hasSwirls: true
+            hasSwirls: true,
+            hasRings: 0.4, // 40% of gas giants have ring systems
+            ringConfig: {
+                innerRadius: 1.4, // Multiple of planet radius
+                outerRadius: 2.2,
+                colors: ['#D4AF37', '#CD853F', '#B8860B'], // Golden/brown ring particles
+                opacity: 0.7,
+                bandCount: 3
+            }
         }
     },
     DESERT: {
@@ -840,7 +952,15 @@ const PlanetTypes = {
             hasCraters: true,
             hasStripes: false,
             hasCrystalline: true,
-            hasGlow: true // Subtle ice glow
+            hasGlow: true, // Subtle ice glow
+            hasRings: 0.3, // 30% chance of icy ring systems
+            ringConfig: {
+                innerRadius: 1.3,
+                outerRadius: 1.8,
+                colors: ['#E0FFFF', '#F0F8FF', '#B0E0E6'], // Icy blue-white particles
+                opacity: 0.5,
+                bandCount: 2
+            }
         }
     },
     VOLCANIC: {
@@ -868,7 +988,16 @@ const PlanetTypes = {
             hasCraters: false,
             hasStripes: false,
             hasGlow: true, // Mysterious glow
-            hasShimmer: true // Special effect
+            hasShimmer: true, // Special effect
+            hasRings: 0.5, // 50% chance of exotic ring systems
+            ringConfig: {
+                innerRadius: 1.5,
+                outerRadius: 2.5,
+                colors: ['#FF69B4', '#9370DB', '#00FFFF'], // Colorful, mysterious particles
+                opacity: 0.8,
+                bandCount: 4,
+                hasShimmer: true // Rings also shimmer
+            }
         }
     }
 };

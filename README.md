@@ -26,9 +26,10 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/gam
 
 ### 🪐 **Rich Planetary Exploration**
 - **7 Planet Types**: Rocky worlds, Ocean planets, Gas Giants, Desert worlds, Frozen planets, Volcanic worlds, and mysterious Exotic worlds
+- **Spectacular Ring Systems**: Gas giants feature beautiful golden rings, frozen worlds may have icy rings, and exotic worlds display colorful shimmering rings
 - **Moon Systems**: Gas giants and large planets can host up to 4 orbiting moons with fast orbital periods
 - **Orbital Mechanics**: Planets and moons follow Kepler's laws with realistic orbital speeds and distances
-- **Visual Variety**: Each world type features unique atmospheric effects, surface patterns, and discovery rewards
+- **Visual Variety**: Each world type features unique atmospheric effects, surface patterns, ring systems, and discovery rewards
 
 ### 🗺️ **Professional Cartography Tools**
 - **Interactive Stellar Map**: Toggle with 'M' to view your expanding chart of discovered systems
@@ -108,11 +109,11 @@ Discover 7 distinct world types, each with unique characteristics:
 |-------------|--------|----------|-----------------|
 | **Rocky** | 35% | Cratered surfaces, no atmosphere | Standard |
 | **Ocean** | 20% | Blue worlds with atmospheric bands | High |
-| **Gas Giant** | 15% | Swirling atmospheric bands, potential moons | High |
+| **Gas Giant** | 15% | Swirling bands, moons, **40% have golden ring systems** | High |
 | **Desert** | 15% | Dune patterns, arid landscapes | Standard |
-| **Frozen** | 8% | Crystalline ice formations, subtle glow | Rare |
+| **Frozen** | 8% | Crystalline formations, glow, **30% have icy rings** | Rare |
 | **Volcanic** | 5% | Lava flows, intense glow effects | Rare |
-| **Exotic** | 2% | Purple worlds with mysterious shimmer | Ultra-rare |
+| **Exotic** | 2% | Purple shimmer, **50% have colorful rings** | Ultra-rare |
 
 ## 🛠️ Technical Features
 
