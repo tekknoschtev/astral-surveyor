@@ -15,6 +15,11 @@ class Game {
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
         this.touchUI = new TouchUI();
+        this.soundManager = new SoundManager();
+        
+        // Track previous ship state for audio triggers
+        this.previousThrustState = false;
+        this.previousBrakeState = false;
         
         // Connect naming service to stellar map
         this.stellarMap.setNamingService(this.namingService);
@@ -62,6 +67,13 @@ class Game {
     update(deltaTime) {
         this.input.update(deltaTime);
         
+        // Resume audio context on first user interaction (required by browsers)
+        if (this.soundManager.context && this.soundManager.context.state === 'suspended') {
+            if (this.input.keys.size > 0 || this.input.mousePressed || this.input.wasClicked()) {
+                this.soundManager.context.resume();
+            }
+        }
+        
         // Handle coordinate copying (C key)
         if (this.input.wasJustPressed('KeyC')) {
             this.copyCurrentCoordinates();
@@ -75,6 +87,12 @@ class Game {
         // Handle logbook toggle (L key)
         if (this.input.wasJustPressed('KeyL')) {
             this.discoveryLogbook.toggle();
+        }
+        
+        // Handle audio mute toggle (H key for "Hush")
+        if (this.input.wasJustPressed('KeyH')) {
+            const isMuted = this.soundManager.toggleMute();
+            this.discoveryDisplay.addNotification(isMuted ? 'Audio muted' : 'Audio unmuted');
         }
         
         // Handle map/logbook close (Escape key)
@@ -129,6 +147,13 @@ class Game {
         this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects);
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
+        
+        // Ambient sounds disabled for now - focusing on discovery chimes only
+        // const velocity = Math.sqrt(this.camera.velocityX ** 2 + this.camera.velocityY ** 2);
+        // this.soundManager.updateAmbientForVelocity(velocity, this.camera.isCoasting);
+        
+        // Ship movement sounds disabled for now - will be tweaked in future
+        // this.updateShipAudio();
         this.discoveryDisplay.update(deltaTime);
         this.discoveryLogbook.update(deltaTime, this.input);
         this.stellarMap.update(deltaTime, this.camera, this.input);
@@ -152,6 +177,9 @@ class Game {
                 this.discoveryDisplay.addDiscovery(objectName, objectType);
                 this.discoveryLogbook.addDiscovery(objectName, objectType);
                 this.chunkManager.markObjectDiscovered(obj, objectName);
+                
+                // Play discovery sound based on object type
+                this.playDiscoverySound(obj, objectType);
                 
                 // Log shareable URL for rare discoveries with proper designation
                 if (this.isRareDiscovery(obj)) {
@@ -208,6 +236,42 @@ class Game {
             return true;
         }
         return false;
+    }
+
+    updateShipAudio() {
+        const isThrusting = this.camera.isThrusting && !this.camera.isBraking;
+        const isBraking = this.camera.isBraking;
+        
+        // Play thrust start sound when beginning to thrust
+        if (isThrusting && !this.previousThrustState) {
+            this.soundManager.playThrusterStart();
+        }
+        
+        // Play brake sound when beginning to brake
+        if (isBraking && !this.previousBrakeState) {
+            this.soundManager.playBrake();
+        }
+        
+        // Update previous states
+        this.previousThrustState = isThrusting;
+        this.previousBrakeState = isBraking;
+    }
+
+    playDiscoverySound(obj, objectType) {
+        if (obj.type === 'star') {
+            this.soundManager.playStarDiscovery(obj.starTypeName);
+        } else if (obj.type === 'planet') {
+            this.soundManager.playPlanetDiscovery(obj.planetTypeName);
+        } else if (obj.type === 'moon') {
+            this.soundManager.playMoonDiscovery();
+        }
+        
+        // Play additional rare discovery sound for special objects
+        if (this.isRareDiscovery(obj)) {
+            setTimeout(() => {
+                this.soundManager.playRareDiscovery();
+            }, 300); // Delay for layered effect
+        }
     }
 
     handleTouchAction(action) {

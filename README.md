@@ -43,6 +43,13 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/gam
 - **Multiple Control Schemes**: Full keyboard, mouse, and touch support for any device
 - **Emergency Controls**: Instant braking and precise maneuvering for careful exploration
 
+### 🎵 **Immersive Audio Design**
+- **Ambient Space Atmosphere**: Subtle cosmic background that adapts to your velocity and movement state
+- **Discovery Chimes**: Unique audio signatures for each celestial object type - from deep stellar tones to delicate moon chimes
+- **Ship Audio Feedback**: Gentle thruster and braking sounds that respond to your piloting
+- **Tranquil Sound Design**: All audio designed to enhance calm exploration without overwhelming the peaceful experience
+- **Full Control**: Toggle mute instantly or customize your audio experience
+
 ## 🎮 Controls & Interface
 
 ### **Desktop Controls**
@@ -51,6 +58,7 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/gam
 - **M**: Toggle stellar map
 - **L**: Toggle discovery logbook
 - **C**: Copy current coordinates to clipboard for sharing
+- **H**: Toggle audio mute/unmute ("Hush")
 - **ESC**: Close open interfaces
 - **J/K**: Scroll through logbook entries (vim-style navigation)
 - **+/-**: Zoom stellar map in/out
