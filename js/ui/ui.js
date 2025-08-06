@@ -138,6 +138,7 @@ class DiscoveryDisplay {
         const y = Math.round(camera.y);
         const coordText = `Position: (${x}, ${y})`;
         const distanceText = `Distance: ${camera.getFormattedDistance()}`;
+        const speedText = `Speed: ${camera.getFormattedSpeed()}`;
         
         // Set up font to match game UI (Courier New, 12px)
         renderer.ctx.font = '12px "Courier New", monospace';
@@ -145,15 +146,17 @@ class DiscoveryDisplay {
         // Calculate widths for right alignment
         const coordWidth = renderer.ctx.measureText(coordText).width;
         const distanceWidth = renderer.ctx.measureText(distanceText).width;
-        const maxWidth = Math.max(coordWidth, distanceWidth);
+        const speedWidth = renderer.ctx.measureText(speedText).width;
+        const maxWidth = Math.max(coordWidth, distanceWidth, speedWidth);
         
         // Position on the right side of screen
         const rightX = renderer.canvas.width - maxWidth - padding;
         
-        // Draw coordinates and distance (minimal, no background or instructions)
+        // Draw coordinates, distance, and speed (minimal, no background or instructions)
         renderer.ctx.fillStyle = '#b0c4d4'; // Soft blue-white to match new UI
         renderer.ctx.fillText(coordText, rightX, padding + 10);
         renderer.ctx.fillText(distanceText, rightX, padding + 25); // 15px below coordinates
+        renderer.ctx.fillText(speedText, rightX, padding + 40); // 15px below distance
     }
 }
 

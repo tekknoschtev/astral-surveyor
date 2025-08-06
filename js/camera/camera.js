@@ -6,7 +6,7 @@ class Camera {
         // Physics properties
         this.velocityX = 0;
         this.velocityY = 0;
-        this.acceleration = 200; // Thrust power (pixels/sec^2)
+        this.acceleration = 50; // Thrust power (pixels/sec^2) - reduced for more gradual acceleration
         this.maxSpeed = 150; // Maximum velocity (pixels/sec) - increased for faster exploration
         this.friction = 0.9999; // Nearly 0% friction for true space coasting
         this.coastingFriction = 1.0; // No friction when coasting
@@ -238,6 +238,40 @@ class Camera {
             // Convert to light years (1 ly ≈ 9.461 trillion km)
             const lightYears = kilometers / 9461000000000;
             return `${Math.round(lightYears * 100) / 100} ly`;
+        }
+    }
+
+    // Get current speed in pixels per second
+    getCurrentSpeed() {
+        return Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+    }
+
+    // Get formatted speed for display
+    getFormattedSpeed() {
+        // Convert pixels/second to km using same scale as distance, but show per second for reasonable values
+        const speedPixelsPerSecond = this.getCurrentSpeed();
+        const kmPerSecond = speedPixelsPerSecond * (this.distanceScale / 1000); // Convert to km/s
+        
+        // Convert to different units based on magnitude
+        if (kmPerSecond < 1) {
+            // Show in km/h for very slow speeds
+            const kmPerHour = kmPerSecond * 3600;
+            if (kmPerHour < 1) {
+                return `${Math.round(kmPerHour * 10) / 10} km/h`;
+            } else {
+                return `${Math.round(kmPerHour).toLocaleString()} km/h`;
+            }
+        } else if (kmPerSecond < 100000) {
+            // Show in km/s for moderate to high speeds
+            return `${Math.round(kmPerSecond * 10) / 10} km/s`;
+        } else {
+            // For very high speeds, show in AU/s
+            const auPerSecond = kmPerSecond / 149597870.7;
+            if (auPerSecond < 1) {
+                return `${Math.round(auPerSecond * 1000000) / 1000000} AU/s`;
+            } else {
+                return `${Math.round(auPerSecond * 100) / 100} AU/s`;
+            }
         }
     }
 
