@@ -356,13 +356,15 @@ class StellarMap {
 
         // Performance optimization: reduce star detail at extreme zoom out
         const isExtremeZoomOut = this.zoomLevel < 0.1;
-        const starSize = isExtremeZoomOut ? 1 : 3;
         const renderLabels = this.zoomLevel > 2.0 || (!isExtremeZoomOut && this.selectedStar);
 
         for (const star of discoveredStars) {
             // Convert world coordinates to map coordinates
             const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * scale;
             const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * scale;
+            
+            // Calculate proportional star size based on zoom level and star type
+            const starSize = this.calculateStarSize(star, isExtremeZoomOut);
             
             // Expanded bounds check for better culling at extreme zoom
             const margin = isExtremeZoomOut ? 0 : 10; // No margin needed at extreme zoom
@@ -372,7 +374,7 @@ class StellarMap {
                 // Get star color based on type
                 const starColor = this.starColors[star.starTypeName] || '#ffffff';
                 
-                // Draw star as circle (smaller at extreme zoom out)
+                // Draw star as circle with proportional sizing
                 ctx.fillStyle = starColor;
                 ctx.beginPath();
                 ctx.arc(starMapX, starMapY, starSize, 0, Math.PI * 2);
@@ -383,7 +385,9 @@ class StellarMap {
                     ctx.strokeStyle = this.currentPositionColor;
                     ctx.lineWidth = 2;
                     ctx.beginPath();
-                    ctx.arc(starMapX, starMapY, 6, 0, Math.PI * 2);
+                    // Scale selection highlight to be proportional to star size
+                    const highlightRadius = Math.max(6, starSize + 2);
+                    ctx.arc(starMapX, starMapY, highlightRadius, 0, Math.PI * 2);
                     ctx.stroke();
                 }
                 
@@ -395,6 +399,35 @@ class StellarMap {
         }
     }
 
+    calculateStarSize(star, isExtremeZoomOut) {
+        // At extreme zoom out, use minimal fixed size for performance
+        if (isExtremeZoomOut) {
+            return 1;
+        }
+        
+        // Get the star's size multiplier from its star type (default 1.0 if not available)
+        const sizeMultiplier = star.starType?.sizeMultiplier || 1.0;
+        
+        // Base size varies by zoom level to show more detail at higher zooms
+        let baseSize;
+        if (this.zoomLevel <= 0.2) {
+            // Galactic/Sector View: minimal differences, focus on visibility
+            baseSize = 2;
+            return Math.max(1, baseSize * (0.8 + sizeMultiplier * 0.4)); // Range: ~1.6-3.2
+        } else if (this.zoomLevel <= 1.0) {
+            // Regional View: moderate size differences become visible
+            baseSize = 3;
+            return Math.max(2, baseSize * (0.6 + sizeMultiplier * 0.8)); // Range: ~1.8-5.4
+        } else if (this.zoomLevel <= 3.0) {
+            // Local View: significant size differences
+            baseSize = 4;
+            return Math.max(2, baseSize * (0.4 + sizeMultiplier * 1.2)); // Range: ~2.6-8.6
+        } else {
+            // Detail View: full proportional sizing - dramatic differences
+            baseSize = 5;
+            return Math.max(2, baseSize * (0.2 + sizeMultiplier * 1.6)); // Range: ~2.6-15.4
+        }
+    }
 
     renderStarLabel(ctx, star, starMapX, starMapY) {
         if (!this.namingService) return;
