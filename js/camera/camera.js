@@ -241,6 +241,40 @@ class Camera {
         }
     }
 
+    // Get current speed in pixels per second
+    getCurrentSpeed() {
+        return Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+    }
+
+    // Get formatted speed for display
+    getFormattedSpeed() {
+        // Convert pixels/second to km using same scale as distance, but show per second for reasonable values
+        const speedPixelsPerSecond = this.getCurrentSpeed();
+        const kmPerSecond = speedPixelsPerSecond * (this.distanceScale / 1000); // Convert to km/s
+        
+        // Convert to different units based on magnitude
+        if (kmPerSecond < 1) {
+            // Show in km/h for very slow speeds
+            const kmPerHour = kmPerSecond * 3600;
+            if (kmPerHour < 1) {
+                return `${Math.round(kmPerHour * 10) / 10} km/h`;
+            } else {
+                return `${Math.round(kmPerHour).toLocaleString()} km/h`;
+            }
+        } else if (kmPerSecond < 100000) {
+            // Show in km/s for moderate to high speeds
+            return `${Math.round(kmPerSecond * 10) / 10} km/s`;
+        } else {
+            // For very high speeds, show in AU/s
+            const auPerSecond = kmPerSecond / 149597870.7;
+            if (auPerSecond < 1) {
+                return `${Math.round(auPerSecond * 1000000) / 1000000} AU/s`;
+            } else {
+                return `${Math.round(auPerSecond * 100) / 100} AU/s`;
+            }
+        }
+    }
+
     saveDistanceTraveled() {
         try {
             // Save lifetime distance with new key name
