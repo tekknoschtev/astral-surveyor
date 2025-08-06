@@ -49,19 +49,29 @@ class TouchUI {
             targetAlpha: 1,
             action: 'toggleLogbook'
         });
+        
+        // Follow ship button (shown when map is open and not following)
+        this.buttons.push({
+            id: 'followShip',
+            x: 0, // Will be calculated in render based on canvas size
+            y: 0,
+            size: this.buttonRadius - 5, // Slightly smaller
+            icon: 'target',
+            visible: false,
+            alpha: 0,
+            targetAlpha: 0.9,
+            action: 'followShip'
+        });
     }
 
     update(deltaTime, canvas, stellarMap, discoveryLogbook) {
-        if (!this.isTouchDevice) return;
-        
-        // Update button positions based on canvas size
+        // Always update button positions and visibility for follow ship button
         this.updateButtonPositions(canvas);
-        
-        // Update button visibility based on map and logbook state
         this.updateButtonVisibility(stellarMap, discoveryLogbook);
-        
-        // Update fade animations
         this.updateFadeAnimations(deltaTime);
+        
+        // Touch device specific updates
+        if (!this.isTouchDevice) return;
     }
 
     updateButtonPositions(canvas) {
@@ -76,6 +86,10 @@ class TouchUI {
             } else if (button.id === 'logbookToggle') {
                 button.x = canvas.width - button.size - margin - buttonSpacing;
                 button.y = canvas.height - button.size - bottomMargin;
+            } else if (button.id === 'followShip') {
+                // Position in upper right when map is open
+                button.x = canvas.width - button.size - margin;
+                button.y = button.size + margin + 40; // Below close button area
             }
         }
     }
@@ -90,6 +104,10 @@ class TouchUI {
                 // Show logbook button only when logbook is closed
                 button.visible = !discoveryLogbook.isVisible();
                 button.targetAlpha = button.visible ? 1 : 0;
+            } else if (button.id === 'followShip') {
+                // Show follow ship button only when map is open and not following player
+                button.visible = stellarMap.isVisible() && !stellarMap.isFollowingPlayer();
+                button.targetAlpha = button.visible ? 0.9 : 0;
             } else if (button.id === 'mapClose' || button.id === 'zoomIn' || button.id === 'zoomOut') {
                 // Hide map control buttons when map is closed
                 button.visible = stellarMap.isVisible();
@@ -111,18 +129,19 @@ class TouchUI {
     }
 
     handleTouch(touchX, touchY) {
-        // Handle touch on all devices now
-        
         // Check if touch hits any visible button
         for (const button of this.buttons) {
             if (button.alpha > 0.1) { // Only check visible buttons
-                const distance = Math.sqrt(
-                    Math.pow(touchX - button.x, 2) + 
-                    Math.pow(touchY - button.y, 2)
-                );
-                
-                if (distance <= button.size) {
-                    return button.action;
+                // Check follow ship button on all devices, other buttons only on touch devices
+                if (button.id === 'followShip' || this.isTouchDevice) {
+                    const distance = Math.sqrt(
+                        Math.pow(touchX - button.x, 2) + 
+                        Math.pow(touchY - button.y, 2)
+                    );
+                    
+                    if (distance <= button.size) {
+                        return button.action;
+                    }
                 }
             }
         }
@@ -131,16 +150,17 @@ class TouchUI {
     }
 
     render(renderer) {
-        // Render on all devices now
-        
         const { ctx } = renderer;
         
         // Save context state
         ctx.save();
         
+        // Always render follow ship button, other buttons only on touch devices
         for (const button of this.buttons) {
             if (button.alpha > 0.01) { // Only render visible buttons
-                this.renderButton(ctx, button);
+                if (button.id === 'followShip' || this.isTouchDevice) {
+                    this.renderButton(ctx, button);
+                }
             }
         }
         
@@ -178,6 +198,9 @@ class TouchUI {
                 break;
             case 'logbook':
                 iconText = '📋'; // Logbook/clipboard symbol
+                break;
+            case 'target':
+                iconText = '⊙'; // Target/follow symbol
                 break;
             case 'close':
                 iconText = '×'; // Close symbol

@@ -28,7 +28,7 @@ class Camera {
         this.loadDistanceTraveled();
     }
 
-    update(input, deltaTime, canvasWidth, canvasHeight, celestialObjects = []) {
+    update(input, deltaTime, canvasWidth, canvasHeight, celestialObjects = [], stellarMap = null) {
         // Calculate thrust direction and intensity
         let thrustX = 0;
         let thrustY = 0;
@@ -64,9 +64,10 @@ class Camera {
                 thrustIntensity = input.brakingIntensity * 2.0; // Strong braking
             }
         } else {
-            // Check for mouse/touch input
+            // Check for mouse/touch input (but not if stellar map is actively panning)
+            const mapIsPanning = stellarMap && stellarMap.isCurrentlyPanning && stellarMap.isCurrentlyPanning();
             const mouseDirection = input.getMouseDirection(canvasWidth, canvasHeight);
-            if (mouseDirection) {
+            if (mouseDirection && !mapIsPanning) {
                 thrustX = mouseDirection.x;
                 thrustY = mouseDirection.y;
                 thrustIntensity = mouseDirection.intensity;

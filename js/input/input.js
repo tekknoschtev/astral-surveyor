@@ -38,6 +38,10 @@ class Input {
 
         window.addEventListener('mousemove', (e) => {
             this.updateMousePosition(e.clientX, e.clientY);
+            // Prevent native drag behavior when dragging on canvas
+            if (this.mousePressed && e.target.tagName === 'CANVAS') {
+                e.preventDefault();
+            }
         });
 
         // Mouse brake (right-click)
@@ -49,6 +53,10 @@ class Input {
             if (e.button === 0) { // Left click
                 this.mousePressed = true;
                 this.rightMousePressed = false;
+                // Prevent native drag behavior on canvas
+                if (e.target.tagName === 'CANVAS') {
+                    e.preventDefault();
+                }
             } else if (e.button === 2) { // Right click
                 this.rightMousePressed = true;
                 this.mousePressed = false;
@@ -62,6 +70,13 @@ class Input {
                 this.mouseClicked = true; // Register click on mouse up
             } else if (e.button === 2) {
                 this.rightMousePressed = false;
+            }
+        });
+
+        // Prevent native drag behavior on canvas
+        window.addEventListener('dragstart', (e) => {
+            if (e.target.tagName === 'CANVAS') {
+                e.preventDefault();
             }
         });
 

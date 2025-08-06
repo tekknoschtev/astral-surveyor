@@ -10,6 +10,16 @@ class StellarMap {
         this.hoveredStar = null;
         this.namingService = null; // Will be injected
         
+        // Interactive panning state
+        this.followPlayer = true; // Whether map should follow player position
+        this.isPanning = false; // Currently dragging to pan
+        this.panStartX = 0; // Start position for pan gesture
+        this.panStartY = 0;
+        this.panStartMapX = 0; // Map center when pan started
+        this.panStartMapY = 0;
+        this.lastMouseX = 0; // For drag detection
+        this.lastMouseY = 0;
+        
         // Visual settings for subtle space aesthetic
         this.backgroundColor = '#000000F0'; // More opaque for better contrast
         this.gridColor = '#2a3a4a40'; // Very subtle dark blue-gray with transparency
@@ -39,12 +49,32 @@ class StellarMap {
     }
 
     update(deltaTime, camera, input) {
-        // Auto-center map on player position when opened
         if (this.visible) {
-            this.centerOnPosition(camera.x, camera.y);
+            // Only auto-center map on player position when following
+            if (this.followPlayer && !this.isPanning) {
+                this.centerOnPosition(camera.x, camera.y);
+            }
             
             // Handle zoom controls when map is visible
             if (input) {
+                // Mouse wheel zoom
+                const wheelDelta = input.getWheelDelta();
+                if (wheelDelta !== 0) {
+                    if (wheelDelta < 0) {
+                        this.zoomIn();
+                    } else {
+                        this.zoomOut();
+                    }
+                }
+                
+                // Pinch zoom for touch devices
+                if (input.hasPinchZoomIn()) {
+                    this.zoomIn();
+                } else if (input.hasPinchZoomOut()) {
+                    this.zoomOut();
+                }
+                
+                // Keyboard zoom
                 if (input.wasJustPressed('Equal') || input.wasJustPressed('NumpadAdd')) {
                     this.zoomIn();
                 }
@@ -55,20 +85,84 @@ class StellarMap {
         }
     }
 
-    handleClick(mouseX, mouseY, discoveredStars, canvas) {
-        if (!this.visible || !discoveredStars) return;
+    handleMouseMove(mouseX, mouseY, canvas, input) {
+        if (!this.visible || !input.mousePressed || input.rightMousePressed) {
+            return false;
+        }
+        
+        // Initialize tracking if we haven't started
+        if (this.lastMouseX === 0 && this.lastMouseY === 0) {
+            const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
+            const inBounds = mouseX >= mapX && mouseX <= mapX + mapWidth && 
+                mouseY >= mapY && mouseY <= mapY + mapHeight;
+            
+            // Only start if mouse is in map bounds
+            if (inBounds) {
+                this.lastMouseX = mouseX;
+                this.lastMouseY = mouseY;
+                this.panStartX = mouseX;
+                this.panStartY = mouseY;
+            }
+            return false;
+        }
+        
+        // Calculate movement from last position
+        const deltaX = mouseX - this.lastMouseX;
+        const deltaY = mouseY - this.lastMouseY;
+        
+        // If there's any movement at all, apply it
+        if (deltaX !== 0 || deltaY !== 0) {
+            // Check if we should start panning (moved enough from start)
+            if (!this.isPanning) {
+                const totalMove = Math.abs(mouseX - this.panStartX) + Math.abs(mouseY - this.panStartY);
+                if (totalMove > 3) {
+                    this.isPanning = true;
+                    this.followPlayer = false;
+                }
+            }
+            
+            // Apply linear panning if active (scales properly with zoom)
+            if (this.isPanning) {
+                const { mapWidth, mapHeight } = this.getMapBounds(canvas);
+                // Linear conversion: screen pixels to world units, scaled by zoom
+                const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
+                
+                // Simple 1:1 conversion with zoom scaling - no multiplication factor
+                this.centerX -= deltaX / worldToMapScale;
+                this.centerY -= deltaY / worldToMapScale;
+            }
+            
+            // Always update last position
+            this.lastMouseX = mouseX;
+            this.lastMouseY = mouseY;
+            
+            return true; // Always consume when we have valid tracking and movement
+        }
+        
+        return false;
+    }
+    
+    // Reset panning state when mouse is released
+    resetPanState() {
+        this.isPanning = false;
+        // Reset mouse positions so next drag starts fresh
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        this.panStartX = 0;
+        this.panStartY = 0;
+    }
+    
+    handleStarSelection(mouseX, mouseY, discoveredStars, canvas) {
+        if (!discoveredStars) return false;
         
         // Calculate map bounds
-        const mapWidth = canvas.width * 0.8;
-        const mapHeight = canvas.height * 0.8;
-        const mapX = canvas.width * 0.1;
-        const mapY = canvas.height * 0.1;
+        const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
         const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
         
         // Check if click is within map bounds
         if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
             this.selectedStar = null;
-            return;
+            return false;
         }
         
         // Find closest star to click position
@@ -93,10 +187,48 @@ class StellarMap {
         }
         
         this.selectedStar = closestStar;
+        return true; // Consumed the event
+    }
+    
+    getMapBounds(canvas) {
+        // Responsive sizing logic from render method
+        let mapWidthRatio = 0.8;
+        let mapHeightRatio = 0.8;
+        let marginRatio = 0.1;
+        
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (isTouchDevice) {
+            mapWidthRatio = 0.95;
+            mapHeightRatio = 0.85;
+            marginRatio = 0.025;
+        }
+        
+        const mapWidth = canvas.width * mapWidthRatio;
+        const mapHeight = canvas.height * mapHeightRatio;
+        const mapX = canvas.width * marginRatio;
+        const mapY = canvas.height * marginRatio;
+        
+        return { mapX, mapY, mapWidth, mapHeight };
     }
 
     setNamingService(namingService) {
         this.namingService = namingService;
+    }
+    
+    // Enable following player position
+    enableFollowPlayer(camera) {
+        this.followPlayer = true;
+        this.centerOnPosition(camera.x, camera.y);
+    }
+    
+    // Check if currently following player
+    isFollowingPlayer() {
+        return this.followPlayer;
+    }
+    
+    // Check if currently panning
+    isCurrentlyPanning() {
+        return this.isPanning;
     }
 
     zoomIn() {
