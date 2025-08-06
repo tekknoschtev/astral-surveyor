@@ -120,27 +120,33 @@ class Game {
             }
         }
         
-        // Handle mouse clicks on stellar map
+        // Handle mouse clicks/touch
         if (this.input.wasClicked()) {
+            // Reset stellar map pan state on click release
+            if (this.stellarMap.isVisible()) {
+                this.stellarMap.resetPanState();
+            }
+            
             // Check if touch hit any TouchUI buttons first
             const touchAction = this.touchUI.handleTouch(this.input.mouseX, this.input.mouseY);
             if (touchAction) {
                 this.handleTouchAction(touchAction);
                 // Prevent the touch from affecting ship movement
                 this.input.consumeTouch();
-            } else if (this.stellarMap.isVisible()) {
-                // Handle stellar map interactions
+            } else if (this.stellarMap.isVisible() && !this.input.touchConsumed) {
+                // Handle stellar map interactions (simplified) - only if not panning
                 const discoveredStars = this.chunkManager.getDiscoveredStars();
-                this.stellarMap.handleClick(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas);
+                this.stellarMap.handleStarSelection(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas);
             }
         }
         
-        // Handle pinch-to-zoom gestures on stellar map
-        if (this.input.hasPinchZoomIn() && this.stellarMap.isVisible()) {
-            this.stellarMap.zoomIn();
-        } else if (this.input.hasPinchZoomOut() && this.stellarMap.isVisible()) {
-            this.stellarMap.zoomOut();
+        // Handle continuous mouse/touch input for map panning
+        if (this.stellarMap.isVisible() && this.input.mousePressed) {
+            // Handle mouse movement for map panning
+            this.stellarMap.handleMouseMove(this.input.mouseX, this.input.mouseY, this.renderer.canvas, this.input);
         }
+        
+        // Pinch zoom is now handled in stellarMap.update() via input system
         
         // Update chunk loading based on camera position
         this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
@@ -160,7 +166,7 @@ class Game {
         // Restore discovery state for newly loaded objects
         this.chunkManager.restoreDiscoveryState(celestialObjects);
         
-        this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects);
+        this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
         
@@ -323,6 +329,10 @@ class Game {
                 
             case 'zoomOut':
                 this.stellarMap.zoomOut();
+                break;
+                
+            case 'followShip':
+                this.stellarMap.enableFollowPlayer(this.camera);
                 break;
         }
     }
