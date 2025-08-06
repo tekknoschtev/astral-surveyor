@@ -36,16 +36,29 @@ class TouchUI {
             targetAlpha: 1,
             action: 'toggleMap'
         });
+
+        // Logbook toggle button (positioned left of map button)
+        this.buttons.push({
+            id: 'logbookToggle',
+            x: 0, // Will be calculated in render based on canvas size
+            y: 0,
+            size: this.buttonRadius,
+            icon: 'logbook',
+            visible: true,
+            alpha: 0,
+            targetAlpha: 1,
+            action: 'toggleLogbook'
+        });
     }
 
-    update(deltaTime, canvas, stellarMap) {
+    update(deltaTime, canvas, stellarMap, discoveryLogbook) {
         if (!this.isTouchDevice) return;
         
         // Update button positions based on canvas size
         this.updateButtonPositions(canvas);
         
-        // Update button visibility based on map state
-        this.updateButtonVisibility(stellarMap);
+        // Update button visibility based on map and logbook state
+        this.updateButtonVisibility(stellarMap, discoveryLogbook);
         
         // Update fade animations
         this.updateFadeAnimations(deltaTime);
@@ -54,20 +67,28 @@ class TouchUI {
     updateButtonPositions(canvas) {
         const margin = 20;
         const bottomMargin = 40; // Extra margin from bottom for comfort
+        const buttonSpacing = 60; // Space between buttons
         
         for (const button of this.buttons) {
             if (button.id === 'mapToggle') {
                 button.x = canvas.width - button.size - margin;
                 button.y = canvas.height - button.size - bottomMargin;
+            } else if (button.id === 'logbookToggle') {
+                button.x = canvas.width - button.size - margin - buttonSpacing;
+                button.y = canvas.height - button.size - bottomMargin;
             }
         }
     }
 
-    updateButtonVisibility(stellarMap) {
+    updateButtonVisibility(stellarMap, discoveryLogbook) {
         for (const button of this.buttons) {
             if (button.id === 'mapToggle') {
                 // Show map button only when map is closed
                 button.visible = !stellarMap.isVisible();
+                button.targetAlpha = button.visible ? 1 : 0;
+            } else if (button.id === 'logbookToggle') {
+                // Show logbook button only when logbook is closed
+                button.visible = !discoveryLogbook.isVisible();
                 button.targetAlpha = button.visible ? 1 : 0;
             } else if (button.id === 'mapClose' || button.id === 'zoomIn' || button.id === 'zoomOut') {
                 // Hide map control buttons when map is closed
@@ -154,6 +175,9 @@ class TouchUI {
         switch (button.icon) {
             case 'map':
                 iconText = '⊞'; // Grid/map symbol
+                break;
+            case 'logbook':
+                iconText = '📋'; // Logbook/clipboard symbol
                 break;
             case 'close':
                 iconText = '×'; // Close symbol
