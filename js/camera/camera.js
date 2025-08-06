@@ -6,7 +6,7 @@ class Camera {
         // Physics properties
         this.velocityX = 0;
         this.velocityY = 0;
-        this.acceleration = 200; // Thrust power (pixels/sec^2)
+        this.acceleration = 50; // Thrust power (pixels/sec^2) - reduced for more gradual acceleration
         this.maxSpeed = 150; // Maximum velocity (pixels/sec) - increased for faster exploration
         this.friction = 0.9999; // Nearly 0% friction for true space coasting
         this.coastingFriction = 1.0; // No friction when coasting
