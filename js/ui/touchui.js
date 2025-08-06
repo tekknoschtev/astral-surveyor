@@ -101,9 +101,9 @@ class TouchUI {
                 button.visible = !stellarMap.isVisible();
                 button.targetAlpha = button.visible ? 1 : 0;
             } else if (button.id === 'logbookToggle') {
-                // Show logbook button only when logbook is closed
-                button.visible = !discoveryLogbook.isVisible();
-                button.targetAlpha = button.visible ? 1 : 0;
+                // Always show logbook button - it toggles open/closed
+                button.visible = true;
+                button.targetAlpha = 1;
             } else if (button.id === 'followShip') {
                 // Show follow ship button only when map is open and not following player
                 button.visible = stellarMap.isVisible() && !stellarMap.isFollowingPlayer();
