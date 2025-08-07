@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     
     steps:
     - name: Checkout code
@@ -39,10 +42,12 @@ jobs:
     - name: Comment coverage on PR
       if: github.event_name == 'pull_request'
       uses: romeovs/lcov-reporter-action@v0.3.1
+      continue-on-error: true
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         lcov-file: ./coverage/lcov.info
         delete-old-comments: true
+        filter-changed-files: true
 
   lint-and-format:
     runs-on: ubuntu-latest
