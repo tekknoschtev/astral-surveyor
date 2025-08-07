@@ -87,9 +87,9 @@ class TouchUI {
                 button.x = canvas.width - button.size - margin - buttonSpacing;
                 button.y = canvas.height - button.size - bottomMargin;
             } else if (button.id === 'followShip') {
-                // Position in upper right when map is open
+                // Position in bottom right above zoom level indicator
                 button.x = canvas.width - button.size - margin;
-                button.y = button.size + margin + 40; // Below close button area
+                button.y = canvas.height - 120; // Above zoom info area (zoom info is at canvas.height - 65)
             }
         }
     }
@@ -101,9 +101,9 @@ class TouchUI {
                 button.visible = !stellarMap.isVisible();
                 button.targetAlpha = button.visible ? 1 : 0;
             } else if (button.id === 'logbookToggle') {
-                // Always show logbook button - it toggles open/closed
-                button.visible = true;
-                button.targetAlpha = 1;
+                // Hide logbook button when map is open to prevent text overlap
+                button.visible = !stellarMap.isVisible();
+                button.targetAlpha = button.visible ? 1 : 0;
             } else if (button.id === 'followShip') {
                 // Show follow ship button only when map is open and not following player
                 button.visible = stellarMap.isVisible() && !stellarMap.isFollowingPlayer();
@@ -249,12 +249,12 @@ class TouchUI {
             const buttonSize = 20;
             const spacing = 50;
             
-            // Position buttons on left side to avoid overlap with map info
+            // Position zoom buttons higher up on mobile for better accessibility
             // Zoom in button
             this.buttons.push({
                 id: 'zoomIn',
                 x: margin + buttonSize,
-                y: canvas.height - buttonSize - margin - spacing,
+                y: canvas.height * 0.4, // Much higher up on screen
                 size: buttonSize,
                 icon: 'plus',
                 visible: true,
@@ -267,7 +267,7 @@ class TouchUI {
             this.buttons.push({
                 id: 'zoomOut',
                 x: margin + buttonSize,
-                y: canvas.height - buttonSize - margin,
+                y: canvas.height * 0.4 + spacing, // Higher up, below zoom in button
                 size: buttonSize,
                 icon: 'minus',
                 visible: true,

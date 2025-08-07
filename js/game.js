@@ -136,7 +136,8 @@ class Game {
             } else if (this.stellarMap.isVisible() && !this.input.touchConsumed) {
                 // Handle stellar map interactions (simplified) - only if not panning
                 const discoveredStars = this.chunkManager.getDiscoveredStars();
-                this.stellarMap.handleStarSelection(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas);
+                const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
+                this.stellarMap.handleStarSelection(this.input.mouseX, this.input.mouseY, discoveredStars, this.renderer.canvas, discoveredPlanets);
             }
         }
         
@@ -189,7 +190,7 @@ class Game {
         
         // Check for discoveries
         for (const obj of celestialObjects) {
-            if (obj.checkDiscovery(this.camera)) {
+            if (obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
                 // Generate proper astronomical name for the discovery
                 const objectName = this.namingService.generateDisplayName(obj);
                 const objectType = obj.type === 'planet' ? obj.planetTypeName : 
@@ -361,7 +362,8 @@ class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discoveredStars = this.chunkManager.getDiscoveredStars();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition);
+        const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);

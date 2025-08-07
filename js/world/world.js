@@ -606,6 +606,87 @@ class ChunkManager {
         
         return discoveredMoons;
     }
+
+    getDiscoveredPlanets() {
+        const discoveredPlanets = [];
+        
+        // Get all discovered objects that are planets
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('planet_') && objId.includes('_planet_')) {
+                // Parse the planet ID format: planet_{starX}_{starY}_planet_{planetIndex}
+                const parts = objId.split('_');
+                if (parts.length >= 5) {
+                    const starX = parseFloat(parts[1]);
+                    const starY = parseFloat(parts[2]);
+                    const planetIndex = parseInt(parts[4]);
+                    
+                    // Find the planet in active chunks or reconstruct minimal data
+                    let planetData = null;
+                    
+                    // Check if planet is in currently active chunks
+                    for (const chunk of this.activeChunks.values()) {
+                        for (const star of chunk.celestialStars) {
+                            if (Math.floor(star.x) === Math.floor(starX) && Math.floor(star.y) === Math.floor(starY)) {
+                                // Found the parent star, look for the planet
+                                if (star.planets && star.planets[planetIndex]) {
+                                    const planet = star.planets[planetIndex];
+                                    planetData = {
+                                        x: planet.x,
+                                        y: planet.y,
+                                        parentStarX: star.x,
+                                        parentStarY: star.y,
+                                        planetTypeName: planet.planetTypeName,
+                                        planetType: planet.planetType,
+                                        planetIndex: planetIndex,
+                                        objectName: discoveryData.objectName,
+                                        timestamp: discoveryData.timestamp
+                                    };
+                                }
+                                break;
+                            }
+                        }
+                        if (planetData) break;
+                    }
+                    
+                    // If not in active chunks, use stored discovery data
+                    if (!planetData) {
+                        // Use stored planet type from discovery data
+                        let planetTypeName = discoveryData.planetTypeName;
+                        let planetType = null;
+                        
+                        if (planetTypeName) {
+                            // Find the planet type object
+                            planetType = Object.values(PlanetTypes).find(type => type.name === planetTypeName);
+                        }
+                        
+                        if (!planetTypeName || !planetType) {
+                            // Fallback: regenerate planet type deterministically if needed
+                            // This would require recreating the star system, but for now skip incomplete data
+                            continue;
+                        }
+                        
+                        planetData = {
+                            x: null, // Position would need to be recalculated from orbital data
+                            y: null,
+                            parentStarX: starX,
+                            parentStarY: starY,
+                            planetTypeName: planetTypeName,
+                            planetType: planetType,
+                            planetIndex: planetIndex,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    if (planetData) {
+                        discoveredPlanets.push(planetData);
+                    }
+                }
+            }
+        }
+        
+        return discoveredPlanets;
+    }
     
     // Score a potential star system position based on distance from existing systems
     scoreStarSystemPosition(x, y, currentChunkX, currentChunkY) {
