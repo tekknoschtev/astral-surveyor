@@ -123,6 +123,12 @@ Discover 7 distinct world types, each with unique characteristics:
 
 ## 🛠️ Technical Features
 
+### **Modern TypeScript Architecture**
+- **Type-Safe Development**: Full TypeScript codebase with comprehensive type definitions
+- **ES6 Modules**: Modern module system with proper imports/exports
+- **Build Pipeline**: TypeScript compilation with cross-platform build scripts
+- **Test Coverage**: 88%+ coverage on core systems with comprehensive test suite
+
 ### **Browser-First Architecture**
 - **No Installation Required**: Runs directly in any modern web browser
 - **Cross-Platform**: Works seamlessly on desktop, tablet, and mobile devices
@@ -157,6 +163,45 @@ Discover 7 distinct world types, each with unique characteristics:
 - **Discovery Lovers**: Hundreds of unique worlds and systems to catalog
 - **Casual Gamers**: Pick up and play anytime, exploration at your own pace
 - **Mobile Users**: Full touch support for gaming on any device
+
+## 🔧 Development
+
+### **Getting Started**
+1. **Prerequisites**: Node.js 16+ and npm
+2. **Install dependencies**: `npm install`
+3. **Build the project**: `npm run build`
+4. **Run tests**: `npm test`
+
+### **Development Workflow**
+- **Source files**: Edit TypeScript files in `src/` directory
+- **Build command**: `npm run build` (compiles TypeScript to `dist/`)
+- **Watch mode**: `npm run dev` (auto-rebuild on changes)
+- **Testing**: `npm test` (runs full build + test suite)
+- **Coverage**: `npm run test:coverage` (generates coverage reports)
+
+### **Project Structure**
+```
+src/           # TypeScript source files
+├── utils/     # Core utilities (random, etc.)  
+├── graphics/  # Rendering system
+├── audio/     # Sound management
+├── input/     # Input handling
+├── camera/    # Camera physics
+├── naming/    # Astronomical naming
+├── celestial/ # Star/planet systems
+├── ship/      # Player ship + particles
+├── world/     # World generation
+├── ui/        # User interface
+└── game.ts    # Main game loop
+
+dist/          # Compiled JavaScript (auto-generated)
+tests/         # Test suite
+```
+
+### **Contributing**
+- Follow the development workflow in `CLAUDE.md`
+- All PRs require passing tests and TypeScript compilation
+- See `TSMIGRATION.md` for architecture details
 
 ---
 
