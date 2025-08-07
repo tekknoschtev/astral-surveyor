@@ -61,29 +61,51 @@ Some things that **are not** priorities right now:
 * GitHub Actions automatically run tests on all PRs - **tests must pass to merge**
 
 **Test Organization**
-* Tests are in `tests/` directory matching the `js/` structure
-* Test files end with `.test.js`
+* Tests are in `tests/` directory testing TypeScript-compiled code in `dist/`
+* Test files end with `.test.js` and import from compiled JavaScript modules
+* Source code is in `src/` directory with TypeScript files (`.ts`)
 * Critical systems tested: random generation, naming service, celestial discovery
 * Integration tests for cross-component interactions
 
 **Testing Commands**
 ```bash
-npm test              # Run all tests once
-npm run test:watch    # Run tests in watch mode
-npm run test:coverage # Generate coverage report
-npm run test:ui       # Open Vitest UI in browser
+npm run build         # Build TypeScript to dist/ (required first)
+npm test              # Build + run all tests once  
+npm run test:watch    # Build + run tests in watch mode
+npm run test:coverage # Build + generate coverage report
+npm run test:ui       # Build + open Vitest UI in browser
+npm run dev           # TypeScript watch mode for development
 ```
+
+# TypeScript Development Workflow
+
+## Source Code Structure
+* **Source files**: Edit `.ts` files in `src/` directory (TypeScript)
+* **Build output**: Compiled `.js` files generated in `dist/` directory  
+* **Tests**: Run against compiled JavaScript in `dist/` for accurate coverage
+
+## Development Commands
+* **Build**: `npm run build` - Compile TypeScript + copy assets
+* **Watch mode**: `npm run dev` - Auto-rebuild on file changes
+* **Clean**: `npm run clean` - Remove dist/ directory
+* **Rebuild**: `npm run rebuild` - Clean + build from scratch
 
 # Desired GIT workflow
 When starting a new feature or refactor branch, try to follow the steps below:
-1. Sync local main before making changes:  `git pull origin main`
+1. Sync local main before making changes: `git pull origin main`
 2. Start a new branch: `git checkout -b {{branch-name}}`
-3. Make changes as needed
-4. **Run tests**: `npm test` to ensure no regressions
-5. Save work: `git add` all modified files
-6. Commit:  `git commit` with a descriptive message
+3. Make changes to `.ts` files in `src/` directory (never edit `js/` files - they're legacy)
+4. **Build and test**: `npm run build && npm test` to ensure no regressions
+5. Save work: `git add` all modified files (exclude `dist/` - it's auto-generated)
+6. Commit: `git commit` with a descriptive message
 7. Push to GitHub: `git push -u origin {{branch-name}}`
-8. Submit a PR:  `gh pr create` with a descriptive message and all validations
-9. **Wait for CI**: GitHub Actions will run tests automatically
+8. Submit a PR: `gh pr create` with a descriptive message and all validations
+9. **Wait for CI**: GitHub Actions will run TypeScript compilation + tests automatically
 10. Merge and delete branch: `git checkout main` then `git pull origin main` then `git branch -d {{feature-name}}`
 11. Final sync: `git fetch -p`
+
+# TypeScript Migration Notes (2025-01-09)
+**Status**: ✅ COMPLETE - All 14 JavaScript files successfully migrated to TypeScript
+**Coverage**: Achieved 88.54% on naming system, 93.54% on random utilities  
+**Architecture**: ES6 modules + proper build pipeline replacing eval() loading pattern
+**Reference**: See TSMIGRATION.md for complete migration documentation
