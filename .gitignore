@@ -9,6 +9,9 @@ coverage/
 *.log
 npm-debug.log*
 
+# Generated TypeScript output
+dist/
+
 # IDE and editor files
 .vscode/
 *.swp

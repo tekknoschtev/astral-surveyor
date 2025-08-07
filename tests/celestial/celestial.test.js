@@ -1,38 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Load the required modules
-const fs = await import('fs');
-const path = await import('path');
-
-// Load dependencies first
-const randomJsPath = path.resolve('./js/utils/random.js');
-const randomJsContent = fs.readFileSync(randomJsPath, 'utf8');
-eval(randomJsContent);
-
-// Load celestial.js
-const celestialJsPath = path.resolve('./js/celestial/celestial.js');
-const celestialJsContent = fs.readFileSync(celestialJsPath, 'utf8');
-eval(celestialJsContent);
-
-const { CelestialObject, Planet, Moon, Star } = window;
+// Import from compiled TypeScript instead of duplicate modules
+import { CelestialObject, Planet, Moon, Star, PlanetTypes, StarTypes } from '../../dist/celestial/celestial.js';
 
 describe('CelestialObject Discovery Logic', () => {
   let camera;
   
   beforeEach(() => {
-    // Set up global state
-    window.UNIVERSE_SEED = 12345;
+    // Set up global state - not needed for ES6 modules
     resetMockMathRandom();
     
-    // Mock camera object with worldToScreen method
+    // Create mock camera with vitest spy
     camera = {
       x: 100,
       y: 100,
-      worldToScreen: vi.fn((x, y, canvasWidth, canvasHeight) => {
+      worldToScreen: vi.fn((worldX, worldY, canvasWidth, canvasHeight) => {
         // Simple mock: return screen coordinates based on world position
-        // In reality this would involve zoom, translation, etc.
-        const screenX = (x - camera.x) + canvasWidth / 2;
-        const screenY = (y - camera.y) + canvasHeight / 2;
+        const screenX = (worldX - camera.x) + canvasWidth / 2;
+        const screenY = (worldY - camera.y) + canvasHeight / 2;
         return [screenX, screenY];
       })
     };

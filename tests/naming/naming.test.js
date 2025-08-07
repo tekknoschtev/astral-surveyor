@@ -1,20 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
-// Load the required modules
-const fs = await import('fs');
-const path = await import('path');
-
-// Load dependencies first (random.js for SeededRandom)
-const randomJsPath = path.resolve('./js/utils/random.js');
-const randomJsContent = fs.readFileSync(randomJsPath, 'utf8');
-eval(randomJsContent);
-
-// Load naming.js
-const namingJsPath = path.resolve('./js/naming/naming.js');
-const namingJsContent = fs.readFileSync(namingJsPath, 'utf8');
-eval(namingJsContent);
-
-const { NamingService } = window;
+// Import from compiled TypeScript instead of duplicate modules
+import { NamingService } from '../../dist/naming/naming.js';
 
 describe('NamingService', () => {
   let namingService;

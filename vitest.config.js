@@ -15,10 +15,15 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
+      include: [
+        'dist/**/*.js'  // Include compiled TypeScript for coverage
+      ],
       exclude: [
         'node_modules/**',
         'tests/**',
         'coverage/**',
+        'src/**',      // Don't test TypeScript source
+        'js/**',       // Don't test old JavaScript files
         '**/*.config.js'
       ]
     },
