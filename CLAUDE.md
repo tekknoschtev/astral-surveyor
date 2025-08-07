@@ -52,14 +52,38 @@ Some things that **are not** priorities right now:
 * Backend services or logins
 * Real-time simulation or physics 
 
+# Testing Strategy
+**Automated Unit Testing with Vitest**
+* Use `npm test` to run the test suite during development
+* Use `npm run test:watch` for continuous testing during coding
+* Use `npm run test:coverage` to generate coverage reports
+* Focus tests on **deterministic systems** (random generation, naming, discovery logic)
+* GitHub Actions automatically run tests on all PRs - **tests must pass to merge**
+
+**Test Organization**
+* Tests are in `tests/` directory matching the `js/` structure
+* Test files end with `.test.js`
+* Critical systems tested: random generation, naming service, celestial discovery
+* Integration tests for cross-component interactions
+
+**Testing Commands**
+```bash
+npm test              # Run all tests once
+npm run test:watch    # Run tests in watch mode
+npm run test:coverage # Generate coverage report
+npm run test:ui       # Open Vitest UI in browser
+```
+
 # Desired GIT workflow
 When starting a new feature or refactor branch, try to follow the steps below:
 1. Sync local main before making changes:  `git pull origin main`
 2. Start a new branch: `git checkout -b {{branch-name}}`
 3. Make changes as needed
-4. Save work: `git add` all modified files
-5. Commit:  `git commit` with a descriptive message
-6. Push to GitHub: `git push -u origin {{branch-name}}`
-7. Submit a PR:  `gh pr create` with a descriptive message and all validations
-8. Merge and delete branch: `git checkout main` then `git pull origin main` then `git branch -d {{feature-name}}`
-9. Final sync: `git fetch -p`
+4. **Run tests**: `npm test` to ensure no regressions
+5. Save work: `git add` all modified files
+6. Commit:  `git commit` with a descriptive message
+7. Push to GitHub: `git push -u origin {{branch-name}}`
+8. Submit a PR:  `gh pr create` with a descriptive message and all validations
+9. **Wait for CI**: GitHub Actions will run tests automatically
+10. Merge and delete branch: `git checkout main` then `git pull origin main` then `git branch -d {{feature-name}}`
+11. Final sync: `git fetch -p`

@@ -174,11 +174,15 @@ class NamingService {
         const parentX = Math.floor(moon.parentPlanet.x);
         const parentY = Math.floor(moon.parentPlanet.y);
         
-        // For now, use a simple hash-based approach for consistent ordering
-        // This ensures the same moon always gets the same index
+        // Use orbital distance directly for moon index calculation
+        // This ensures different distances get different indices
         const moonDistance = Math.floor(moon.orbitalDistance);
-        const hash = this.hashCoordinate(parentX + parentY + moonDistance);
-        return hash % 4; // Limit to 4 moon indices (I, II, III, IV)
+        // Sort moons by distance and assign indices accordingly
+        // For now, use a simple approach based on distance ranges
+        if (moonDistance <= 10) return 0;
+        else if (moonDistance <= 20) return 1;
+        else if (moonDistance <= 30) return 2;
+        else return 3;
     }
 
     /**

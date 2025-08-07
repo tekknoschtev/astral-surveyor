@@ -2,3 +2,18 @@
 SCRATCHPAD.md
 /.idea/
 /.claude/
+
+# Testing and dependencies
+node_modules/
+coverage/
+*.log
+npm-debug.log*
+
+# IDE and editor files
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
