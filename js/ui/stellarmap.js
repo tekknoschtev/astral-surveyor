@@ -609,23 +609,40 @@ class StellarMap {
         // Generate star name
         const starName = this.namingService.generateDisplayName(star);
         
-        // Set up text rendering to match game UI
+        // Calculate star size for positioning
+        const starSize = this.calculateStarSize(star, false);
+        
+        // Calculate offset position for scientific diagram style
+        const offsetDistance = 35; // Distance from star center
+        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = starMapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = starMapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from star edge to text
+        ctx.strokeStyle = '#aaaaaa'; // Lighter gray for visibility
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of star
+        const lineStartX = starMapX + Math.cos(offsetAngle) * (starSize + 2);
+        const lineStartY = starMapY + Math.sin(offsetAngle) * (starSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
+        // Draw star name at offset position
+        ctx.fillStyle = '#b0c4d4';
         ctx.font = '12px "Courier New", monospace';
-        ctx.fillStyle = '#b0c4d4';
-        ctx.textAlign = 'center';
-        
-        // Draw text background for readability
-        const textWidth = ctx.measureText(starName).width;
-        const bgPadding = 2;
-        ctx.fillStyle = '#000000C0';
-        ctx.fillRect(starMapX - textWidth/2 - bgPadding, starMapY - 20, textWidth + bgPadding*2, 12);
-        
-        // Draw star name above the star
-        ctx.fillStyle = '#b0c4d4';
-        ctx.fillText(starName, starMapX, starMapY - 10);
-        
-        // Reset text alignment
         ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(starName, labelX, labelY);
+        
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
     }
 
     renderStartingPositionMarker(ctx, mapX, mapY, mapWidth, mapHeight, scale, startingPosition) {
@@ -778,32 +795,7 @@ class StellarMap {
         const titleWidth = ctx.measureText(title).width;
         ctx.fillText(title, (canvas.width - titleWidth) / 2, 30);
         
-        // Instructions - adapt for device type
-        let instructions = [];
-        // More specific touch device detection - check for mobile user agent patterns
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const hasTouchPoints = navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-        const isTouchDevice = isMobile || (hasTouchPoints && window.screen.width < 1024);
-        
-        if (isTouchDevice) {
-            instructions = [
-                'Pinch - Zoom In/Out',
-                this.zoomLevel > 3.0 ? 'Tap Star/Planet - Select' : 'Tap Star - Select',
-                'Tap Outside - Close'
-            ];
-        } else {
-            instructions = [
-                'M - Toggle Map',
-                'ESC - Close Map',
-                '+/- - Zoom In/Out'
-            ];
-        }
-        
-        let y = canvas.height - 80;
-        for (const instruction of instructions) {
-            ctx.fillText(instruction, 20, y);
-            y += 15;
-        }
+        // Instructions removed - map is intuitive enough without them
         
         // Zoom info with descriptive labels
         let zoomLabel = '';
@@ -921,7 +913,7 @@ class StellarMap {
         
         // Planet designation using naming service
         const planetName = this.generatePlanetDisplayName(this.selectedPlanet);
-        ctx.fillText(`Name: ${planetName}`, panelX + 10, lineY);
+        ctx.fillText(`Designation: ${planetName}`, panelX + 10, lineY);
         lineY += lineHeight;
         
         // Planet type
