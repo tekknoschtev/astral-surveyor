@@ -134,5 +134,6 @@ window.SeededRandom = SeededRandom;
 window.hashPosition = hashPosition;
 window.initializeUniverseSeed = initializeUniverseSeed;
 window.getUniverseSeed = () => UNIVERSE_SEED;
+window.setUniverseSeed = (seed) => { UNIVERSE_SEED = seed; };
 window.getStartingCoordinates = () => STARTING_COORDINATES;
 window.generateShareableURL = generateShareableURL;
