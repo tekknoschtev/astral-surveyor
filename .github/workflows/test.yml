@@ -29,25 +29,25 @@ jobs:
     - name: Run tests
       run: npm test
       
-    - name: Run tests with coverage
-      run: npm run test:coverage
+ #   - name: Run tests with coverage
+ #     run: npm run test:coverage
       
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        fail_ci_if_error: false
-        verbose: true
+ #   - name: Upload coverage reports
+ #     uses: codecov/codecov-action@v3
+ #     with:
+ #       file: ./coverage/lcov.info
+ #       fail_ci_if_error: false
+ #       verbose: true
         
-    - name: Comment coverage on PR
-      if: github.event_name == 'pull_request'
-      uses: romeovs/lcov-reporter-action@v0.3.1
-      continue-on-error: true
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        lcov-file: ./coverage/lcov.info
-        delete-old-comments: true
-        filter-changed-files: true
+#    - name: Comment coverage on PR
+#      if: github.event_name == 'pull_request'
+#      uses: romeovs/lcov-reporter-action@v0.3.1
+#      continue-on-error: true
+#      with:
+#        github-token: ${{ secrets.GITHUB_TOKEN }}
+#        lcov-file: ./coverage/lcov.info
+#        delete-old-comments: true
+#        filter-changed-files: true
 
   lint-and-format:
     runs-on: ubuntu-latest
