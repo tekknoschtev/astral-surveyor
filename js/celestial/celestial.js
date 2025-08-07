@@ -13,10 +13,27 @@ class CelestialObject {
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    checkDiscovery(camera) {
-        if (!this.discovered && this.distanceToShip(camera) <= this.discoveryDistance) {
-            this.discovered = true;
-            return true; // Newly discovered
+    checkDiscovery(camera, canvasWidth, canvasHeight) {
+        if (this.discovered) return false;
+        
+        // For stars, discovery happens when they're visible on screen (since stars are so bright)
+        if (this.type === 'star') {
+            const [screenX, screenY] = camera.worldToScreen(this.x, this.y, canvasWidth, canvasHeight);
+            const margin = Math.max(this.radius, 50); // Use star radius or minimum 50px margin
+            
+            const isVisible = screenX >= -margin && screenX <= canvasWidth + margin && 
+                             screenY >= -margin && screenY <= canvasHeight + margin;
+            
+            if (isVisible) {
+                this.discovered = true;
+                return true; // Newly discovered
+            }
+        } else {
+            // For planets and moons, use the traditional distance-based discovery
+            if (this.distanceToShip(camera) <= this.discoveryDistance) {
+                this.discovered = true;
+                return true; // Newly discovered
+            }
         }
         return false;
     }

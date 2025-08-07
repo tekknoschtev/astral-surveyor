@@ -190,7 +190,7 @@ class Game {
         
         // Check for discoveries
         for (const obj of celestialObjects) {
-            if (obj.checkDiscovery(this.camera)) {
+            if (obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
                 // Generate proper astronomical name for the discovery
                 const objectName = this.namingService.generateDisplayName(obj);
                 const objectType = obj.type === 'planet' ? obj.planetTypeName : 
