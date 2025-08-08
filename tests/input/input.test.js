@@ -13,6 +13,10 @@ describe('Input System', () => {
   const CANVAS_HEIGHT = 600;
 
   beforeEach(() => {
+    // Set up fake timers first
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    
     // Mock DOM event listeners
     mockEventListeners = new Map();
     
@@ -24,13 +28,11 @@ describe('Input System', () => {
       mockEventListeners.get(event).push(handler);
     });
 
-    // Mock Date.now for consistent time-based testing
-    vi.spyOn(Date, 'now').mockReturnValue(1000);
-
     input = new Input();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -44,6 +46,30 @@ describe('Input System', () => {
     
     handlers.forEach(handler => handler(mockEvent));
     return mockEvent;
+  }
+  
+  // Helper function to create proper touch objects
+  function createTouch(identifier, clientX, clientY) {
+    return {
+      identifier,
+      clientX,
+      clientY,
+      screenX: clientX,
+      screenY: clientY,
+      pageX: clientX,
+      pageY: clientY,
+      radiusX: 1,
+      radiusY: 1,
+      rotationAngle: 0,
+      force: 1
+    };
+  }
+  
+  // Helper function to create touch list
+  function createTouchList(touches) {
+    const touchList = touches;
+    touchList.length = touches.length;
+    return touchList;
   }
 
   describe('Initialization and Setup', () => {
@@ -368,24 +394,24 @@ describe('Input System', () => {
     });
 
     it('should detect short tap as click', () => {
-      vi.mocked(Date.now).mockReturnValue(1000);
+      vi.setSystemTime(1000);
       
       const touch = createMockTouch(1, 100, 200);
       simulateEvent('touchstart', { touches: createMockTouchList([touch]) });
       
-      vi.mocked(Date.now).mockReturnValue(1150); // 150ms later
+      vi.setSystemTime(1150); // 150ms later
       simulateEvent('touchend', { touches: createMockTouchList([]) });
       
       expect(input.wasClicked()).toBe(true);
     });
 
     it('should not detect long press as click', () => {
-      vi.mocked(Date.now).mockReturnValue(1000);
+      vi.setSystemTime(1000);
       
       const touch = createMockTouch(1, 100, 200);
       simulateEvent('touchstart', { touches: createMockTouchList([touch]) });
       
-      vi.mocked(Date.now).mockReturnValue(1300); // 300ms later
+      vi.setSystemTime(1300); // 300ms later
       simulateEvent('touchend', { touches: createMockTouchList([]) });
       
       expect(input.wasClicked()).toBe(false);
@@ -619,6 +645,190 @@ describe('Input System', () => {
 
       input.clearFrameState();
       expect(input.isMuteTogglePressed()).toBe(false);
+    });
+  });
+
+  describe('Mobile Braking System', () => {
+    describe('Two-finger tap for stop braking', () => {
+      it('should detect two-finger tap for stop braking', () => {
+        // Use test helper to simulate two-finger tap state
+        input._testSetTwoFingerTap();
+        
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeTruthy();
+        expect(brake.mode).toBe('stop');
+        expect(brake.intensity).toBe(1.0);
+        
+        // Clean up
+        input._testResetBrakingState();
+      });
+
+      it('should not trigger stop brake if two-finger hold is too long', () => {
+        // Start two-finger touch
+        const touches = createTouchList([
+          createTouch(0, 100, 100),
+          createTouch(1, 200, 200)
+        ]);
+        
+        simulateEvent('touchstart', { touches });
+        
+        // Wait too long (simulate with time advance)
+        vi.advanceTimersByTime(600); // Over tap threshold
+        
+        simulateEvent('touchend', { touches: createTouchList([]) });
+        
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeNull(); // Should not be a tap anymore
+      });
+
+      it('should clear stop brake after being consumed', () => {
+        // Use test helper to simulate two-finger tap state
+        input._testSetTwoFingerTap();
+        
+        // First call should return brake
+        const brake1 = input.getTouchBrake(800, 600);
+        expect(brake1).toBeTruthy();
+        
+        // Should clear after frame
+        input.clearFrameState();
+        
+        // Second call should return null
+        const brake2 = input.getTouchBrake(800, 600);
+        expect(brake2).toBeNull();
+      });
+    });
+
+    describe('Two-finger drag for directional braking', () => {
+      it('should detect two-finger drag for directional braking', () => {
+        // Use test helper to simulate two-finger drag towards upper-right
+        input._testSetTwoFingerDrag(500, 200); // Center at 500, 200 (right and up from center 400, 300)
+        
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeTruthy();
+        expect(brake.mode).toBe('directional');
+        expect(brake.x).toBeGreaterThan(0); // Moving right
+        expect(brake.y).toBeLessThan(0); // Moving up
+        expect(brake.intensity).toBeGreaterThan(0);
+        
+        // Clean up
+        input._testResetBrakingState();
+      });
+
+      it('should calculate brake intensity based on drag distance', () => {
+        const canvasWidth = 800;
+        const canvasHeight = 600;
+        const centerX = canvasWidth / 2; // 400
+        const centerY = canvasHeight / 2; // 300
+        
+        // Small drag - close to center (lower intensity)
+        input._testSetTwoFingerDrag(centerX + 50, centerY); // 450, 300
+        const brakeSmall = input.getTouchBrake(canvasWidth, canvasHeight);
+        input._testResetBrakingState();
+        
+        // Large drag - far from center (higher intensity)  
+        input._testSetTwoFingerDrag(centerX + 200, centerY); // 600, 300
+        const brakeLarge = input.getTouchBrake(canvasWidth, canvasHeight);
+        input._testResetBrakingState();
+        
+        expect(brakeSmall).toBeTruthy();
+        expect(brakeLarge).toBeTruthy();
+        expect(brakeLarge.intensity).toBeGreaterThan(brakeSmall.intensity);
+      });
+
+      it('should normalize drag direction correctly', () => {
+        // Drag straight right from center (400, 300) to (600, 300)
+        input._testSetTwoFingerDrag(600, 300); // Center at 600, 300 (straight right from center 400, 300)
+        
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeTruthy();
+        expect(brake.mode).toBe('directional');
+        
+        // Direction should be normalized (length = 1)
+        const length = Math.sqrt(brake.x * brake.x + brake.y * brake.y);
+        expect(length).toBeCloseTo(1.0, 1);
+        
+        // Clean up
+        input._testResetBrakingState();
+      });
+
+      it('should require minimum drag distance to activate', () => {
+        // Start two-finger touch
+        const touchStart = new TouchEvent('touchstart', {
+          touches: [
+            { identifier: 0, clientX: 400, clientY: 300 },
+            { identifier: 1, clientX: 405, clientY: 305 }
+          ]
+        });
+        
+        window.dispatchEvent(touchStart);
+        
+        // Very small movement (should not trigger brake)
+        const touchMove = new TouchEvent('touchmove', {
+          touches: [
+            { identifier: 0, clientX: 402, clientY: 301 },
+            { identifier: 1, clientX: 407, clientY: 306 }
+          ]
+        });
+        
+        window.dispatchEvent(touchMove);
+        
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeNull(); // Too small to register
+      });
+    });
+
+    describe('Mobile brake integration', () => {
+      it('should not interfere with single-touch ship movement', () => {
+        // Simulate single touch movement (which should update mouse position for ship movement)
+        input._testSetMousePosition(200, 200);
+        
+        // Should not trigger braking
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeNull();
+        
+        // Should still update mouse position for ship movement
+        expect(input._testGetMouseX()).toBeGreaterThan(0);
+        expect(input._testGetMouseY()).toBeGreaterThan(0);
+      });
+
+      it('should handle transition from two-finger to single-finger', () => {
+        // Start with two-finger drag
+        input._testSetTwoFingerDrag(425, 125); // Center of the drag
+        
+        // Should have brake
+        const brake1 = input.getTouchBrake(800, 600);
+        expect(brake1).toBeTruthy();
+        
+        // Transition to single finger (reset brake state)
+        input._testResetBrakingState();
+        
+        // Should no longer have brake
+        const brake2 = input.getTouchBrake(800, 600);
+        expect(brake2).toBeNull();
+      });
+
+      it('should return null when no mobile braking is active', () => {
+        const brake = input.getTouchBrake(800, 600);
+        expect(brake).toBeNull();
+      });
+
+      it('should handle canvas size variations correctly', () => {
+        // Use test helper to set up drag
+        input._testSetTwoFingerDrag(225, 125); // Center at 225, 125
+        
+        const smallCanvasBrake = input.getTouchBrake(400, 300);  // Small canvas (center at 200, 150)
+        const largeCanvasBrake = input.getTouchBrake(1200, 800); // Large canvas (center at 600, 400)
+        
+        // Both should work but with different intensities relative to their canvas centers
+        expect(smallCanvasBrake).toBeTruthy();
+        expect(largeCanvasBrake).toBeTruthy();
+        
+        // Large canvas should have higher intensity due to drag point being further from its center
+        expect(largeCanvasBrake.intensity).toBeGreaterThan(smallCanvasBrake.intensity);
+        
+        // Clean up
+        input._testResetBrakingState();
+      });
     });
   });
 

@@ -22,6 +22,7 @@ interface MouseBrakeResult {
 // Extend Input interface for camera-specific methods
 interface CameraInput extends Input {
     getMouseBrake(canvasWidth: number, canvasHeight: number): MouseBrakeResult | null;
+    getTouchBrake(canvasWidth: number, canvasHeight: number): MouseBrakeResult | null;
 }
 
 export class Camera {
@@ -62,11 +63,14 @@ export class Camera {
         let isBraking = false;
         let thrustIntensity = 1.0;
 
-        // Check for braking input first
+        // Check for braking input first (both mouse and touch)
         const mouseBrake = input.getMouseBrake(canvasWidth, canvasHeight);
-        if (mouseBrake) {
+        const touchBrake = input.getTouchBrake(canvasWidth, canvasHeight);
+        const brake = mouseBrake || touchBrake;
+        
+        if (brake) {
             isBraking = true;
-            if (mouseBrake.mode === 'stop') {
+            if (brake.mode === 'stop') {
                 // Brake directly opposite to current velocity
                 const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
                 if (currentSpeed > 0) {
@@ -74,11 +78,11 @@ export class Camera {
                     thrustY = -this.velocityY / currentSpeed;
                     thrustIntensity = 2.0; // Extra strong braking
                 }
-            } else if (mouseBrake.mode === 'directional') {
+            } else if (brake.mode === 'directional') {
                 // Directional braking
-                thrustX = mouseBrake.x;
-                thrustY = mouseBrake.y;
-                thrustIntensity = mouseBrake.intensity * 1.5; // Slightly stronger
+                thrustX = brake.x;
+                thrustY = brake.y;
+                thrustIntensity = brake.intensity * 1.5; // Slightly stronger
             }
         }
 

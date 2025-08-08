@@ -29,6 +29,13 @@ export class Input {
     private touches = new Map<number, TouchData>(); // Track multiple touches
     private lastPinchDistance = 0;
     private pinchGesture: 'in' | 'out' | null = null;
+    
+    // Mobile braking support
+    private twoFingerTapStartTime: number | null = null;
+    private twoFingerTapTriggered = false;
+    private twoFingerDragActive = false;
+    private twoFingerStartCenter = { x: 0, y: 0 };
+    private twoFingerCurrentCenter = { x: 0, y: 0 };
 
     constructor() {
         this.setupEventListeners();
@@ -95,6 +102,7 @@ export class Input {
             
             if (e.touches.length === 2) {
                 this.initPinchGesture(e.touches);
+                this.initTwoFingerBraking(e.touches);
             }
         });
 
@@ -104,6 +112,7 @@ export class Input {
             
             if (e.touches.length === 2) {
                 this.updatePinchGesture(e.touches);
+                this.updateTwoFingerBraking(e.touches);
             } else if (e.touches.length === 1 && !this.touchConsumed) {
                 // Single touch - update mouse position for dragging
                 const touch = e.touches[0];
@@ -115,6 +124,14 @@ export class Input {
         window.addEventListener('touchend', (e: TouchEvent) => {
             e.preventDefault();
             this.updateTouches(e.touches);
+            
+            // Check for two-finger tap completion
+            if (e.touches.length === 0 && this.twoFingerTapStartTime) {
+                const tapDuration = Date.now() - this.twoFingerTapStartTime;
+                if (tapDuration < 300) { // Quick two-finger tap
+                    this.twoFingerTapTriggered = true;
+                }
+            }
             
             // If this was a short touch and not consumed by UI, treat as click
             if (this.touchStartTime && !this.touchConsumed) {
@@ -130,6 +147,7 @@ export class Input {
             if (e.touches.length < 2) {
                 this.pinchGesture = null;
                 this.lastPinchDistance = 0;
+                this.resetTwoFingerBraking();
             }
         });
 
@@ -140,6 +158,7 @@ export class Input {
             this.pinchGesture = null;
             this.lastPinchDistance = 0;
             this.touchConsumed = false;
+            this.resetTwoFingerBraking();
         });
     }
 
@@ -160,6 +179,7 @@ export class Input {
         this.mouseClicked = false;
         this.wheelDeltaY = 0;
         this.keyPressed.clear(); // Clear just-pressed flags
+        this.twoFingerTapTriggered = false; // Clear mobile brake tap
     }
 
     wasClicked(): boolean {
@@ -392,6 +412,100 @@ export class Input {
         };
     }
 
+    // Mobile brake functionality for camera system
+    getTouchBrake(canvasWidth: number, canvasHeight: number): { mode: 'stop' | 'directional', x: number, y: number, intensity: number } | null {
+        // Check for two-finger tap (stop braking)
+        if (this.twoFingerTapTriggered) {
+            return {
+                mode: 'stop',
+                x: 0,
+                y: 0,
+                intensity: 1.0
+            };
+        }
+        
+        // Check for two-finger drag (directional braking)
+        if (this.twoFingerDragActive && this.touches.size === 2) {
+            // Calculate direction from center of screen to current two-finger center
+            const centerX = canvasWidth / 2;
+            const centerY = canvasHeight / 2;
+            const deltaX = this.twoFingerCurrentCenter.x - centerX;
+            const deltaY = this.twoFingerCurrentCenter.y - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Minimum distance threshold to prevent accidental activation
+            const minThreshold = Math.min(canvasWidth, canvasHeight) / 20;
+            if (distance < minThreshold) {
+                return null;
+            }
+            
+            // Calculate normalized direction
+            const directionX = distance > 0 ? deltaX / distance : 0;
+            const directionY = distance > 0 ? deltaY / distance : 0;
+            
+            // Calculate intensity based on distance from center
+            const maxDistance = Math.min(canvasWidth, canvasHeight) / 3;
+            const intensity = Math.min(distance / maxDistance, 1.0);
+            
+            return {
+                mode: 'directional',
+                x: directionX,
+                y: directionY,
+                intensity: intensity
+            };
+        }
+        
+        return null;
+    }
+    
+    private initTwoFingerBraking(touches: TouchList): void {
+        if (touches.length === 2) {
+            this.twoFingerTapStartTime = Date.now();
+            this.twoFingerTapTriggered = false;
+            this.twoFingerDragActive = false;
+            
+            // Calculate initial center of two fingers
+            const touch1 = touches[0];
+            const touch2 = touches[1];
+            this.twoFingerStartCenter = {
+                x: (touch1.clientX + touch2.clientX) / 2,
+                y: (touch1.clientY + touch2.clientY) / 2
+            };
+            this.twoFingerCurrentCenter = { ...this.twoFingerStartCenter };
+        }
+    }
+    
+    private updateTwoFingerBraking(touches: TouchList): void {
+        if (touches.length === 2) {
+            // Update current center position
+            const touch1 = touches[0];
+            const touch2 = touches[1];
+            this.twoFingerCurrentCenter = {
+                x: (touch1.clientX + touch2.clientX) / 2,
+                y: (touch1.clientY + touch2.clientY) / 2
+            };
+            
+            // Check if we've moved enough to activate drag mode
+            const dragDistance = Math.sqrt(
+                Math.pow(this.twoFingerCurrentCenter.x - this.twoFingerStartCenter.x, 2) +
+                Math.pow(this.twoFingerCurrentCenter.y - this.twoFingerStartCenter.y, 2)
+            );
+            
+            if (dragDistance > 15) { // Minimum drag distance to activate
+                this.twoFingerDragActive = true;
+                this.twoFingerTapStartTime = null; // Cancel tap mode
+            }
+        }
+    }
+    
+    private resetTwoFingerBraking(): void {
+        this.twoFingerTapStartTime = null;
+        this.twoFingerTapTriggered = false;
+        this.twoFingerDragActive = false;
+        this.twoFingerStartCenter = { x: 0, y: 0 };
+        this.twoFingerCurrentCenter = { x: 0, y: 0 };
+    }
+
     // Touch-specific methods
     getTouchCount(): number {
         return this.touches.size;
@@ -399,5 +513,39 @@ export class Input {
 
     hasTouches(): boolean {
         return this.touches.size > 0;
+    }
+    
+    // Test helper methods - only use in tests
+    _testSetTwoFingerTap(): void {
+        this.twoFingerTapTriggered = true;
+    }
+    
+    _testSetTwoFingerDrag(centerX: number, centerY: number, active = true): void {
+        this.twoFingerDragActive = active;
+        this.twoFingerCurrentCenter = { x: centerX, y: centerY };
+        if (active) {
+            // Set up some fake touches for the size check
+            this.touches.set(0, { id: 0, x: centerX - 10, y: centerY - 10 });
+            this.touches.set(1, { id: 1, x: centerX + 10, y: centerY + 10 });
+        }
+    }
+    
+    _testResetBrakingState(): void {
+        this.resetTwoFingerBraking();
+        this.touches.clear();
+    }
+    
+    // Test getter methods for mouse position
+    _testGetMouseX(): number {
+        return this.mouseX;
+    }
+    
+    _testGetMouseY(): number {
+        return this.mouseY;
+    }
+    
+    _testSetMousePosition(x: number, y: number): void {
+        this.mouseX = x;
+        this.mouseY = y;
     }
 }
