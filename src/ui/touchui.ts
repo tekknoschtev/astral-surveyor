@@ -169,8 +169,8 @@ export class TouchUI {
         // Check if touch hits any visible button
         for (const button of this.buttons) {
             if (button.alpha > 0.1) { // Only check visible buttons
-                // Check follow ship button on all devices, other buttons only on touch devices
-                if (button.id === 'followShip' || this.isTouchDevice) {
+                // Check follow ship button and zoom buttons on all devices, other buttons only on touch devices
+                if (button.id === 'followShip' || button.id === 'zoomIn' || button.id === 'zoomOut' || this.isTouchDevice) {
                     const distance = Math.sqrt(
                         Math.pow(touchX - button.x, 2) + 
                         Math.pow(touchY - button.y, 2)
@@ -192,10 +192,10 @@ export class TouchUI {
         // Save context state
         ctx.save();
         
-        // Always render follow ship button, other buttons only on touch devices
+        // Render follow ship button and zoom buttons on all devices, other buttons only on touch devices
         for (const button of this.buttons) {
             if (button.alpha > 0.01) { // Only render visible buttons
-                if (button.id === 'followShip' || this.isTouchDevice) {
+                if (button.id === 'followShip' || button.id === 'zoomIn' || button.id === 'zoomOut' || this.isTouchDevice) {
                     this.renderButton(ctx, button);
                 }
             }
@@ -284,14 +284,13 @@ export class TouchUI {
         if (!hasZoomButtons) {
             const margin = 20;
             const buttonSize = 20;
-            const spacing = 50;
             
-            // Position zoom buttons higher up on mobile for better accessibility
-            // Zoom in button
+            // Position zoom buttons on right side above zoom/center data for all devices
+            // Zoom in button - positioned above zoom out button
             this.buttons.push({
                 id: 'zoomIn',
-                x: margin + buttonSize,
-                y: canvas.height * 0.4, // Much higher up on screen
+                x: canvas.width - margin - buttonSize, // Right side alignment
+                y: canvas.height - 140, // Above zoom data (zoom data is at canvas.height - 65)
                 size: buttonSize,
                 icon: 'plus',
                 visible: true,
@@ -300,11 +299,11 @@ export class TouchUI {
                 action: 'zoomIn'
             });
             
-            // Zoom out button
+            // Zoom out button - positioned below zoom in, above zoom data
             this.buttons.push({
                 id: 'zoomOut',
-                x: margin + buttonSize,
-                y: canvas.height * 0.4 + spacing, // Higher up, below zoom in button
+                x: canvas.width - margin - buttonSize, // Right side alignment
+                y: canvas.height - 90, // Between zoom in button and zoom data
                 size: buttonSize,
                 icon: 'minus',
                 visible: true,
