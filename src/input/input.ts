@@ -13,7 +13,7 @@ interface MouseDirection {
 }
 
 export class Input {
-    private keys = new Set<string>();
+    keys = new Set<string>(); // Public for game state detection
     private keyHoldTimes = new Map<string, number>(); // Track how long keys have been held
     private keyPressed = new Map<string, boolean>(); // Track single key presses
     private mousePressed = false;
@@ -348,6 +348,44 @@ export class Input {
         const intensity = Math.min(distance / maxDistance, 1.0);
 
         return {
+            x: directionX,
+            y: directionY,
+            intensity: intensity
+        };
+    }
+
+    // Mouse brake functionality for camera system
+    getMouseBrake(canvasWidth: number, canvasHeight: number): { mode: 'stop' | 'directional', x: number, y: number, intensity: number } | null {
+        if (!this.rightMousePressed) {
+            return null;
+        }
+
+        // Calculate direction from center of screen for directional braking
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+        const deltaX = this.mouseX - centerX;
+        const deltaY = this.mouseY - centerY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        // If near center, use stop braking
+        const stopThreshold = Math.min(canvasWidth, canvasHeight) / 8;
+        if (distance < stopThreshold) {
+            return {
+                mode: 'stop',
+                x: 0,
+                y: 0,
+                intensity: 1.0
+            };
+        }
+
+        // Otherwise use directional braking
+        const directionX = distance > 0 ? deltaX / distance : 0;
+        const directionY = distance > 0 ? deltaY / distance : 0;
+        const maxDistance = Math.min(canvasWidth, canvasHeight) / 3;
+        const intensity = Math.min(distance / maxDistance, 1.0);
+
+        return {
+            mode: 'directional',
             x: directionX,
             y: directionY,
             intensity: intensity

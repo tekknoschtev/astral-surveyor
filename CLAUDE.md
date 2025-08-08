@@ -46,7 +46,7 @@ Avoid relying on side effects or global state - keep behavior predictable.
 - Chunk-based loading for infinite world generation
 - Core values: testability, simplicity, emergent wonder
 
-# Not YUet Prioritized 
+# Not Yet Prioritized 
 Some things that **are not** priorities right now:
 * Multiplayer or networking
 * Backend services or logins

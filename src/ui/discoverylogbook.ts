@@ -119,11 +119,12 @@ export class DiscoveryLogbook {
         }
 
         const maxScroll = Math.max(0, this.discoveries.length - this.maxVisible);
+        const scrollAmount = Math.abs(direction);
         
         if (direction > 0) { // Scroll down (towards newer entries)
-            this.scrollOffset = Math.min(this.scrollOffset + 1, maxScroll);
+            this.scrollOffset = Math.min(this.scrollOffset + scrollAmount, maxScroll);
         } else { // Scroll up (towards older entries)
-            this.scrollOffset = Math.max(this.scrollOffset - 1, 0);
+            this.scrollOffset = Math.max(this.scrollOffset - scrollAmount, 0);
         }
     }
 
