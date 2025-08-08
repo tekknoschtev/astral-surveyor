@@ -204,6 +204,84 @@ export class TouchUI {
         // Restore context state
         ctx.restore();
     }
+    
+    // Render mobile braking feedback overlay
+    renderBrakeFeedback(renderer: Renderer, input: { getTouchBrake(width: number, height: number): { mode: 'stop' | 'directional', x: number, y: number, intensity: number } | null }): void {
+        if (!this.isTouchDevice) return;
+        
+        const brake = input.getTouchBrake(renderer.canvas.width, renderer.canvas.height);
+        if (!brake) return;
+        
+        const { ctx, canvas } = renderer;
+        
+        // Save context state
+        ctx.save();
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        if (brake.mode === 'stop') {
+            // Show stop brake indicator
+            ctx.fillStyle = '#ff4444dd'; // Red with transparency
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Draw background circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY - 100, 50, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw "BRAKE" text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('BRAKE', centerX, centerY - 100);
+            
+        } else if (brake.mode === 'directional') {
+            // Show directional brake indicator
+            const alpha = Math.floor(brake.intensity * 150 + 50); // 50-200 alpha range
+            ctx.fillStyle = `rgba(255, 165, 0, ${alpha / 255})`; // Orange with variable transparency
+            
+            // Draw direction arrow
+            const arrowLength = 60 * brake.intensity;
+            const endX = centerX + brake.x * arrowLength;
+            const endY = centerY + brake.y * arrowLength;
+            
+            // Arrow shaft
+            ctx.strokeStyle = `rgba(255, 165, 0, ${alpha / 255})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // Arrow head
+            const headLength = 15;
+            const angle = Math.atan2(brake.y, brake.x);
+            
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angle - Math.PI / 6),
+                endY - headLength * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angle + Math.PI / 6),
+                endY - headLength * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.stroke();
+            
+            // Intensity indicator
+            ctx.fillStyle = `rgba(255, 165, 0, ${alpha / 255})`;
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`BRAKE ${Math.round(brake.intensity * 100)}%`, centerX, centerY + 80);
+        }
+        
+        // Restore context state
+        ctx.restore();
+    }
 
     renderButton(ctx: CanvasRenderingContext2D, button: TouchButton): void {
         // Apply alpha for fade effect

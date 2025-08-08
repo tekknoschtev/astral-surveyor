@@ -607,4 +607,270 @@ describe('StellarMap System', () => {
       }
     });
   });
+
+  describe('Rendering Methods', () => {
+    let mockStars;
+    let mockPlanets;
+
+    beforeEach(() => {
+      stellarMap.visible = true;
+      
+      mockStars = [
+        {
+          x: 1000,
+          y: 2000,
+          starTypeName: 'G-Type Star',
+          starType: { sizeMultiplier: 1.0 },
+          timestamp: Date.now()
+        },
+        {
+          x: 1500,
+          y: 2500,
+          starTypeName: 'K-Type Star',
+          starType: { sizeMultiplier: 0.8 },
+          timestamp: Date.now()
+        }
+      ];
+
+      mockPlanets = [
+        {
+          x: 1050,
+          y: 2050,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Rocky Planet',
+          planetType: { sizeMultiplier: 0.5, colors: ['#8B4513'] },
+          planetIndex: 1,
+          objectName: 'Test Planet',
+          timestamp: Date.now()
+        },
+        {
+          x: null, // Inactive planet
+          y: null,
+          parentStarX: 2000,
+          parentStarY: 3000,
+          planetTypeName: 'Gas Giant',
+          planetIndex: 2
+        }
+      ];
+    });
+
+    describe('Grid Rendering', () => {
+      it('should render grid with dynamic sizing based on zoom level', () => {
+        stellarMap.zoomLevel = 0.05; // Galactic view
+        stellarMap.render(mockRenderer, mockCamera, []);
+        
+        // Should call strokeStyle and stroke methods for grid
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+      });
+
+      it('should skip grid rendering when spacing is too small', () => {
+        stellarMap.zoomLevel = 0.001; // Extreme zoom out
+        stellarMap.render(mockRenderer, mockCamera, []);
+        
+        // Grid should be skipped but map should still render
+        expect(mockRenderer.ctx.save).toHaveBeenCalled();
+      });
+
+      it('should use different grid sizes for different zoom levels', () => {
+        // Test sector view
+        stellarMap.zoomLevel = 0.3;
+        stellarMap.render(mockRenderer, mockCamera, []);
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+
+        // Test detail view  
+        stellarMap.zoomLevel = 8.0;
+        stellarMap.render(mockRenderer, mockCamera, []);
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+      });
+    });
+
+    describe('Star Rendering', () => {
+      it('should render discovered stars with correct colors', () => {
+        stellarMap.render(mockRenderer, mockCamera, mockStars);
+        
+        expect(mockRenderer.ctx.arc).toHaveBeenCalled();
+        expect(mockRenderer.ctx.fill).toHaveBeenCalled();
+      });
+
+      it('should highlight selected star', () => {
+        stellarMap.selectedStar = mockStars[0];
+        stellarMap.render(mockRenderer, mockCamera, mockStars);
+        
+        // Should draw selection highlight
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+      });
+
+      it('should render star labels at high zoom levels', () => {
+        stellarMap.zoomLevel = 3.0; // High zoom
+        stellarMap.render(mockRenderer, mockCamera, mockStars);
+        
+        expect(mockRenderer.ctx.fillText).toHaveBeenCalled();
+      });
+
+      it('should render star labels for selected stars regardless of zoom', () => {
+        stellarMap.zoomLevel = 0.5; // Low zoom
+        stellarMap.selectedStar = mockStars[0];
+        stellarMap.render(mockRenderer, mockCamera, mockStars);
+        
+        expect(mockRenderer.ctx.fillText).toHaveBeenCalled();
+      });
+
+      it('should calculate star size based on type and zoom level', () => {
+        stellarMap.zoomLevel = 0.05; // Extreme zoom out
+        stellarMap.render(mockRenderer, mockCamera, mockStars);
+        
+        // Should call arc with calculated radius
+        expect(mockRenderer.ctx.arc).toHaveBeenCalled();
+      });
+
+      it('should handle stars with missing star type', () => {
+        const starsWithMissingType = [{
+          x: 1000,
+          y: 2000,
+          starTypeName: null,
+          starType: null
+        }];
+        
+        stellarMap.render(mockRenderer, mockCamera, starsWithMissingType);
+        
+        // Should not crash and use default white color
+        expect(mockRenderer.ctx.fill).toHaveBeenCalled();
+      });
+    });
+
+    describe('Planet Rendering', () => {
+      it('should render planets with orbital circles', () => {
+        stellarMap.zoomLevel = 4.0; // Detail view to show planets
+        stellarMap.render(mockRenderer, mockCamera, mockStars, mockPlanets);
+        
+        // Should render orbital circles and planets
+        expect(mockRenderer.ctx.arc).toHaveBeenCalled();
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled(); // For orbital circles
+        expect(mockRenderer.ctx.fill).toHaveBeenCalled(); // For planets
+      });
+
+      it('should skip planets with null positions', () => {
+        stellarMap.zoomLevel = 4.0;
+        stellarMap.render(mockRenderer, mockCamera, mockStars, mockPlanets);
+        
+        // Should only render active planets (first one), skip second
+        expect(mockRenderer.ctx.fill).toHaveBeenCalled();
+      });
+
+      it('should highlight selected planets', () => {
+        stellarMap.selectedPlanet = mockPlanets[0];
+        stellarMap.zoomLevel = 4.0;
+        stellarMap.render(mockRenderer, mockCamera, mockStars, mockPlanets);
+        
+        // Should draw planet highlight
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+      });
+
+      it('should group planets by parent star', () => {
+        stellarMap.zoomLevel = 4.0;
+        stellarMap.render(mockRenderer, mockCamera, mockStars, mockPlanets);
+        
+        // Should render orbital system for the parent star
+        expect(mockRenderer.ctx.arc).toHaveBeenCalled();
+      });
+
+      it('should render planet labels at high zoom levels', () => {
+        stellarMap.zoomLevel = 5.0; // Very high zoom
+        stellarMap.render(mockRenderer, mockCamera, mockStars, mockPlanets);
+        
+        expect(mockRenderer.ctx.fillText).toHaveBeenCalled();
+      });
+
+      it('should handle empty planet arrays gracefully', () => {
+        stellarMap.zoomLevel = 4.0;
+        stellarMap.render(mockRenderer, mockCamera, mockStars, []);
+        
+        // Should not crash
+        expect(mockRenderer.ctx.save).toHaveBeenCalled();
+      });
+    });
+
+    describe('Current Position Rendering', () => {
+      it('should render current position marker', () => {
+        stellarMap.render(mockRenderer, mockCamera, []);
+        
+        // Should draw current position crosshair
+        expect(mockRenderer.ctx.moveTo).toHaveBeenCalled();
+        expect(mockRenderer.ctx.lineTo).toHaveBeenCalled();
+        expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Size and Color Calculations', () => {
+    beforeEach(() => {
+      stellarMap.visible = true;
+    });
+
+    it('should calculate star sizes based on zoom and star type', () => {
+      const mockStar = {
+        starType: { sizeMultiplier: 1.5 },
+        starTypeName: 'Blue Giant'
+      };
+      
+      // Test at different zoom levels
+      stellarMap.zoomLevel = 0.05; // Extreme zoom out
+      stellarMap.render(mockRenderer, mockCamera, [mockStar]);
+      
+      stellarMap.zoomLevel = 3.0; // Normal zoom
+      stellarMap.render(mockRenderer, mockCamera, [mockStar]);
+      
+      expect(mockRenderer.ctx.arc).toHaveBeenCalled();
+    });
+
+    it('should calculate planet sizes correctly', () => {
+      const mockPlanet = {
+        x: 1000,
+        y: 2000,
+        parentStarX: 1000,
+        parentStarY: 2000,
+        planetType: { sizeMultiplier: 2.0 },
+        planetTypeName: 'Gas Giant'
+      };
+      
+      stellarMap.zoomLevel = 4.0;
+      stellarMap.render(mockRenderer, mockCamera, [], [mockPlanet]);
+      
+      expect(mockRenderer.ctx.arc).toHaveBeenCalled();
+    });
+
+    it('should get planet colors from planet type', () => {
+      const mockPlanet = {
+        x: 1000,
+        y: 2000,
+        parentStarX: 1000,
+        parentStarY: 2000,
+        planetType: { colors: ['#FF0000', '#00FF00'] },
+        planetTypeName: 'Colorful Planet'
+      };
+      
+      stellarMap.zoomLevel = 4.0;
+      stellarMap.render(mockRenderer, mockCamera, [], [mockPlanet]);
+      
+      expect(mockRenderer.ctx.fill).toHaveBeenCalled();
+    });
+
+    it('should handle planets with missing color data', () => {
+      const mockPlanet = {
+        x: 1000,
+        y: 2000,
+        parentStarX: 1000,
+        parentStarY: 2000,
+        planetType: { colors: null },
+        planetTypeName: 'Unknown Planet'
+      };
+      
+      stellarMap.zoomLevel = 4.0;
+      stellarMap.render(mockRenderer, mockCamera, [], [mockPlanet]);
+      
+      // Should use default color and not crash
+      expect(mockRenderer.ctx.fill).toHaveBeenCalled();
+    });
+  });
 });

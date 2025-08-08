@@ -29,7 +29,8 @@ describe('Camera Physics and Movement', () => {
       isRightPressed: vi.fn(() => false),
       getThrustIntensity: vi.fn(() => 1.0),
       getMouseDirection: vi.fn(() => ({ x: 0, y: 0, intensity: 0 })),
-      getMouseBrake: vi.fn(() => null)
+      getMouseBrake: vi.fn(() => null),
+      getTouchBrake: vi.fn(() => null)
     };
     
     mockStellarMap = {
