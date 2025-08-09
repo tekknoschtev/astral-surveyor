@@ -151,16 +151,16 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
       expect(logbook.discoveries[0].timestamp).toBeLessThanOrEqual(endTime);
     });
 
-    it('should limit discoveries to 100 entries', () => {
+    it('should store all discoveries without limit', () => {
       // Add 105 discoveries
       for (let i = 0; i < 105; i++) {
         logbook.addDiscovery(`Star ${i}`, 'G-type Star', Date.now() + i);
       }
       
-      expect(logbook.discoveries).toHaveLength(100);
-      // Should keep the most recent 100 (Star 5 through Star 104)
-      expect(logbook.discoveries[0].name).toBe('Star 5');
-      expect(logbook.discoveries[99].name).toBe('Star 104');
+      expect(logbook.discoveries).toHaveLength(105);
+      // Should keep all discoveries
+      expect(logbook.discoveries[0].name).toBe('Star 0');
+      expect(logbook.discoveries[104].name).toBe('Star 104');
     });
 
     it('should auto-scroll to bottom when adding discoveries', () => {
