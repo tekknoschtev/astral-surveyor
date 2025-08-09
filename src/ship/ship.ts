@@ -49,9 +49,9 @@ interface ThrustDirection {
 
 // Extended camera interface for ship-specific properties
 interface ShipCamera extends Camera {
-    isThrusting?: boolean;
-    isBraking?: boolean;
-    thrustDirection?: ThrustDirection;
+    isThrusting: boolean;
+    isBraking: boolean;
+    thrustDirection: ThrustDirection;
     rotation: number;
 }
 
@@ -159,8 +159,8 @@ export class ThrusterParticles {
     }
 
     update(deltaTime: number, camera: ShipCamera, ship: Ship): void {
-        // Spawn new particles if thrusting
-        if (camera.isThrusting) {
+        // Spawn new particles if thrusting or braking
+        if (camera.isThrusting || camera.isBraking) {
             this.spawnParticles(camera, ship);
         }
 
@@ -204,7 +204,7 @@ export class ThrusterParticles {
             const thrusterY = rotatedY * scale;
 
             // Choose particle color based on braking
-            const isBraking = camera.isBraking || false;
+            const isBraking = camera.isBraking;
             const particleColor = isBraking 
                 ? (Math.random() > 0.7 ? '#ff6666' : '#ff4444') // Red for braking
                 : (Math.random() > 0.7 ? '#00ffaa' : '#00ff88'); // Green for thrusting

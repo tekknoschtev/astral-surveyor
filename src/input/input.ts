@@ -294,20 +294,64 @@ export class Input {
     }
 
     // Movement input methods
-    isThrustPressed(): boolean {
-        return this.isPressed('KeyW') || this.isPressed('ArrowUp') || this.isPressed('Space');
+    // Four-directional movement (restored from working version)
+    get moveUp(): boolean {
+        return this.isPressed('KeyW') || this.isPressed('ArrowUp');
     }
 
-    isBrakePressed(): boolean {
-        return this.isPressed('KeyS') || this.isPressed('ArrowDown') || this.rightMousePressed;
+    get moveDown(): boolean {
+        return this.isPressed('KeyS') || this.isPressed('ArrowDown');
     }
 
-    isLeftPressed(): boolean {
+    get moveLeft(): boolean {
         return this.isPressed('KeyA') || this.isPressed('ArrowLeft');
     }
 
-    isRightPressed(): boolean {
+    get moveRight(): boolean {
         return this.isPressed('KeyD') || this.isPressed('ArrowRight');
+    }
+
+    // Movement intensities
+    get upIntensity(): number {
+        return Math.max(
+            this.getThrustIntensity('KeyW'),
+            this.getThrustIntensity('ArrowUp')
+        );
+    }
+
+    get downIntensity(): number {
+        return Math.max(
+            this.getThrustIntensity('KeyS'),
+            this.getThrustIntensity('ArrowDown')
+        );
+    }
+
+    get leftIntensity(): number {
+        return Math.max(
+            this.getThrustIntensity('KeyA'),
+            this.getThrustIntensity('ArrowLeft')
+        );
+    }
+
+    get rightIntensity(): number {
+        return Math.max(
+            this.getThrustIntensity('KeyD'),
+            this.getThrustIntensity('ArrowRight')
+        );
+    }
+
+    // Braking system (Space bar only)
+    get isBraking(): boolean {
+        return this.isPressed('Space');
+    }
+
+    get brakingIntensity(): number {
+        return this.getThrustIntensity('Space');
+    }
+
+    // Legacy method for compatibility
+    isRightPressed(): boolean {
+        return this.rightMousePressed;
     }
 
     // UI input methods
