@@ -159,8 +159,8 @@ export class ThrusterParticles {
     }
 
     update(deltaTime: number, camera: ShipCamera, ship: Ship): void {
-        // Spawn new particles if thrusting
-        if (camera.isThrusting) {
+        // Spawn new particles if thrusting or braking
+        if (camera.isThrusting || camera.isBraking) {
             this.spawnParticles(camera, ship);
         }
 

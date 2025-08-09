@@ -1,34 +1,34 @@
-class CelestialObject {
+// Celestial Objects: Stars, Planets, and Moons
+// TypeScript conversion with comprehensive type definitions
+// Base celestial object class
+export class CelestialObject {
     constructor(x, y, type) {
+        this.discovered = false;
+        this.discoveryDistance = 50;
         this.x = x;
         this.y = y;
         this.type = type;
-        this.discovered = false;
-        this.discoveryDistance = 50; // How close ship needs to be for discovery
     }
-
     distanceToShip(camera) {
         const dx = this.x - camera.x;
         const dy = this.y - camera.y;
         return Math.sqrt(dx * dx + dy * dy);
     }
-
     checkDiscovery(camera, canvasWidth, canvasHeight) {
-        if (this.discovered) return false;
-        
+        if (this.discovered)
+            return false;
         // For stars, discovery happens when they're visible on screen (since stars are so bright)
         if (this.type === 'star') {
             const [screenX, screenY] = camera.worldToScreen(this.x, this.y, canvasWidth, canvasHeight);
-            const margin = Math.max(this.radius, 50); // Use star radius or minimum 50px margin
-            
-            const isVisible = screenX >= -margin && screenX <= canvasWidth + margin && 
-                             screenY >= -margin && screenY <= canvasHeight + margin;
-            
+            const margin = Math.max(this.radius || 50, 50); // Use star radius or minimum 50px margin
+            const isVisible = screenX >= -margin && screenX <= canvasWidth + margin &&
+                screenY >= -margin && screenY <= canvasHeight + margin;
             if (isVisible) {
                 this.discovered = true;
                 return true; // Newly discovered
             }
-        } else {
+        }
+        else {
             // For planets and moons, use the traditional distance-based discovery
             if (this.distanceToShip(camera) <= this.discoveryDistance) {
                 this.discovered = true;
@@ -37,58 +37,51 @@ class CelestialObject {
         }
         return false;
     }
-
-    render(renderer, camera) {
-        // To be overridden by subclasses
-    }
 }
-
-class Planet extends CelestialObject {
-    constructor(x, y, parentStar = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, planetType = null) {
+// Planet class
+export class Planet extends CelestialObject {
+    constructor(x, y, parentStar, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, planetType) {
         super(x, y, 'planet');
-        
+        this.orbitalDistance = 0;
+        this.orbitalAngle = 0;
+        this.orbitalSpeed = 0;
+        this.radius = 8;
+        this.color = '#808080';
+        this.visualEffects = {};
+        this.hasRings = false;
         // Orbital properties
         this.parentStar = parentStar;
         this.orbitalDistance = orbitalDistance;
-        this.orbitalAngle = orbitalAngle; // Current angle in radians
-        this.orbitalSpeed = orbitalSpeed; // Radians per second
-        
+        this.orbitalAngle = orbitalAngle;
+        this.orbitalSpeed = orbitalSpeed;
         // Planet type and properties
-        this.planetType = planetType || PlanetTypes.ROCKY; // Default to rocky if not specified
+        this.planetType = planetType || PlanetTypes.ROCKY;
         this.planetTypeName = this.planetType.name;
-        
         // Initialize properties based on planet type
         this.initializePlanetProperties();
     }
-    
     initializePlanetProperties() {
         // Set size based on planet type
         const baseRadius = 8 + Math.random() * 12; // 8-20 pixels base
         this.radius = baseRadius * this.planetType.sizeMultiplier;
         this.discoveryDistance = this.radius + 30;
-        
         // Set color from planet type's color palette
         this.color = this.planetType.colors[Math.floor(Math.random() * this.planetType.colors.length)];
-        
         // Set visual effects based on planet type
         this.visualEffects = { ...this.planetType.visualEffects };
-        
         // Initialize stripe color if planet has stripes
         if (this.visualEffects.hasStripes) {
             this.stripeColor = this.darkenColor(this.color, 0.3);
         }
-        
         // Initialize glow color if planet has glow
         if (this.visualEffects.hasGlow) {
             this.glowColor = this.lightenColor(this.color, 0.3);
         }
-        
         // Initialize ring system if planet has rings
         this.hasRings = this.determineRingSystem();
     }
-
     // Initialize planet with seeded random for deterministic generation
-    initWithSeed(rng, parentStar = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, planetType = null, planetIndex = null) {
+    initWithSeed(rng, parentStar, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, planetType, planetIndex) {
         // Update orbital properties if provided
         if (parentStar) {
             this.parentStar = parentStar;
@@ -96,46 +89,36 @@ class Planet extends CelestialObject {
             this.orbitalAngle = orbitalAngle;
             this.orbitalSpeed = orbitalSpeed;
         }
-        
         // Store planet index for unique ID generation
-        if (planetIndex !== null) {
+        if (planetIndex !== undefined) {
             this.planetIndex = planetIndex;
         }
-        
         // Update planet type if provided
         if (planetType) {
             this.planetType = planetType;
             this.planetTypeName = this.planetType.name;
         }
-        
         // Generate unique identifier for this planet using the same system as discovery
         this.uniqueId = this.generateUniqueId();
-        
         // Set size based on planet type using seeded random
         const baseRadius = rng.nextFloat(8, 20); // 8-20 pixels base
         this.radius = baseRadius * this.planetType.sizeMultiplier;
         this.discoveryDistance = this.radius + 30;
-        
         // Set color from planet type's color palette using seeded random
         this.color = rng.choice(this.planetType.colors);
-        
         // Set visual effects based on planet type
         this.visualEffects = { ...this.planetType.visualEffects };
-        
         // Initialize stripe color if planet has stripes
         if (this.visualEffects.hasStripes) {
             this.stripeColor = this.darkenColor(this.color, 0.3);
         }
-        
         // Initialize glow color if planet has glow
         if (this.visualEffects.hasGlow) {
             this.glowColor = this.lightenColor(this.color, 0.3);
         }
-        
         // Initialize ring system if planet has rings
         this.hasRings = this.determineRingSystem(rng);
     }
-
     generateUniqueId() {
         // Use the same logic as the world manager's getObjectId for consistency
         if (this.parentStar && this.planetIndex !== undefined) {
@@ -146,7 +129,6 @@ class Planet extends CelestialObject {
         // Fallback for planets without parent stars
         return `planet_${Math.floor(this.x)}_${Math.floor(this.y)}`;
     }
-
     // Simple hash function to convert string ID to numeric seed
     hashStringToNumber(str, offset = 0) {
         let hash = offset;
@@ -157,48 +139,41 @@ class Planet extends CelestialObject {
         }
         return Math.abs(hash) % 1000000; // Return positive number
     }
-
     // Determine if this planet should have rings based on type and probability
-    determineRingSystem(rng = null) {
+    determineRingSystem(rng) {
         const ringChance = this.visualEffects.hasRings;
-        
         // If hasRings is boolean true, planet always has rings
-        if (ringChance === true) return true;
-        
+        if (ringChance === true)
+            return true;
         // If hasRings is a number, it's a probability
         if (typeof ringChance === 'number') {
             if (rng) {
                 return rng.next() < ringChance;
-            } else {
+            }
+            else {
                 return Math.random() < ringChance;
             }
         }
-        
         // Otherwise, no rings
         return false;
     }
-
     // Render ring system around the planet
     renderRings(renderer, screenX, screenY) {
-        if (!this.hasRings || !this.visualEffects.ringConfig) return;
-        
+        if (!this.hasRings || !this.visualEffects.ringConfig)
+            return;
         const ctx = renderer.ctx;
         const config = this.visualEffects.ringConfig;
-        
         // Ring dimensions
         const innerRadius = this.radius * config.innerRadius;
         const outerRadius = this.radius * config.outerRadius;
-        
         // Draw rings in multiple bands for depth and realism
         for (let band = 0; band < config.bandCount; band++) {
             const bandProgress = band / (config.bandCount - 1); // 0.0 to 1.0
             const currentInner = innerRadius + (outerRadius - innerRadius) * bandProgress * 0.3;
             const currentOuter = innerRadius + (outerRadius - innerRadius) * (bandProgress * 0.7 + 0.3);
-            
             // Calculate ring color for this band
             const colorIndex = Math.floor(bandProgress * (config.colors.length - 1));
             const ringColor = config.colors[colorIndex];
-            
             // Apply opacity and shimmer effect if configured
             let alpha = config.opacity;
             if (config.hasShimmer) {
@@ -206,24 +181,19 @@ class Planet extends CelestialObject {
                 const shimmer = Math.sin(time * 2 + band * 0.5) * 0.2 + 0.8;
                 alpha *= shimmer;
             }
-            
             const alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
-            
             // Draw ring segments as elliptical arcs for 3D appearance
             ctx.strokeStyle = ringColor + alphaHex;
             ctx.lineWidth = Math.max(1, (currentOuter - currentInner) / 3);
-            
             // Draw multiple ring segments to create filled appearance
             const segmentCount = 8;
             for (let segment = 0; segment < segmentCount; segment++) {
                 const startAngle = (segment / segmentCount) * Math.PI * 2;
                 const endAngle = ((segment + 1) / segmentCount) * Math.PI * 2;
-                
                 // Draw outer ring edge
                 ctx.beginPath();
                 ctx.ellipse(screenX, screenY, currentOuter, currentOuter * 0.3, 0, startAngle, endAngle);
                 ctx.stroke();
-                
                 // Draw inner ring edge for hollow appearance
                 if (currentInner > 0) {
                     ctx.beginPath();
@@ -233,24 +203,20 @@ class Planet extends CelestialObject {
             }
         }
     }
-
     updatePosition(deltaTime) {
         // Update orbital position if planet has a parent star
         if (this.parentStar && this.orbitalDistance > 0) {
             // Update orbital angle based on orbital speed
             this.orbitalAngle += this.orbitalSpeed * deltaTime;
-            
             // Keep angle within 0 to 2π range
             if (this.orbitalAngle >= Math.PI * 2) {
                 this.orbitalAngle -= Math.PI * 2;
             }
-            
             // Calculate new position based on orbital parameters
             this.x = this.parentStar.x + Math.cos(this.orbitalAngle) * this.orbitalDistance;
             this.y = this.parentStar.y + Math.sin(this.orbitalAngle) * this.orbitalDistance;
         }
     }
-
     darkenColor(hex, amount) {
         const num = parseInt(hex.replace('#', ''), 16);
         const r = Math.max(0, Math.floor((num >> 16) * (1 - amount)));
@@ -258,7 +224,6 @@ class Planet extends CelestialObject {
         const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - amount)));
         return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
     }
-
     lightenColor(hex, amount) {
         const num = parseInt(hex.replace('#', ''), 16);
         const r = Math.min(255, Math.floor((num >> 16) + (255 - (num >> 16)) * amount));
@@ -266,30 +231,22 @@ class Planet extends CelestialObject {
         const b = Math.min(255, Math.floor((num & 0x0000FF) + (255 - (num & 0x0000FF)) * amount));
         return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
     }
-
     render(renderer, camera) {
         const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
-        
         // Only render if on screen
-        if (screenX >= -this.radius - 20 && screenX <= renderer.canvas.width + this.radius + 20 && 
+        if (screenX >= -this.radius - 20 && screenX <= renderer.canvas.width + this.radius + 20 &&
             screenY >= -this.radius - 20 && screenY <= renderer.canvas.height + this.radius + 20) {
-            
             // Draw glow effect if planet has glow (before main planet)
-            if (this.visualEffects.hasGlow) {
+            if (this.visualEffects.hasGlow && this.glowColor) {
                 const glowRadius = this.radius + 8;
-                const gradient = renderer.ctx.createRadialGradient(
-                    screenX, screenY, this.radius,
-                    screenX, screenY, glowRadius
-                );
+                const gradient = renderer.ctx.createRadialGradient(screenX, screenY, this.radius, screenX, screenY, glowRadius);
                 gradient.addColorStop(0, this.glowColor + '40'); // Semi-transparent
                 gradient.addColorStop(1, this.glowColor + '00'); // Fully transparent
-                
                 renderer.ctx.fillStyle = gradient;
                 renderer.ctx.beginPath();
                 renderer.ctx.arc(screenX, screenY, glowRadius, 0, Math.PI * 2);
                 renderer.ctx.fill();
             }
-            
             // Draw back portion of rings (behind planet)
             if (this.hasRings) {
                 renderer.ctx.save();
@@ -300,7 +257,6 @@ class Planet extends CelestialObject {
                 this.renderRings(renderer, screenX, screenY);
                 renderer.ctx.restore();
             }
-            
             // Draw atmosphere if planet has one
             if (this.visualEffects.hasAtmosphere) {
                 const atmosphereRadius = this.radius + 3;
@@ -311,13 +267,10 @@ class Planet extends CelestialObject {
                 renderer.ctx.arc(screenX, screenY, atmosphereRadius, 0, Math.PI * 2);
                 renderer.ctx.stroke();
             }
-            
             // Draw main planet
             renderer.drawCircle(screenX, screenY, this.radius, this.color);
-            
             // Draw type-specific visual effects
             this.renderVisualEffects(renderer, screenX, screenY);
-            
             // Draw front portion of rings (in front of planet)
             if (this.hasRings) {
                 renderer.ctx.save();
@@ -328,7 +281,6 @@ class Planet extends CelestialObject {
                 this.renderRings(renderer, screenX, screenY);
                 renderer.ctx.restore();
             }
-            
             // Visual indicator if discovered
             if (this.discovered) {
                 renderer.ctx.strokeStyle = '#00ff88';
@@ -339,32 +291,23 @@ class Planet extends CelestialObject {
             }
         }
     }
-
     renderVisualEffects(renderer, screenX, screenY) {
         const ctx = renderer.ctx;
-        
         // Draw stripes (atmospheric bands for gas giants, ocean currents for ocean worlds)
-        if (this.visualEffects.hasStripes) {
+        if (this.visualEffects.hasStripes && this.stripeColor) {
             const stripeCount = this.planetType === PlanetTypes.GAS_GIANT ? 5 : 3;
             for (let i = 0; i < stripeCount; i++) {
                 const stripeY = screenY - this.radius + (this.radius * 2 / (stripeCount + 1)) * (i + 1);
                 const stripeWidth = Math.sqrt(this.radius * this.radius - Math.pow(stripeY - screenY, 2)) * 2;
-                
                 if (stripeWidth > 0) {
                     ctx.fillStyle = this.stripeColor;
                     const stripeHeight = this.planetType === PlanetTypes.GAS_GIANT ? 3 : 2;
-                    ctx.fillRect(
-                        screenX - stripeWidth / 2, 
-                        stripeY - stripeHeight / 2, 
-                        stripeWidth, 
-                        stripeHeight
-                    );
+                    ctx.fillRect(screenX - stripeWidth / 2, stripeY - stripeHeight / 2, stripeWidth, stripeHeight);
                 }
             }
         }
-        
         // Draw swirls for gas giants
-        if (this.visualEffects.hasSwirls) {
+        if (this.visualEffects.hasSwirls && this.stripeColor) {
             ctx.strokeStyle = this.stripeColor;
             ctx.lineWidth = 1.5;
             for (let i = 0; i < 2; i++) {
@@ -375,7 +318,6 @@ class Planet extends CelestialObject {
                 ctx.stroke();
             }
         }
-        
         // Draw craters for rocky/desert/frozen worlds
         if (this.visualEffects.hasCraters) {
             ctx.fillStyle = this.darkenColor(this.color, 0.4);
@@ -383,51 +325,41 @@ class Planet extends CelestialObject {
             const baseCraterCount = Math.floor(this.radius / 6); // Increased from /8 to /6
             const bonusCraters = Math.floor((this.radius - 10) / 4); // Extra craters for larger planets
             const craterCount = Math.max(2, baseCraterCount + bonusCraters); // Minimum 2 craters
-            
             for (let i = 0; i < craterCount; i++) {
                 // Use unique planet ID for consistent but varied crater patterns
                 const baseHash = this.hashStringToNumber(this.uniqueId || 'default');
-                
                 // Generate random but consistent angle for each crater
                 const angleSeed = (baseHash + i * 50) % 1000 / 1000;
                 const angle = angleSeed * Math.PI * 2;
-                
                 // Generate random but consistent distance from center
                 const distanceSeed = (baseHash + i * 100 + 12345) % 1000 / 1000;
                 const distance = this.radius * 0.7 * distanceSeed;
-                
                 const craterX = screenX + Math.cos(angle) * distance;
                 const craterY = screenY + Math.sin(angle) * distance;
-                
                 // Generate consistent crater size
                 const sizeSeed = (baseHash + i * 200 + 67890) % 1000 / 1000;
                 const craterSize = 1 + sizeSeed * 2;
-                
                 ctx.beginPath();
                 ctx.arc(craterX, craterY, craterSize, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
-        
         // Draw dune patterns for desert worlds
         if (this.visualEffects.hasDunePatterns) {
             ctx.strokeStyle = this.darkenColor(this.color, 0.2);
             ctx.lineWidth = 1;
             const baseHash = this.hashStringToNumber(this.uniqueId || 'default', 5000);
             const duneCount = 3 + Math.floor((baseHash % 100) / 50); // 3-4 dunes
-            
             for (let i = 0; i < duneCount; i++) {
                 // Add slight variation to dune positions using unique ID
                 const positionSeed = (baseHash + i * 300) % 1000 / 1000;
                 const yOffset = (positionSeed - 0.5) * this.radius * 0.2; // Small random offset
                 const y = screenY - this.radius * 0.6 + (i * this.radius * 0.4) + yOffset;
-                
                 const width = Math.sqrt(this.radius * this.radius - Math.pow(y - screenY, 2)) * 1.5;
                 if (width > 0) {
                     // Add slight curve variation
                     const curveSeed = (baseHash + i * 400) % 1000 / 1000;
                     const curveHeight = 2 + curveSeed * 3; // 2-5 pixel curve height
-                    
                     ctx.beginPath();
                     ctx.moveTo(screenX - width / 2, y);
                     ctx.quadraticCurveTo(screenX, y - curveHeight, screenX + width / 2, y);
@@ -435,38 +367,32 @@ class Planet extends CelestialObject {
                 }
             }
         }
-        
         // Draw crystalline patterns for frozen worlds
         if (this.visualEffects.hasCrystalline) {
             ctx.strokeStyle = this.lightenColor(this.color, 0.5);
             ctx.lineWidth = 1;
             const baseHash = this.hashStringToNumber(this.uniqueId || 'default', 7000);
             const crystalCount = 4 + Math.floor((baseHash % 100) / 25); // 4-7 crystal lines
-            
             for (let i = 0; i < crystalCount; i++) {
                 // Add variation to crystal angles using unique ID
                 const angleSeed = (baseHash + i * 500) % 1000 / 1000;
                 const baseAngle = (i / crystalCount) * Math.PI * 2;
                 const angleVariation = (angleSeed - 0.5) * 0.3; // ±0.15 radian variation
                 const angle = baseAngle + angleVariation;
-                
                 // Add variation to crystal lengths
                 const lengthSeed = (baseHash + i * 600) % 1000 / 1000;
                 const startRadius = 0.2 + lengthSeed * 0.2; // 0.2-0.4
-                const endRadius = 0.6 + lengthSeed * 0.3;   // 0.6-0.9
-                
+                const endRadius = 0.6 + lengthSeed * 0.3; // 0.6-0.9
                 const startX = screenX + Math.cos(angle) * this.radius * startRadius;
                 const startY = screenY + Math.sin(angle) * this.radius * startRadius;
                 const endX = screenX + Math.cos(angle) * this.radius * endRadius;
                 const endY = screenY + Math.sin(angle) * this.radius * endRadius;
-                
                 ctx.beginPath();
                 ctx.moveTo(startX, startY);
                 ctx.lineTo(endX, endY);
                 ctx.stroke();
             }
         }
-        
         // Draw lava flows for volcanic worlds
         if (this.visualEffects.hasLavaFlow) {
             ctx.strokeStyle = this.lightenColor(this.color, 0.3);
@@ -475,20 +401,12 @@ class Planet extends CelestialObject {
                 const angle = (i / 3) * Math.PI * 2;
                 const startRadius = this.radius * 0.2;
                 const endRadius = this.radius * 0.9;
-                
                 ctx.beginPath();
-                ctx.moveTo(
-                    screenX + Math.cos(angle) * startRadius,
-                    screenY + Math.sin(angle) * startRadius
-                );
-                ctx.lineTo(
-                    screenX + Math.cos(angle) * endRadius,
-                    screenY + Math.sin(angle) * endRadius
-                );
+                ctx.moveTo(screenX + Math.cos(angle) * startRadius, screenY + Math.sin(angle) * startRadius);
+                ctx.lineTo(screenX + Math.cos(angle) * endRadius, screenY + Math.sin(angle) * endRadius);
                 ctx.stroke();
             }
         }
-        
         // Draw shimmer effect for exotic worlds
         if (this.visualEffects.hasShimmer) {
             const time = Date.now() * 0.001; // Convert to seconds
@@ -501,71 +419,66 @@ class Planet extends CelestialObject {
         }
     }
 }
-
-class Star extends CelestialObject {
-    constructor(x, y, starType = null) {
+// Star class
+export class Star extends CelestialObject {
+    constructor(x, y, starType) {
         super(x, y, 'star');
-        
         // Array to track planets orbiting this star
         this.planets = [];
-        
+        this.radius = 80;
+        this.color = '#ffdd88';
+        this.visualEffects = {};
+        this.brightness = 1.0;
+        // Braking distance for stars
+        this.brakingDistance = 100;
         // Star type and properties
-        this.starType = starType || StarTypes.G_TYPE; // Default to G-type if not specified
+        this.starType = starType || StarTypes.G_TYPE;
         this.starTypeName = this.starType.name;
-        
         // Initialize properties based on star type
         this.initializeStarProperties();
     }
-    
     initializeStarProperties() {
         // Set size based on star type
         const baseRadius = 80 + Math.random() * 60; // 80-140 pixels base
         this.radius = baseRadius * this.starType.sizeMultiplier;
         this.discoveryDistance = this.radius + 400;
         this.brakingDistance = this.radius + 100; // Separate braking distance for stars
-        
         // Set color from star type's color palette
         this.color = this.starType.colors[Math.floor(Math.random() * this.starType.colors.length)];
-        
         // Set visual effects based on star type
         this.visualEffects = { ...this.starType.visualEffects };
-        
         // Full brightness for all stars
         this.brightness = 1.0;
     }
-
     // Initialize star with seeded random for deterministic generation
-    initWithSeed(rng, starType = null) {
+    initWithSeed(rng, starType) {
         // Update star type if provided
         if (starType) {
             this.starType = starType;
             this.starTypeName = this.starType.name;
         }
-        
         // Generate unique identifier for this star
         this.uniqueId = this.generateUniqueId();
-        
         // Set size based on star type using seeded random
         const baseRadius = rng.nextFloat(80, 140); // 80-140 pixels base
         this.radius = baseRadius * this.starType.sizeMultiplier;
         this.discoveryDistance = this.radius + 400;
         this.brakingDistance = this.radius + 100; // Separate braking distance for stars
-        
         // Set color from star type's color palette using seeded random
         this.color = rng.choice(this.starType.colors);
-        
         // Set visual effects based on star type
         this.visualEffects = { ...this.starType.visualEffects };
-        
+        // Generate sunspots for G-type stars
+        if (this.visualEffects.hasSunspots) {
+            this.generateSunspots(rng);
+        }
         // Full brightness for all stars
         this.brightness = 1.0;
     }
-
     generateUniqueId() {
         // Create unique identifier for this star based on position
         return `star_${Math.floor(this.x)}_${Math.floor(this.y)}`;
     }
-
     // Simple hash function to convert string ID to numeric seed (same as planets)
     hashStringToNumber(str, offset = 0) {
         let hash = offset;
@@ -576,27 +489,44 @@ class Star extends CelestialObject {
         }
         return Math.abs(hash) % 1000000; // Return positive number
     }
-
+    generateSunspots(rng) {
+        this.sunspots = [];
+        // Determine number of sunspots (0-6) with realistic probability distribution
+        const rand = rng.next();
+        let sunspotCount;
+        if (rand < 0.2)
+            sunspotCount = 0; // 20% - solar minimum
+        else if (rand < 0.4)
+            sunspotCount = rng.nextInt(1, 2); // 20% - low activity
+        else if (rand < 0.7)
+            sunspotCount = rng.nextInt(3, 4); // 30% - moderate activity  
+        else
+            sunspotCount = rng.nextInt(5, 6); // 30% - high activity
+        // Generate individual sunspots
+        for (let i = 0; i < sunspotCount; i++) {
+            const sunspot = {
+                angle: rng.next() * Math.PI * 2, // Random angle around star
+                radius: rng.nextFloat(0.3, 0.8) * this.radius, // Distance from center (30-80% of star radius)
+                size: rng.nextFloat(0.08, 0.15) * this.radius, // Sunspot size (8-15% of star radius)
+                intensity: rng.nextFloat(0.4, 0.7) // How dark the sunspot appears (0.4-0.7)
+            };
+            this.sunspots.push(sunspot);
+        }
+    }
     addPlanet(planet) {
         this.planets.push(planet);
     }
-
     render(renderer, camera) {
         const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
-        
         // Expand render bounds for corona and radiation effects
         const renderBounds = this.radius + 30;
-        
         // Only render if on screen
-        if (screenX >= -renderBounds && screenX <= renderer.canvas.width + renderBounds && 
+        if (screenX >= -renderBounds && screenX <= renderer.canvas.width + renderBounds &&
             screenY >= -renderBounds && screenY <= renderer.canvas.height + renderBounds) {
-            
             // Draw type-specific visual effects before the main star
             this.renderVisualEffects(renderer, screenX, screenY);
-            
             // Draw the main star with enhanced luminosity
             this.drawStarWithLuminosity(renderer, screenX, screenY, this.radius);
-            
             // Visual indicator if discovered
             if (this.discovered) {
                 renderer.ctx.strokeStyle = '#00ff88';
@@ -607,38 +537,29 @@ class Star extends CelestialObject {
             }
         }
     }
-
     renderVisualEffects(renderer, screenX, screenY) {
         const ctx = renderer.ctx;
-        
         // Draw corona effect
-        if (this.visualEffects.hasCorona) {
+        if (this.visualEffects.hasCorona && this.visualEffects.coronaSize) {
             const coronaRadius = this.radius * this.visualEffects.coronaSize;
-            const gradient = ctx.createRadialGradient(
-                screenX, screenY, this.radius,
-                screenX, screenY, coronaRadius
-            );
+            const gradient = ctx.createRadialGradient(screenX, screenY, this.radius, screenX, screenY, coronaRadius);
             gradient.addColorStop(0, this.color + '20'); // Semi-transparent
             gradient.addColorStop(1, this.color + '00'); // Fully transparent
-            
             ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(screenX, screenY, coronaRadius, 0, Math.PI * 2);
             ctx.fill();
         }
-        
         // Draw radiation effects for high-energy stars
         if (this.visualEffects.hasRadiation) {
             const intensity = this.visualEffects.radiationIntensity || 0.3;
             const radiationRadius = this.radius + 15;
-            
             // Create multiple radiation rings
             for (let i = 0; i < 3; i++) {
                 const time = Date.now() * 0.001;
                 const offset = i * Math.PI * 0.67; // Offset each ring
                 const alpha = (Math.sin(time * 2 + offset) * 0.3 + 0.7) * intensity;
                 const alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
-                
                 ctx.strokeStyle = this.color + alphaHex;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
@@ -646,19 +567,16 @@ class Star extends CelestialObject {
                 ctx.stroke();
             }
         }
-        
         // Draw shimmer effect for white dwarfs
         if (this.visualEffects.hasShimmer) {
             const time = Date.now() * 0.001;
             const shimmerAlpha = Math.sin(time * 3) * 0.2 + 0.8; // Oscillate between 0.6 and 1.0
             const alphaHex = Math.floor(shimmerAlpha * 255).toString(16).padStart(2, '0');
-            
             ctx.strokeStyle = '#ffffff' + alphaHex;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.arc(screenX, screenY, this.radius + 3, 0, Math.PI * 2);
             ctx.stroke();
-            
             // Additional inner shimmer
             ctx.strokeStyle = this.color + alphaHex;
             ctx.lineWidth = 1;
@@ -666,34 +584,27 @@ class Star extends CelestialObject {
             ctx.arc(screenX, screenY, this.radius * 0.8, 0, Math.PI * 2);
             ctx.stroke();
         }
-        
         // Draw swirling effects for dynamic stars
-        if (this.visualEffects.hasSwirling && this.visualEffects.swirlSpeed > 0) {
+        if (this.visualEffects.hasSwirling && this.visualEffects.swirlSpeed && this.visualEffects.swirlSpeed > 0) {
             const time = Date.now() * 0.001;
             const swirlSpeed = this.visualEffects.swirlSpeed;
-            
             // Create multiple swirling layers for depth
             for (let layer = 0; layer < 3; layer++) {
                 const layerOffset = layer * Math.PI * 0.67; // Offset each layer
                 const layerRadius = this.radius * (0.3 + layer * 0.2); // Inner to outer layers
                 const rotationSpeed = swirlSpeed * (1 + layer * 0.3); // Different speeds per layer
-                
                 // Draw swirling arcs
                 for (let i = 0; i < 6; i++) {
                     const angleOffset = (i / 6) * Math.PI * 2;
                     const rotation = time * rotationSpeed + angleOffset + layerOffset;
-                    
                     // Calculate swirl path
                     const startAngle = rotation;
                     const endAngle = rotation + Math.PI * 0.4; // Arc length
-                    
                     // Vary opacity based on time for undulating effect
                     const opacity = (Math.sin(time * 2 + angleOffset + layerOffset) * 0.3 + 0.7) * (0.2 - layer * 0.05);
                     const opacityHex = Math.floor(opacity * 255).toString(16).padStart(2, '0');
-                    
                     // Use a brighter version of the star color for swirls
                     const swirlColor = this.lightenColor(this.color, 0.3) + opacityHex;
-                    
                     ctx.strokeStyle = swirlColor;
                     ctx.lineWidth = 2 - layer * 0.3; // Thinner for outer layers
                     ctx.beginPath();
@@ -702,8 +613,35 @@ class Star extends CelestialObject {
                 }
             }
         }
+        // Draw rotating sunspots for G-type stars
+        if (this.visualEffects.hasSunspots && this.sunspots && this.sunspots.length > 0) {
+            const time = Date.now() * 0.001;
+            const rotationSpeed = this.visualEffects.sunspotRotationSpeed || 0.15;
+            for (const sunspot of this.sunspots) {
+                // Calculate current position with rotation
+                const currentAngle = sunspot.angle + (time * rotationSpeed);
+                const spotX = screenX + Math.cos(currentAngle) * sunspot.radius;
+                const spotY = screenY + Math.sin(currentAngle) * sunspot.radius;
+                // Calculate perspective foreshortening (spots fade near edges)
+                const normalizedRadius = sunspot.radius / this.radius;
+                const edgeFade = Math.cos(currentAngle) * 0.3 + 0.7; // Fade as spot approaches edges
+                const perspectiveScale = 1.0 - (normalizedRadius * 0.3); // Smaller towards edges
+                // Only render spots that are reasonably visible (front side of star)
+                if (edgeFade > 0.4) {
+                    // Create darkened color for sunspot
+                    const sunspotColor = this.darkenColor(this.color, sunspot.intensity);
+                    // Draw elliptical sunspot with perspective
+                    const spotSize = sunspot.size * perspectiveScale * edgeFade;
+                    const ellipseWidth = spotSize;
+                    const ellipseHeight = spotSize * Math.abs(Math.cos(currentAngle)) * 0.6 + spotSize * 0.4;
+                    ctx.fillStyle = sunspotColor;
+                    ctx.beginPath();
+                    ctx.ellipse(spotX, spotY, ellipseWidth, ellipseHeight, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
     }
-    
     // Helper method for lightening colors
     lightenColor(hex, amount) {
         // Parse hex color
@@ -711,31 +649,25 @@ class Star extends CelestialObject {
         const r = (colorNum >> 16) & 255;
         const g = (colorNum >> 8) & 255;
         const b = colorNum & 255;
-        
         // Lighten by moving towards white
         const newR = Math.min(255, Math.floor(r + (255 - r) * amount));
         const newG = Math.min(255, Math.floor(g + (255 - g) * amount));
         const newB = Math.min(255, Math.floor(b + (255 - b) * amount));
-        
         return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
     }
-    
     // Enhanced star rendering with simple solid colors and pulsing
     drawStarWithLuminosity(renderer, screenX, screenY, baseRadius) {
         const time = Date.now() * 0.001;
-        
         // Calculate effective radius (with pulsing if applicable)
         let effectiveRadius = baseRadius;
-        if (this.visualEffects.hasPulsing) {
-            const pulseSpeed = this.visualEffects.pulseSpeed || 1.0;
+        if (this.visualEffects.hasPulsing && this.visualEffects.pulseSpeed) {
+            const pulseSpeed = this.visualEffects.pulseSpeed;
             const pulse = Math.sin(time * pulseSpeed) * 0.03 + 0.97;
             effectiveRadius = baseRadius * pulse;
         }
-        
         // Draw simple solid star - no gradients or luminosity effects
         renderer.drawCircle(screenX, screenY, effectiveRadius, this.color);
     }
-    
     // Helper method for darkening colors
     darkenColor(hex, amount) {
         // Parse hex color
@@ -743,45 +675,45 @@ class Star extends CelestialObject {
         const r = (colorNum >> 16) & 255;
         const g = (colorNum >> 8) & 255;
         const b = colorNum & 255;
-        
         // Darken by moving towards black
         const newR = Math.max(0, Math.floor(r * (1 - amount)));
         const newG = Math.max(0, Math.floor(g * (1 - amount)));
         const newB = Math.max(0, Math.floor(b * (1 - amount)));
-        
         return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
     }
 }
-
-class Moon extends CelestialObject {
-    constructor(x, y, parentPlanet = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0) {
+// Moon class
+export class Moon extends CelestialObject {
+    constructor(x, y, parentPlanet, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0) {
         super(x, y, 'moon');
-        
+        this.orbitalDistance = 0;
+        this.orbitalAngle = 0;
+        this.orbitalSpeed = 0;
+        // Moon properties
+        this.radius = 3;
+        this.color = '#808080';
         // Orbital properties
         this.parentPlanet = parentPlanet;
         this.orbitalDistance = orbitalDistance;
-        this.orbitalAngle = orbitalAngle; // Current angle in radians
-        this.orbitalSpeed = orbitalSpeed; // Radians per second
-        
+        this.orbitalAngle = orbitalAngle;
+        this.orbitalSpeed = orbitalSpeed;
         // Initialize moon properties
         this.initializeMoonProperties();
     }
-    
     initializeMoonProperties() {
         // Set size based on parent planet (much smaller)
         if (this.parentPlanet) {
             this.radius = Math.max(2, this.parentPlanet.radius * 0.15); // 15% of parent size, minimum 2px
-        } else {
+        }
+        else {
             this.radius = 3; // Fallback size
         }
         this.discoveryDistance = this.radius + 25; // Closer discovery distance
-        
         // Set muted color based on parent planet or neutral grays
         this.color = this.generateMoonColor();
     }
-
     // Initialize moon with seeded random for deterministic generation
-    initWithSeed(rng, parentPlanet = null, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, moonIndex = null) {
+    initWithSeed(rng, parentPlanet, orbitalDistance = 0, orbitalAngle = 0, orbitalSpeed = 0, moonIndex) {
         // Update orbital properties if provided
         if (parentPlanet) {
             this.parentPlanet = parentPlanet;
@@ -789,28 +721,24 @@ class Moon extends CelestialObject {
             this.orbitalAngle = orbitalAngle;
             this.orbitalSpeed = orbitalSpeed;
         }
-        
         // Store moon index for unique ID generation
-        if (moonIndex !== null) {
+        if (moonIndex !== undefined) {
             this.moonIndex = moonIndex;
         }
-        
         // Generate unique identifier for this moon
         this.uniqueId = this.generateUniqueId();
-        
         // Set size based on parent planet using seeded random
         if (this.parentPlanet) {
             const sizeVariation = rng.nextFloat(0.1, 0.2); // 10-20% of parent size
             this.radius = Math.max(2, Math.floor(this.parentPlanet.radius * sizeVariation));
-        } else {
+        }
+        else {
             this.radius = rng.nextInt(2, 4); // 2-4 pixels fallback
         }
         this.discoveryDistance = this.radius + 25;
-        
         // Set color using seeded random
         this.color = this.generateMoonColor(rng);
     }
-
     generateUniqueId() {
         // Use parent planet's position and moon index for stable unique ID
         if (this.parentPlanet && this.moonIndex !== undefined) {
@@ -821,52 +749,49 @@ class Moon extends CelestialObject {
         // Fallback for moons without parent planets
         return `moon_${Math.floor(this.x)}_${Math.floor(this.y)}`;
     }
-
-    generateMoonColor(rng = null) {
+    generateMoonColor(rng) {
         // Generate muted colors - either neutral grays or darkened planet colors
         const moonColors = [
             '#808080', // Gray
             '#A0A0A0', // Light gray
             '#696969', // Dim gray
             '#778899', // Light slate gray
-            '#708090'  // Slate gray
+            '#708090' // Slate gray
         ];
-        
         if (rng) {
             // Use seeded random for deterministic color selection
             const useParentColor = rng.next() < 0.3; // 30% chance to use parent color
             if (useParentColor && this.parentPlanet) {
                 return this.darkenColor(this.parentPlanet.color, 0.4);
-            } else {
+            }
+            else {
                 return rng.choice(moonColors);
             }
-        } else {
+        }
+        else {
             // Fallback random selection
             if (Math.random() < 0.3 && this.parentPlanet) {
                 return this.darkenColor(this.parentPlanet.color, 0.4);
-            } else {
+            }
+            else {
                 return moonColors[Math.floor(Math.random() * moonColors.length)];
             }
         }
     }
-
     updatePosition(deltaTime) {
         // Update orbital position if moon has a parent planet
         if (this.parentPlanet && this.orbitalDistance > 0) {
             // Update orbital angle based on orbital speed
             this.orbitalAngle += this.orbitalSpeed * deltaTime;
-            
             // Keep angle within 0 to 2π range
             if (this.orbitalAngle >= Math.PI * 2) {
                 this.orbitalAngle -= Math.PI * 2;
             }
-            
             // Calculate new position based on orbital parameters
             this.x = this.parentPlanet.x + Math.cos(this.orbitalAngle) * this.orbitalDistance;
             this.y = this.parentPlanet.y + Math.sin(this.orbitalAngle) * this.orbitalDistance;
         }
     }
-
     darkenColor(hex, amount) {
         const num = parseInt(hex.replace('#', ''), 16);
         const r = Math.max(0, Math.floor((num >> 16) * (1 - amount)));
@@ -874,26 +799,20 @@ class Moon extends CelestialObject {
         const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - amount)));
         return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
     }
-
     render(renderer, camera) {
         const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
-        
         // Only render if parent planet is reasonably close (avoid visual clutter)
-        const parentDistance = this.parentPlanet ? 
+        const parentDistance = this.parentPlanet ?
             Math.sqrt(Math.pow(this.parentPlanet.x - camera.x, 2) + Math.pow(this.parentPlanet.y - camera.y, 2)) : 0;
         const maxRenderDistance = 800; // Only show moons when parent planet is within 800 pixels of camera
-        
         if (parentDistance > maxRenderDistance) {
             return; // Don't render distant moons to avoid clutter
         }
-        
         // Only render if on screen
-        if (screenX >= -this.radius - 10 && screenX <= renderer.canvas.width + this.radius + 10 && 
+        if (screenX >= -this.radius - 10 && screenX <= renderer.canvas.width + this.radius + 10 &&
             screenY >= -this.radius - 10 && screenY <= renderer.canvas.height + this.radius + 10) {
-            
             // Draw simple moon - just a solid circle
             renderer.drawCircle(screenX, screenY, this.radius, this.color);
-            
             // Visual indicator if discovered
             if (this.discovered) {
                 renderer.ctx.strokeStyle = '#00ff88';
@@ -905,9 +824,8 @@ class Moon extends CelestialObject {
         }
     }
 }
-
 // Planet type definitions with properties and visual characteristics
-const PlanetTypes = {
+export const PlanetTypes = {
     ROCKY: {
         name: 'Rocky Planet',
         colors: ['#8B4513', '#708090', '#A0522D'], // Brown, gray, darker brown
@@ -1026,9 +944,8 @@ const PlanetTypes = {
         }
     }
 };
-
 // Star type definitions with properties and visual characteristics
-const StarTypes = {
+export const StarTypes = {
     G_TYPE: {
         name: 'G-Type Star',
         description: 'Sun-like yellow star',
@@ -1043,7 +960,10 @@ const StarTypes = {
             hasRadiation: false,
             coronaSize: 1.2,
             hasSwirling: true,
-            swirlSpeed: 0.3
+            swirlSpeed: 0.3,
+            hasSunspots: true,
+            maxSunspots: 6,
+            sunspotRotationSpeed: 0.15 // Slow rotation for realistic 25-30 day period
         }
     },
     K_TYPE: {
@@ -1154,11 +1074,4 @@ const StarTypes = {
         }
     }
 };
-
-// Export for use in other modules
-window.StarTypes = StarTypes;
-window.PlanetTypes = PlanetTypes;
-window.CelestialObject = CelestialObject;
-window.Planet = Planet;
-window.Star = Star;
-window.Moon = Moon;
+//# sourceMappingURL=celestial.js.map
