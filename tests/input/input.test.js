@@ -221,13 +221,13 @@ describe('Input System', () => {
     });
 
     it('should handle right mouse button correctly', () => {
-      expect(input.isBrakePressed()).toBe(false);
+      expect(input.isRightPressed()).toBe(false);
 
       simulateEvent('mousedown', { button: 2 }); // Right click
-      expect(input.isBrakePressed()).toBe(true);
+      expect(input.isRightPressed()).toBe(true);
 
       simulateEvent('mouseup', { button: 2 });
-      expect(input.isBrakePressed()).toBe(false);
+      expect(input.isRightPressed()).toBe(false);
     });
 
     it('should prevent context menu on right click', () => {
@@ -554,59 +554,61 @@ describe('Input System', () => {
   });
 
   describe('Game Control Methods', () => {
-    it('should detect thrust input from multiple keys', () => {
-      expect(input.isThrustPressed()).toBe(false);
+    it('should detect movement input from multiple keys', () => {
+      expect(input.moveUp).toBe(false);
+      expect(input.moveDown).toBe(false);
+      expect(input.moveLeft).toBe(false);
+      expect(input.moveRight).toBe(false);
 
       simulateEvent('keydown', { code: 'KeyW' });
-      expect(input.isThrustPressed()).toBe(true);
+      expect(input.moveUp).toBe(true);
 
       simulateEvent('keyup', { code: 'KeyW' });
       simulateEvent('keydown', { code: 'ArrowUp' });
-      expect(input.isThrustPressed()).toBe(true);
+      expect(input.moveUp).toBe(true);
 
       simulateEvent('keyup', { code: 'ArrowUp' });
-      simulateEvent('keydown', { code: 'Space' });
-      expect(input.isThrustPressed()).toBe(true);
+      simulateEvent('keydown', { code: 'KeyA' });
+      expect(input.moveLeft).toBe(true);
 
-      simulateEvent('keyup', { code: 'Space' });
-      expect(input.isThrustPressed()).toBe(false);
+      simulateEvent('keyup', { code: 'KeyA' });
+      expect(input.moveLeft).toBe(false);
     });
 
     it('should detect brake input from keyboard and mouse', () => {
-      expect(input.isBrakePressed()).toBe(false);
+      expect(input.isBraking).toBe(false);
+      expect(input.isRightPressed()).toBe(false);
 
-      simulateEvent('keydown', { code: 'KeyS' });
-      expect(input.isBrakePressed()).toBe(true);
+      simulateEvent('keydown', { code: 'Space' }); // Space bar for braking
+      expect(input.isBraking).toBe(true);
 
-      simulateEvent('keyup', { code: 'KeyS' });
-      simulateEvent('keydown', { code: 'ArrowDown' });
-      expect(input.isBrakePressed()).toBe(true);
-
-      simulateEvent('keyup', { code: 'ArrowDown' });
-      simulateEvent('mousedown', { button: 2 }); // Right mouse
-      expect(input.isBrakePressed()).toBe(true);
+      simulateEvent('keyup', { code: 'Space' });
+      expect(input.isBraking).toBe(false);
+      
+      simulateEvent('mousedown', { button: 2 }); // Right mouse for braking
+      expect(input.isRightPressed()).toBe(true);
 
       simulateEvent('mouseup', { button: 2 });
-      expect(input.isBrakePressed()).toBe(false);
+      expect(input.isRightPressed()).toBe(false);
     });
 
     it('should detect left/right movement input', () => {
-      expect(input.isLeftPressed()).toBe(false);
-      expect(input.isRightPressed()).toBe(false);
+      expect(input.moveLeft).toBe(false);
+      expect(input.moveRight).toBe(false);
 
       simulateEvent('keydown', { code: 'KeyA' });
-      expect(input.isLeftPressed()).toBe(true);
+      expect(input.moveLeft).toBe(true);
 
       simulateEvent('keydown', { code: 'KeyD' });
-      expect(input.isRightPressed()).toBe(true);
+      expect(input.moveRight).toBe(true);
 
       simulateEvent('keyup', { code: 'KeyA' });
       simulateEvent('keydown', { code: 'ArrowLeft' });
-      expect(input.isLeftPressed()).toBe(true);
+      expect(input.moveLeft).toBe(true);
 
       simulateEvent('keyup', { code: 'KeyD' });
       simulateEvent('keydown', { code: 'ArrowRight' });
-      expect(input.isRightPressed()).toBe(true);
+      expect(input.moveRight).toBe(true);
     });
 
     it('should detect UI toggle inputs', () => {
@@ -838,7 +840,7 @@ describe('Input System', () => {
       simulateEvent('mousedown', { button: 0 });
       simulateEvent('mousemove', { clientX: 100, clientY: 200 });
 
-      expect(input.isThrustPressed()).toBe(true);
+      expect(input.moveUp).toBe(true);
       expect(input.isMousePressed()).toBe(true);
       expect(input.getMouseX()).toBe(100);
       expect(input.getMouseY()).toBe(200);
