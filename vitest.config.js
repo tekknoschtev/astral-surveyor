@@ -29,7 +29,7 @@ export default defineConfig({
     },
     
     // Test file patterns
-    include: ['tests/**/*.test.js'],
+    include: ['tests/**/*.test.js', 'tests/**/*.test.ts'],
     
     // Timeout for long-running tests
     testTimeout: 10000,

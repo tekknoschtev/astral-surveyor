@@ -477,7 +477,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         type: 'star', 
         x: 100, 
         y: 200,
-        checkDiscovery: vi.fn().mockReturnValue(false)
+        checkDiscovery: vi.fn().mockReturnValue(false),
+        distanceToShip: vi.fn().mockReturnValue(1000)
       }];
       game.chunkManager.getAllActiveObjects.mockReturnValue({
         stars: [], // background stars
@@ -527,7 +528,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         y: 200,
         starTypeName: 'G-type Main Sequence',
         checkDiscovery: vi.fn().mockReturnValue(true),
-        updatePosition: undefined
+        updatePosition: undefined,
+        distanceToShip: vi.fn().mockReturnValue(1000)
       };
 
       game.chunkManager.getAllActiveObjects = vi.fn().mockReturnValue({
@@ -553,7 +555,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         y: 400,
         planetTypeName: 'Rocky World',
         checkDiscovery: vi.fn().mockReturnValue(true),
-        updatePosition: vi.fn()
+        updatePosition: vi.fn(),
+        distanceToShip: vi.fn().mockReturnValue(1000)
       };
 
       game.chunkManager.getAllActiveObjects = vi.fn().mockReturnValue({
@@ -576,7 +579,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         x: 500,
         y: 600,
         checkDiscovery: vi.fn().mockReturnValue(true),
-        updatePosition: vi.fn()
+        updatePosition: vi.fn(),
+        distanceToShip: vi.fn().mockReturnValue(1000)
       };
 
       game.chunkManager.getAllActiveObjects = vi.fn().mockReturnValue({
@@ -822,7 +826,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
     it('should handle objects without updatePosition method', () => {
       const mockObject = {
         type: 'planet',
-        checkDiscovery: vi.fn().mockReturnValue(false)
+        checkDiscovery: vi.fn().mockReturnValue(false),
+        distanceToShip: vi.fn().mockReturnValue(1000)
         // No updatePosition method
       };
 

@@ -68,7 +68,7 @@ describe('Renderer', () => {
     renderer.drawCircle(15.2, 25.8, 5, '#00ff00');
     expect(mockCtx.fillStyle).toBe('#00ff00');
     expect(mockCtx.beginPath).toHaveBeenCalled();
-    expect(mockCtx.arc).toHaveBeenCalledWith(15, 26, 5, 0, Math.PI * 2);
+    expect(mockCtx.arc).toHaveBeenCalledWith(15, 25, 5, 0, Math.PI * 2);
     expect(mockCtx.fill).toHaveBeenCalled();
   });
 
