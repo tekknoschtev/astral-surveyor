@@ -86,11 +86,6 @@ export class DiscoveryLogbook {
         
         this.discoveries.push(discovery);
         
-        // Limit total discoveries to prevent memory issues (keep last 100)
-        if (this.discoveries.length > 100) {
-            this.discoveries = this.discoveries.slice(-100); // Keep the most recent 100
-        }
-        
         // Auto-scroll to bottom when new discovery is added
         this.scrollToBottom();
     }
