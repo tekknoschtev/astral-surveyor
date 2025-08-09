@@ -41,16 +41,26 @@ interface PlanetVisualEffects {
     ringConfig?: RingConfig;
 }
 
+interface Sunspot {
+    angle: number;      // Position angle around star
+    radius: number;     // Distance from star center
+    size: number;       // Sunspot diameter
+    intensity: number;  // Darkness intensity (0-1)
+}
+
 interface StarVisualEffects {
     hasCorona?: boolean;
     hasPulsing?: boolean;
     hasRadiation?: boolean;
     hasShimmer?: boolean;
     hasSwirling?: boolean;
+    hasSunspots?: boolean;
     coronaSize?: number;
     pulseSpeed?: number;
     radiationIntensity?: number;
     swirlSpeed?: number;
+    maxSunspots?: number;
+    sunspotRotationSpeed?: number;
 }
 
 // Planet and star type definitions
@@ -622,6 +632,9 @@ export class Star extends CelestialObject {
     
     // Identification
     uniqueId?: string;
+    
+    // Sunspot data for G-type stars
+    sunspots?: Sunspot[];
 
     constructor(x: number, y: number, starType?: StarType) {
         super(x, y, 'star');
@@ -674,6 +687,11 @@ export class Star extends CelestialObject {
         // Set visual effects based on star type
         this.visualEffects = { ...this.starType.visualEffects };
         
+        // Generate sunspots for G-type stars
+        if (this.visualEffects.hasSunspots) {
+            this.generateSunspots(rng);
+        }
+        
         // Full brightness for all stars
         this.brightness = 1.0;
     }
@@ -692,6 +710,29 @@ export class Star extends CelestialObject {
             hash = hash & hash; // Convert to 32-bit integer
         }
         return Math.abs(hash) % 1000000; // Return positive number
+    }
+
+    generateSunspots(rng: SeededRandom): void {
+        this.sunspots = [];
+        
+        // Determine number of sunspots (0-6) with realistic probability distribution
+        const rand = rng.next();
+        let sunspotCount: number;
+        if (rand < 0.2) sunspotCount = 0;        // 20% - solar minimum
+        else if (rand < 0.4) sunspotCount = rng.nextInt(1, 2);  // 20% - low activity
+        else if (rand < 0.7) sunspotCount = rng.nextInt(3, 4);  // 30% - moderate activity  
+        else sunspotCount = rng.nextInt(5, 6);  // 30% - high activity
+        
+        // Generate individual sunspots
+        for (let i = 0; i < sunspotCount; i++) {
+            const sunspot = {
+                angle: rng.next() * Math.PI * 2,  // Random angle around star
+                radius: rng.nextFloat(0.3, 0.8) * this.radius,  // Distance from center (30-80% of star radius)
+                size: rng.nextFloat(0.08, 0.15) * this.radius,  // Sunspot size (8-15% of star radius)
+                intensity: rng.nextFloat(0.4, 0.7)  // How dark the sunspot appears (0.4-0.7)
+            };
+            this.sunspots.push(sunspot);
+        }
     }
 
     addPlanet(planet: Planet): void {
@@ -816,6 +857,40 @@ export class Star extends CelestialObject {
                     ctx.beginPath();
                     ctx.arc(screenX, screenY, layerRadius, startAngle, endAngle);
                     ctx.stroke();
+                }
+            }
+        }
+        
+        // Draw rotating sunspots for G-type stars
+        if (this.visualEffects.hasSunspots && this.sunspots && this.sunspots.length > 0) {
+            const time = Date.now() * 0.001;
+            const rotationSpeed = this.visualEffects.sunspotRotationSpeed || 0.15;
+            
+            for (const sunspot of this.sunspots) {
+                // Calculate current position with rotation
+                const currentAngle = sunspot.angle + (time * rotationSpeed);
+                const spotX = screenX + Math.cos(currentAngle) * sunspot.radius;
+                const spotY = screenY + Math.sin(currentAngle) * sunspot.radius;
+                
+                // Calculate perspective foreshortening (spots fade near edges)
+                const normalizedRadius = sunspot.radius / this.radius;
+                const edgeFade = Math.cos(currentAngle) * 0.3 + 0.7; // Fade as spot approaches edges
+                const perspectiveScale = 1.0 - (normalizedRadius * 0.3); // Smaller towards edges
+                
+                // Only render spots that are reasonably visible (front side of star)
+                if (edgeFade > 0.4) {
+                    // Create darkened color for sunspot
+                    const sunspotColor = this.darkenColor(this.color, sunspot.intensity);
+                    
+                    // Draw elliptical sunspot with perspective
+                    const spotSize = sunspot.size * perspectiveScale * edgeFade;
+                    const ellipseWidth = spotSize;
+                    const ellipseHeight = spotSize * Math.abs(Math.cos(currentAngle)) * 0.6 + spotSize * 0.4;
+                    
+                    ctx.fillStyle = sunspotColor;
+                    ctx.beginPath();
+                    ctx.ellipse(spotX, spotY, ellipseWidth, ellipseHeight, 0, 0, Math.PI * 2);
+                    ctx.fill();
                 }
             }
         }
@@ -1175,7 +1250,10 @@ export const StarTypes: Record<string, StarType> = {
             hasRadiation: false,
             coronaSize: 1.2,
             hasSwirling: true,
-            swirlSpeed: 0.3
+            swirlSpeed: 0.3,
+            hasSunspots: true,
+            maxSunspots: 6,
+            sunspotRotationSpeed: 0.15 // Slow rotation for realistic 25-30 day period
         }
     },
     K_TYPE: {

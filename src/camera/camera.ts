@@ -6,6 +6,9 @@ interface CelestialObject {
     x: number;
     y: number;
     type: string;
+    distanceToShip(camera: Camera): number;
+    brakingDistance?: number;
+    discoveryDistance: number;
 }
 
 interface StellarMap {
@@ -21,6 +24,16 @@ interface MouseBrakeResult {
 
 // Extend Input interface for camera-specific methods
 interface CameraInput extends Input {
+    moveUp: boolean;
+    moveDown: boolean;  
+    moveLeft: boolean;
+    moveRight: boolean;
+    upIntensity: number;
+    downIntensity: number;
+    leftIntensity: number;
+    rightIntensity: number;
+    isBraking: boolean;
+    brakingIntensity: number;
     getMouseBrake(canvasWidth: number, canvasHeight: number): MouseBrakeResult | null;
     getTouchBrake(canvasWidth: number, canvasHeight: number): MouseBrakeResult | null;
 }
@@ -37,8 +50,11 @@ export class Camera {
     friction = 0.9999; // Nearly 0% friction for true space coasting
     coastingFriction = 1.0; // No friction when coasting
     
-    // Coasting state
+    // Coasting and thruster states
     isCoasting = false;
+    isThrusting = false;
+    isBraking = false;
+    thrustDirection = { x: 0, y: -1 };
     
     // Rotation properties
     rotation = 0; // Current rotation in radians
@@ -55,99 +71,107 @@ export class Camera {
         this.loadDistanceTraveled();
     }
 
-    update(input: CameraInput, deltaTime: number, canvasWidth: number, canvasHeight: number, celestialObjects: CelestialObject[] = [], stellarMap: StellarMap | null = null): void {
-        // Calculate thrust direction and intensity
+    update(input: CameraInput, deltaTime: number, canvasWidth: number, canvasHeight: number, celestialObjects: any[] = [], stellarMap: StellarMap | null = null): void {
+        // Movement logic restored from working version
         let thrustX = 0;
         let thrustY = 0;
         let isThrusting = false;
-        let isBraking = false;
+        let isBraking = input.isBraking || input.isRightPressed(); // Space bar OR right-click
         let thrustIntensity = 1.0;
 
-        // Check for braking input first (both mouse and touch)
-        const mouseBrake = input.getMouseBrake(canvasWidth, canvasHeight);
-        const touchBrake = input.getTouchBrake(canvasWidth, canvasHeight);
-        const brake = mouseBrake || touchBrake;
-        
-        if (brake) {
-            isBraking = true;
-            if (brake.mode === 'stop') {
-                // Brake directly opposite to current velocity
-                const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-                if (currentSpeed > 0) {
-                    thrustX = -this.velocityX / currentSpeed;
-                    thrustY = -this.velocityY / currentSpeed;
-                    thrustIntensity = 2.0; // Extra strong braking
-                }
-            } else if (brake.mode === 'directional') {
-                // Directional braking
-                thrustX = brake.x;
-                thrustY = brake.y;
-                thrustIntensity = brake.intensity * 1.5; // Slightly stronger
+        // Handle braking first - overrides movement
+        if (isBraking) {
+            // Brake opposite to current velocity direction  
+            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+            if (currentSpeed > 0) {
+                thrustX = -this.velocityX / currentSpeed;
+                thrustY = -this.velocityY / currentSpeed;
+                thrustIntensity = input.isBraking ? input.brakingIntensity : 1.0; // Use braking intensity if Space, default for right-click
             }
-        }
-
-        // If not braking, check for movement input
-        if (!isBraking) {
-            // Keyboard movement
-            if (input.isThrustPressed()) {
-                isThrusting = true;
-                thrustY = -1; // Forward
-                thrustIntensity = input.getThrustIntensity('KeyW') || input.getThrustIntensity('ArrowUp') || input.getThrustIntensity('Space');
-            }
-            
-            if (input.isLeftPressed()) {
-                isThrusting = true;
-                thrustX = -1; // Left
-                const leftIntensity = input.getThrustIntensity('KeyA') || input.getThrustIntensity('ArrowLeft');
-                if (thrustY !== 0) {
-                    // Diagonal movement - normalize but keep intensity
-                    const magnitude = Math.sqrt(thrustX * thrustX + thrustY * thrustY);
-                    thrustX = (thrustX / magnitude) * Math.max(thrustIntensity, leftIntensity);
-                    thrustY = (thrustY / magnitude) * Math.max(thrustIntensity, leftIntensity);
-                    thrustIntensity = Math.max(thrustIntensity, leftIntensity);
-                } else {
-                    thrustIntensity = leftIntensity;
-                }
-            }
-            
-            if (input.isRightPressed()) {
-                isThrusting = true;
-                thrustX = 1; // Right
-                const rightIntensity = input.getThrustIntensity('KeyD') || input.getThrustIntensity('ArrowRight');
-                if (thrustY !== 0) {
-                    // Diagonal movement - normalize but keep intensity
-                    const magnitude = Math.sqrt(thrustX * thrustX + thrustY * thrustY);
-                    thrustX = (thrustX / magnitude) * Math.max(thrustIntensity, rightIntensity);
-                    thrustY = (thrustY / magnitude) * Math.max(thrustIntensity, rightIntensity);
-                    thrustIntensity = Math.max(thrustIntensity, rightIntensity);
-                } else {
-                    thrustIntensity = rightIntensity;
-                }
-            }
-
-            // Mouse/touch movement
+        } else {
+            // Handle mouse/touch input first
             const mouseDirection = input.getMouseDirection(canvasWidth, canvasHeight);
             if (mouseDirection.intensity > 0) {
-                isThrusting = true;
                 thrustX = mouseDirection.x;
                 thrustY = mouseDirection.y;
                 thrustIntensity = mouseDirection.intensity;
+                isThrusting = true;
+            } else {
+            // Fall back to keyboard input with variable intensity
+            if (input.moveLeft) { 
+                thrustX -= input.leftIntensity; 
+                isThrusting = true; 
+            }
+            if (input.moveRight) { 
+                thrustX += input.rightIntensity; 
+                isThrusting = true; 
+            }
+            if (input.moveUp) { 
+                thrustY -= input.upIntensity; 
+                isThrusting = true; 
+            }
+            if (input.moveDown) { 
+                thrustY += input.downIntensity; 
+                isThrusting = true; 
+            }
+
+            // For keyboard, calculate average intensity
+            if (isThrusting) {
+                const intensities = [];
+                if (input.moveLeft) intensities.push(input.leftIntensity);
+                if (input.moveRight) intensities.push(input.rightIntensity);
+                if (input.moveUp) intensities.push(input.upIntensity);
+                if (input.moveDown) intensities.push(input.downIntensity);
+                thrustIntensity = intensities.reduce((sum, i) => sum + i, 0) / intensities.length;
+            }
+
+            // Normalize thrust vector for diagonal movement
+            if (thrustX !== 0 && thrustY !== 0) {
+                const length = Math.sqrt(thrustX * thrustX + thrustY * thrustY);
+                thrustX /= length;
+                thrustY /= length;
+            }
             }
         }
 
-        // Apply thrust or braking
+        // Detect coasting state (not actively controlling)
+        this.isCoasting = !isBraking && !isThrusting;
+        
+        // Simple auto-braking for all celestial objects when coasting
+        if (this.isCoasting) {
+            for (const obj of celestialObjects) {
+                const distance = obj.distanceToShip(this);
+                // Use separate braking distance for stars, or fall back to discovery distance + 40 for other objects
+                const brakeDistance = obj.brakingDistance ? obj.brakingDistance + 40 : obj.discoveryDistance + 40;
+                
+                if (distance < brakeDistance) {
+                    const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                    if (currentSpeed > 35) { // Only brake if moving fairly fast
+                        // Simple braking - slow down in the direction opposite to velocity
+                        const brakeIntensity = Math.min(1.0, (brakeDistance - distance) / brakeDistance);
+                        thrustX = -this.velocityX / currentSpeed;
+                        thrustY = -this.velocityY / currentSpeed;
+                        thrustIntensity = brakeIntensity * 2.0; // Smoother auto-braking
+                        isBraking = true;
+                        break; // Only brake for the closest object
+                    }
+                }
+            }
+        }
+
+        // Apply acceleration with variable intensity
         if (isThrusting || isBraking) {
             this.velocityX += thrustX * this.acceleration * thrustIntensity * deltaTime;
             this.velocityY += thrustY * this.acceleration * thrustIntensity * deltaTime;
-            this.isCoasting = false;
             
-            // Update target rotation based on thrust direction (for visual effect)
-            if (thrustX !== 0 || thrustY !== 0) {
-                this.targetRotation = Math.atan2(thrustY, thrustX) + Math.PI / 2;
-            }
-        } else {
-            this.isCoasting = true;
+            // Calculate target rotation based on thrust direction
+            this.targetRotation = Math.atan2(thrustY, thrustX) + Math.PI / 2;
         }
+
+        // Update camera states for particle systems (after auto-braking logic)
+        this.isThrusting = isThrusting;
+        this.isBraking = isBraking;
+        this.thrustDirection = { x: thrustX, y: thrustY };
 
         // Apply speed limit
         const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
@@ -201,29 +225,35 @@ export class Camera {
 
     // Get formatted distance for UI display
     getFormattedDistance(): string {
-        const kilometers = this.sessionDistanceTraveled / this.distanceScale;
+        const kilometers = this.sessionDistanceTraveled * (this.distanceScale / 1000);
         
-        if (kilometers < 1) {
-            return `${Math.round(kilometers * 1000)} m`;
-        } else if (kilometers < 1000) {
+        // Convert to AU (1 AU ≈ 149.6 million km)
+        const au = kilometers / 149597870.7;
+        
+        if (au < 0.5) {
             return `${kilometers.toFixed(1)} km`;
+        } else if (au < 1000) {
+            return `${au.toFixed(2)} AU`;
         } else {
-            return `${(kilometers / 1000).toFixed(1)} Mm`; // Megameters (1000 km)
+            return `${(au / 1000).toFixed(1)} kAU`;
         }
     }
 
     // Get formatted lifetime distance for UI display
     getFormattedLifetimeDistance(): string {
-        const kilometers = this.totalDistanceTraveled / this.distanceScale;
+        const kilometers = this.totalDistanceTraveled * (this.distanceScale / 1000);
         
-        if (kilometers < 1) {
-            return `${Math.round(kilometers * 1000)} m`;
-        } else if (kilometers < 1000) {
+        // Convert to AU (1 AU ≈ 149.6 million km)
+        const au = kilometers / 149597870.7;
+        
+        if (au < 0.5) {
             return `${kilometers.toFixed(1)} km`;
-        } else if (kilometers < 1000000) {
-            return `${(kilometers / 1000).toFixed(1)} Mm`; // Megameters
+        } else if (au < 1000) {
+            return `${au.toFixed(2)} AU`;
+        } else if (au < 1000000) {
+            return `${(au / 1000).toFixed(1)} kAU`;
         } else {
-            return `${(kilometers / 1000000).toFixed(2)} Gm`; // Gigameters
+            return `${(au / 1000000).toFixed(2)} MAU`;
         }
     }
 
@@ -232,19 +262,31 @@ export class Camera {
         return Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
     }
 
-    // Get formatted speed for UI display
+    // Get formatted speed for UI display (restored from working version)
     getFormattedSpeed(): string {
-        const pixelsPerSecond = this.getCurrentSpeed();
-        const kilometersPerSecond = pixelsPerSecond / this.distanceScale;
+        const speedPixelsPerSecond = this.getCurrentSpeed();
+        const kmPerSecond = speedPixelsPerSecond * (this.distanceScale / 1000);
         
-        if (kilometersPerSecond < 0.001) {
-            return `${Math.round(kilometersPerSecond * 1000000)} mm/s`;
-        } else if (kilometersPerSecond < 1) {
-            return `${Math.round(kilometersPerSecond * 1000)} m/s`;
-        } else if (kilometersPerSecond < 1000) {
-            return `${kilometersPerSecond.toFixed(2)} km/s`;
+        // Convert to different units based on magnitude
+        if (kmPerSecond < 1) {
+            // Show in km/h for very slow speeds
+            const kmPerHour = kmPerSecond * 3600;
+            if (kmPerHour < 1) {
+                return `${Math.round(kmPerHour * 10) / 10} km/h`;
+            } else {
+                return `${Math.round(kmPerHour).toLocaleString()} km/h`;
+            }
+        } else if (kmPerSecond < 100000) {
+            // Show in km/s for moderate to high speeds
+            return `${Math.round(kmPerSecond * 10) / 10} km/s`;
         } else {
-            return `${(kilometersPerSecond / 1000).toFixed(3)} Mm/s`;
+            // For very high speeds, show in AU/s
+            const auPerSecond = kmPerSecond / 149597870.7;
+            if (auPerSecond < 1) {
+                return `${Math.round(auPerSecond * 1000000) / 1000000} AU/s`;
+            } else {
+                return `${Math.round(auPerSecond * 100) / 100} AU/s`;
+            }
         }
     }
 

@@ -124,8 +124,8 @@ export class SoundManager {
         const configs: Record<string, SoundConfig> = {
             'star_discovery': {
                 type: 'oscillator',
-                frequency: 440,
-                frequency2: 660,
+                frequency: 220,
+                frequency2: 330,
                 duration: 0.8,
                 attack: 0.1,
                 decay: 0.2,
@@ -136,8 +136,8 @@ export class SoundManager {
             },
             'planet_discovery': {
                 type: 'oscillator', 
-                frequency: 220,
-                frequency2: 330,
+                frequency: 440,
+                frequency2: 660,
                 duration: 0.6,
                 attack: 0.05,
                 decay: 0.15,
