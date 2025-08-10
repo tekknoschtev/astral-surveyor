@@ -8,7 +8,7 @@ body {
 
 canvas {
     display: block;
-    cursor: crosshair;
+    cursor: default;
 }
 
 #ui {
