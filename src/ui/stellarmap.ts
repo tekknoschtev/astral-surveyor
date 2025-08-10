@@ -56,6 +56,7 @@ export class StellarMap {
     selectedStar: StarLike | null;
     hoveredStar: StarLike | null;
     selectedPlanet: PlanetLike | null;
+    hoveredPlanet: PlanetLike | null;
     namingService: NamingService | null;
     
     // Interactive panning state
@@ -83,6 +84,7 @@ export class StellarMap {
         this.selectedStar = null;
         this.hoveredStar = null;
         this.selectedPlanet = null;
+        this.hoveredPlanet = null;
         this.namingService = null; // Will be injected
         
         // Interactive panning state
@@ -161,6 +163,11 @@ export class StellarMap {
     }
 
     handleMouseMove(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, input: Input): boolean {
+        // Always check for hover state when map is visible
+        if (this.visible) {
+            this.updateHoverState(mouseX, mouseY, canvas);
+        }
+        
         if (!this.visible || !input.isMousePressed() || input.isRightPressed()) {
             return false;
         }
@@ -300,6 +307,109 @@ export class StellarMap {
         }
         
         return true; // Consumed the event
+    }
+    
+    updateHoverState(mouseX: number, mouseY: number, canvas: HTMLCanvasElement): void {
+        // Get discovered objects from the chunk manager
+        // Note: This requires discoveredStars and discoveredPlanets to be passed in
+        // For now, we'll implement this as a separate method that game.ts can call
+        // This is a placeholder to maintain the hover detection structure
+        
+        // Reset hover state - will be set by detectHoverTarget when called from game.ts
+        this.hoveredStar = null;
+        this.hoveredPlanet = null;
+        
+        // Update cursor based on hover state
+        this.updateCursor(canvas);
+    }
+    
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null): void {
+        if (!this.visible) return;
+        
+        // Calculate map bounds and scaling
+        const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
+        const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
+        
+        // Check if mouse is within map bounds
+        if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
+            this.updateCursor(canvas);
+            return;
+        }
+        
+        // Find closest celestial object to mouse position (prioritize planets if in detail view)
+        let closestStar: StarLike | null = null;
+        let closestPlanet: PlanetLike | null = null;
+        let closestStarDistance = Infinity;
+        let closestPlanetDistance = Infinity;
+        const hoverThreshold = 15; // Slightly larger than click threshold for better UX
+        
+        // Check for planet hover first (in detail view)
+        if (this.zoomLevel > 3.0 && discoveredPlanets) {
+            for (const planet of discoveredPlanets) {
+                // Skip planets without position data
+                if (planet.x === null || planet.y === null) continue;
+                
+                const planetMapX = mapX + mapWidth/2 + (planet.x - this.centerX) * worldToMapScale;
+                const planetMapY = mapY + mapHeight/2 + (planet.y - this.centerY) * worldToMapScale;
+                
+                // Check if planet is within map bounds and hover threshold
+                if (planetMapX >= mapX && planetMapX <= mapX + mapWidth && 
+                    planetMapY >= mapY && planetMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - planetMapX)**2 + (mouseY - planetMapY)**2);
+                    if (distance <= hoverThreshold && distance < closestPlanetDistance) {
+                        closestPlanet = planet;
+                        closestPlanetDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Check for star hover
+        for (const star of discoveredStars) {
+            const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * worldToMapScale;
+            const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * worldToMapScale;
+            
+            // Check if star is within map bounds and hover threshold
+            if (starMapX >= mapX && starMapX <= mapX + mapWidth && 
+                starMapY >= mapY && starMapY <= mapY + mapHeight) {
+                
+                const distance = Math.sqrt((mouseX - starMapX)**2 + (mouseY - starMapY)**2);
+                if (distance <= hoverThreshold && distance < closestStarDistance) {
+                    closestStar = star;
+                    closestStarDistance = distance;
+                }
+            }
+        }
+        
+        // Set hover state (prioritize planets if they're closer)
+        if (closestPlanet && closestPlanetDistance <= closestStarDistance) {
+            this.hoveredPlanet = closestPlanet;
+            this.hoveredStar = null;
+        } else if (closestStar) {
+            this.hoveredStar = closestStar;
+            this.hoveredPlanet = null;
+        } else {
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
+        }
+        
+        // Update cursor based on hover state
+        this.updateCursor(canvas);
+    }
+    
+    updateCursor(canvas: HTMLCanvasElement): void {
+        if (this.hoveredStar || this.hoveredPlanet) {
+            canvas.style.cursor = 'pointer';
+        } else if (this.visible) {
+            // Use crosshair for map navigation when visible
+            canvas.style.cursor = 'crosshair';
+        } else {
+            // Default cursor when map is not visible
+            canvas.style.cursor = 'default';
+        }
     }
     
     getMapBounds(canvas: HTMLCanvasElement): { mapX: number; mapY: number; mapWidth: number; mapHeight: number; } {
@@ -497,7 +607,18 @@ export class StellarMap {
                 ctx.arc(starMapX, starMapY, starSize, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Add selection highlight if this star is selected
+                // Add hover highlight if this star is hovered (but not selected)
+                if (this.hoveredStar === star && this.selectedStar !== star) {
+                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    // Scale hover highlight to be proportional to star size
+                    const hoverRadius = Math.max(5, starSize + 1);
+                    ctx.arc(starMapX, starMapY, hoverRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Add selection highlight if this star is selected (takes precedence over hover)
                 if (this.selectedStar === star) {
                     ctx.strokeStyle = this.currentPositionColor;
                     ctx.lineWidth = 2;
@@ -599,7 +720,17 @@ export class StellarMap {
                     ctx.lineWidth = 0.5;
                     ctx.stroke();
                     
-                    // Add selection highlight if this planet is selected
+                    // Add hover highlight if this planet is hovered (but not selected)
+                    if (this.hoveredPlanet === planet && this.selectedPlanet !== planet) {
+                        ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath();
+                        const hoverRadius = Math.max(3, planetSize + 0.5);
+                        ctx.arc(planetMapX, planetMapY, hoverRadius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    
+                    // Add selection highlight if this planet is selected (takes precedence over hover)
                     if (this.selectedPlanet === planet) {
                         ctx.strokeStyle = this.currentPositionColor;
                         ctx.lineWidth = 1.5;
