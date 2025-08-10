@@ -220,6 +220,16 @@ export class Game {
             this.stellarMap.handleMouseMove(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, this.input);
         }
         
+        // Always update hover state when stellar map is visible (for cursor feedback)
+        if (this.stellarMap.isVisible()) {
+            const discoveredStars = this.chunkManager.getDiscoveredStars();
+            const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discoveredStars, discoveredPlanets);
+        } else {
+            // Reset cursor when map is not visible
+            this.stellarMap.updateCursor(this.renderer.canvas);
+        }
+        
         // Pinch zoom is now handled in stellarMap.update() via input system
         
         // Update chunk loading based on camera position

@@ -17,7 +17,10 @@ describe('StellarMap System', () => {
     // Mock canvas
     mockCanvas = {
       width: 800,
-      height: 600
+      height: 600,
+      style: {
+        cursor: 'default'
+      }
     };
 
     // Mock renderer
