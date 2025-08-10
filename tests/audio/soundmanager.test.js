@@ -261,29 +261,30 @@ describe('SoundManager Audio System', () => {
       soundManager.playStarDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
-      expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(330, expect.any(Number));
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110, 0);
+      expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(165, expect.any(Number));
     });
 
     it('should have correct planet discovery sound config', () => {
       soundManager.playPlanetDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(440, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
+      expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(330, expect.any(Number));
     });
 
     it('should have correct moon discovery sound config', () => {
       soundManager.playMoonDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(880, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(440, 0);
     });
 
     it('should have correct rare discovery sound config', () => {
       soundManager.playRareDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(523, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(65, 0);
     });
 
     it('should have UI sound configurations', () => {
@@ -319,15 +320,15 @@ describe('SoundManager Audio System', () => {
         
         soundManager.playStarDiscovery(name);
         
-        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220 * multiplier, 0);
-        expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(330 * multiplier, expect.any(Number));
+        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110 * multiplier, 0);
+        expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(165 * multiplier, expect.any(Number));
       });
     });
 
     it('should handle unknown star types with default frequency', () => {
       soundManager.playStarDiscovery('Unknown Star Type');
       
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110, 0);
     });
   });
 
@@ -351,14 +352,14 @@ describe('SoundManager Audio System', () => {
         
         soundManager.playPlanetDiscovery(name);
         
-        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(440 * multiplier, 0);
+        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220 * multiplier, 0);
       });
     });
 
     it('should handle unknown planet types with default frequency', () => {
       soundManager.playPlanetDiscovery('Unknown Planet Type');
       
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(440, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
     });
   });
 
