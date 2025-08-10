@@ -124,9 +124,9 @@ export class SoundManager {
         const configs: Record<string, SoundConfig> = {
             'star_discovery': {
                 type: 'oscillator',
-                frequency: 220,
-                frequency2: 330,
-                duration: 0.8,
+                frequency: 110,
+                frequency2: 165,
+                duration: 1.2,
                 attack: 0.1,
                 decay: 0.2,
                 sustain: 0.3,
@@ -136,8 +136,8 @@ export class SoundManager {
             },
             'planet_discovery': {
                 type: 'oscillator', 
-                frequency: 440,
-                frequency2: 660,
+                frequency: 220,
+                frequency2: 330,
                 duration: 0.6,
                 attack: 0.05,
                 decay: 0.15,
@@ -148,7 +148,7 @@ export class SoundManager {
             },
             'moon_discovery': {
                 type: 'oscillator',
-                frequency: 880,
+                frequency: 440,
                 duration: 0.3,
                 attack: 0.02,
                 decay: 0.08,
@@ -159,15 +159,15 @@ export class SoundManager {
             },
             'rare_discovery': {
                 type: 'oscillator',
-                frequency: 523,
-                frequency2: 784,
+                frequency: 65,
+                frequency2: 97,
                 duration: 1.2,
                 attack: 0.15,
                 decay: 0.3,
                 sustain: 0.4,
                 release: 0.5,
-                volume: 0.8,
-                waveform: 'sawtooth'
+                volume: 0.6,
+                waveform: 'sine'
             },
             'map_toggle': {
                 type: 'oscillator',
