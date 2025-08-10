@@ -103,6 +103,10 @@ export class Input {
             if (e.touches.length === 2) {
                 this.initPinchGesture(e.touches);
                 this.initTwoFingerBraking(e.touches);
+            } else if (e.touches.length === 1) {
+                // Update mouse position immediately for single touch (needed for TouchUI button detection)
+                const touch = e.touches[0];
+                this.updateMousePosition(touch.clientX, touch.clientY);
             }
         });
 
