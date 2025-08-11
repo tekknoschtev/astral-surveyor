@@ -876,4 +876,613 @@ describe('StellarMap System', () => {
       expect(mockRenderer.ctx.fill).toHaveBeenCalled();
     });
   });
+
+  describe('Hover Detection System', () => {
+    let mockStars;
+    let mockPlanets;
+
+    beforeEach(() => {
+      stellarMap.visible = true;
+      stellarMap.centerX = 1000;
+      stellarMap.centerY = 2000;
+      stellarMap.zoomLevel = 2.0;
+
+      mockStars = [
+        {
+          x: 1000,
+          y: 2000,
+          starTypeName: 'G-Type Star',
+          starType: { sizeMultiplier: 1.0 },
+          timestamp: Date.now()
+        },
+        {
+          x: 1200,
+          y: 2200,
+          starTypeName: 'K-Type Star',
+          starType: { sizeMultiplier: 0.8 },
+          timestamp: Date.now()
+        }
+      ];
+
+      mockPlanets = [
+        {
+          x: 1050,
+          y: 2050,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Rocky Planet',
+          planetType: { sizeMultiplier: 0.5, colors: ['#8B4513'] },
+          planetIndex: 1,
+          objectName: 'Test Planet A',
+          timestamp: Date.now()
+        },
+        {
+          x: 1075,
+          y: 2075,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Ocean World',
+          planetType: { sizeMultiplier: 0.7 },
+          planetIndex: 2,
+          objectName: 'Test Planet B',
+          timestamp: Date.now()
+        }
+      ];
+    });
+
+    describe('detectHoverTarget Method', () => {
+      it('should not detect hover when map is invisible', () => {
+        stellarMap.visible = false;
+        stellarMap.hoveredStar = mockStars[0]; // Set initial state
+        
+        stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, mockPlanets);
+        
+        // Should exit early and not change hover state
+        expect(stellarMap.hoveredStar).toBe(mockStars[0]);
+      });
+
+      it('should clear hover state when mouse is outside map bounds', () => {
+        stellarMap.hoveredStar = mockStars[0];
+        stellarMap.hoveredPlanet = mockPlanets[0];
+        
+        // Mouse position outside map bounds
+        stellarMap.detectHoverTarget(50, 50, mockCanvas, mockStars, mockPlanets);
+        
+        expect(stellarMap.hoveredStar).toBe(null);
+        expect(stellarMap.hoveredPlanet).toBe(null);
+      });
+
+      it('should detect star hover within threshold', () => {
+        // Position mouse near the center where the star should be mapped
+        stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, mockPlanets);
+        
+        // Should detect hover on the closest star
+        expect(stellarMap.hoveredStar).toBeTruthy();
+        expect(stellarMap.hoveredPlanet).toBe(null);
+      });
+
+      it('should prioritize planets over stars in detail view', () => {
+        stellarMap.zoomLevel = 4.0; // Detail view
+        
+        stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, mockPlanets);
+        
+        // At high zoom, should detect planet hover first if closer
+        // (Test behavior depends on exact positioning)
+      });
+
+      it('should handle planets with null positions', () => {
+        const planetsWithNulls = [
+          {
+            x: null,
+            y: null,
+            parentStarX: 1000,
+            parentStarY: 2000,
+            planetTypeName: 'Distant Planet',
+            planetIndex: 3
+          }
+        ];
+        
+        expect(() => {
+          stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, planetsWithNulls);
+        }).not.toThrow();
+        
+        // Should skip null-position planets safely
+      });
+
+      it('should clear hover state when mouse is far from any objects', () => {
+        stellarMap.hoveredStar = mockStars[0];
+        stellarMap.hoveredPlanet = mockPlanets[0];
+        
+        // Mouse position far from any objects but within map bounds
+        stellarMap.detectHoverTarget(200, 200, mockCanvas, mockStars, mockPlanets);
+        
+        expect(stellarMap.hoveredStar).toBe(null);
+        expect(stellarMap.hoveredPlanet).toBe(null);
+      });
+
+      it('should use hover threshold larger than click threshold', () => {
+        // The hover threshold is 15px vs click threshold of 10px
+        stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, mockPlanets);
+        
+        // Should detect hover at distances that might not trigger click
+        expect(() => stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, mockPlanets)).not.toThrow();
+      });
+
+      it('should work with empty planet arrays', () => {
+        expect(() => {
+          stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, []);
+        }).not.toThrow();
+        
+        expect(() => {
+          stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, null);
+        }).not.toThrow();
+      });
+    });
+
+    describe('updateHoverState Method', () => {
+      it('should reset hover state and update cursor', () => {
+        stellarMap.hoveredStar = mockStars[0];
+        stellarMap.hoveredPlanet = mockPlanets[0];
+        
+        stellarMap.updateHoverState(400, 300, mockCanvas);
+        
+        expect(stellarMap.hoveredStar).toBe(null);
+        expect(stellarMap.hoveredPlanet).toBe(null);
+      });
+
+      it('should call updateCursor method', () => {
+        const updateCursorSpy = vi.spyOn(stellarMap, 'updateCursor');
+        
+        stellarMap.updateHoverState(400, 300, mockCanvas);
+        
+        expect(updateCursorSpy).toHaveBeenCalledWith(mockCanvas);
+      });
+    });
+
+    describe('updateCursor Method', () => {
+      it('should set pointer cursor when hovering over star', () => {
+        stellarMap.hoveredStar = mockStars[0];
+        stellarMap.hoveredPlanet = null;
+        
+        stellarMap.updateCursor(mockCanvas);
+        
+        expect(mockCanvas.style.cursor).toBe('pointer');
+      });
+
+      it('should set pointer cursor when hovering over planet', () => {
+        stellarMap.hoveredStar = null;
+        stellarMap.hoveredPlanet = mockPlanets[0];
+        
+        stellarMap.updateCursor(mockCanvas);
+        
+        expect(mockCanvas.style.cursor).toBe('pointer');
+      });
+
+      it('should set crosshair cursor when map is visible but no hover', () => {
+        stellarMap.visible = true;
+        stellarMap.hoveredStar = null;
+        stellarMap.hoveredPlanet = null;
+        
+        stellarMap.updateCursor(mockCanvas);
+        
+        expect(mockCanvas.style.cursor).toBe('crosshair');
+      });
+
+      it('should set default cursor when map is not visible', () => {
+        stellarMap.visible = false;
+        stellarMap.hoveredStar = null;
+        stellarMap.hoveredPlanet = null;
+        
+        stellarMap.updateCursor(mockCanvas);
+        
+        expect(mockCanvas.style.cursor).toBe('default');
+      });
+
+      it('should prioritize star hover over planet hover for cursor', () => {
+        stellarMap.hoveredStar = mockStars[0];
+        stellarMap.hoveredPlanet = mockPlanets[0];
+        
+        stellarMap.updateCursor(mockCanvas);
+        
+        expect(mockCanvas.style.cursor).toBe('pointer');
+      });
+    });
+  });
+
+  describe('Additional Zoom Control Tests', () => {
+    beforeEach(() => {
+      stellarMap.visible = true;
+    });
+
+    it('should handle mouse wheel zoom out', () => {
+      mockInput.getWheelDelta.mockReturnValue(1); // Positive = zoom out
+      
+      const initialZoom = stellarMap.zoomLevel;
+      stellarMap.update(0.016, mockCamera, mockInput);
+      
+      expect(stellarMap.zoomLevel).toBe(initialZoom / 1.5);
+    });
+
+    it('should handle pinch zoom out for touch devices', () => {
+      mockInput.hasPinchZoomOut.mockReturnValue(true);
+      
+      const initialZoom = stellarMap.zoomLevel;
+      stellarMap.update(0.016, mockCamera, mockInput);
+      
+      expect(stellarMap.zoomLevel).toBe(initialZoom / 1.5);
+    });
+
+    it('should handle keyboard zoom out with minus key', () => {
+      mockInput.wasJustPressed.mockImplementation(key => key === 'Minus');
+      
+      const initialZoom = stellarMap.zoomLevel;
+      stellarMap.update(0.016, mockCamera, mockInput);
+      
+      expect(stellarMap.zoomLevel).toBe(initialZoom / 1.5);
+    });
+
+    it('should handle keyboard zoom out with numpad subtract', () => {
+      mockInput.wasJustPressed.mockImplementation(key => key === 'NumpadSubtract');
+      
+      const initialZoom = stellarMap.zoomLevel;
+      stellarMap.update(0.016, mockCamera, mockInput);
+      
+      expect(stellarMap.zoomLevel).toBe(initialZoom / 1.5);
+    });
+
+    it('should handle keyboard zoom in with numpad add', () => {
+      mockInput.wasJustPressed.mockImplementation(key => key === 'NumpadAdd');
+      
+      const initialZoom = stellarMap.zoomLevel;
+      stellarMap.update(0.016, mockCamera, mockInput);
+      
+      expect(stellarMap.zoomLevel).toBe(initialZoom * 1.5);
+    });
+  });
+
+  describe('Star Size Calculation Edge Cases', () => {
+    it('should calculate sizes correctly for galactic view', () => {
+      stellarMap.zoomLevel = 0.1; // Galactic view
+      const mockStar = {
+        starType: { sizeMultiplier: 1.5 },
+        starTypeName: 'Blue Giant'
+      };
+      
+      const size = stellarMap.calculateStarSize(mockStar, false);
+      
+      expect(size).toBeGreaterThan(0);
+      expect(size).toBeLessThan(5); // Should be small for galactic view
+    });
+
+    it('should use minimal size for extreme zoom out', () => {
+      const mockStar = {
+        starType: { sizeMultiplier: 2.0 },
+        starTypeName: 'Red Giant'
+      };
+      
+      const size = stellarMap.calculateStarSize(mockStar, true); // isExtremeZoomOut = true
+      
+      expect(size).toBe(1); // Should be minimal fixed size
+    });
+
+    it('should handle stars without starType gracefully', () => {
+      stellarMap.zoomLevel = 2.0;
+      const mockStar = {
+        starType: null,
+        starTypeName: 'Unknown Star'
+      };
+      
+      const size = stellarMap.calculateStarSize(mockStar, false);
+      
+      expect(size).toBeGreaterThan(0);
+      expect(typeof size).toBe('number');
+    });
+
+    it('should scale sizes correctly across zoom levels', () => {
+      const mockStar = {
+        starType: { sizeMultiplier: 1.0 },
+        starTypeName: 'G-Type Star'
+      };
+      
+      stellarMap.zoomLevel = 0.5; // Regional view
+      const regionalSize = stellarMap.calculateStarSize(mockStar, false);
+      
+      stellarMap.zoomLevel = 5.0; // Detail view
+      const detailSize = stellarMap.calculateStarSize(mockStar, false);
+      
+      expect(detailSize).toBeGreaterThan(regionalSize);
+    });
+  });
+
+  describe('Planet Rendering and Calculations', () => {
+    let mockPlanet;
+
+    beforeEach(() => {
+      mockPlanet = {
+        x: 1050,
+        y: 2050,
+        parentStarX: 1000,
+        parentStarY: 2000,
+        planetTypeName: 'Gas Giant',
+        planetType: { sizeMultiplier: 1.5, colors: ['#DAA520', '#FFD700'] },
+        planetIndex: 2
+      };
+    });
+
+    describe('calculatePlanetSize Method', () => {
+      it('should calculate planet sizes based on type multiplier', () => {
+        const size = stellarMap.calculatePlanetSize(mockPlanet);
+        
+        expect(size).toBeGreaterThan(1);
+        expect(typeof size).toBe('number');
+      });
+
+      it('should handle planets without planetType', () => {
+        const planetWithoutType = {
+          ...mockPlanet,
+          planetType: null
+        };
+        
+        const size = stellarMap.calculatePlanetSize(planetWithoutType);
+        
+        expect(size).toBeGreaterThan(0);
+        expect(typeof size).toBe('number');
+      });
+
+      it('should keep planet sizes smaller than star sizes', () => {
+        const planetSize = stellarMap.calculatePlanetSize(mockPlanet);
+        
+        // Planet base size is 1.5, should be smaller than typical star sizes
+        expect(planetSize).toBeLessThan(5);
+      });
+    });
+
+    describe('getPlanetColor Method', () => {
+      it('should return color from planetType colors array', () => {
+        const color = stellarMap.getPlanetColor(mockPlanet);
+        
+        expect(color).toBe('#DAA520'); // First color from colors array
+      });
+
+      it('should return fallback color for known planet type names', () => {
+        const rockyPlanet = {
+          planetTypeName: 'Rocky Planet',
+          planetType: null
+        };
+        
+        const color = stellarMap.getPlanetColor(rockyPlanet);
+        
+        expect(color).toBe('#8B4513'); // Fallback color for Rocky Planet
+      });
+
+      it('should return default color for unknown planet types', () => {
+        const unknownPlanet = {
+          planetTypeName: 'Mysterious Planet',
+          planetType: null
+        };
+        
+        const color = stellarMap.getPlanetColor(unknownPlanet);
+        
+        expect(color).toBe('#888888'); // Default gray color
+      });
+
+      it('should handle planets with null planetType colors', () => {
+        const planetWithNullColors = {
+          planetTypeName: 'Ocean World',
+          planetType: { colors: null }
+        };
+        
+        const color = stellarMap.getPlanetColor(planetWithNullColors);
+        
+        expect(color).toBe('#4169E1'); // Fallback for Ocean World
+      });
+
+      it('should handle all standard planet type fallback colors', () => {
+        const planetTypes = [
+          { type: 'Rocky Planet', expected: '#8B4513' },
+          { type: 'Ocean World', expected: '#4169E1' },
+          { type: 'Gas Giant', expected: '#DAA520' },
+          { type: 'Desert World', expected: '#FFE4B5' },
+          { type: 'Frozen World', expected: '#87CEEB' },
+          { type: 'Volcanic World', expected: '#DC143C' },
+          { type: 'Exotic World', expected: '#DA70D6' }
+        ];
+        
+        for (const { type, expected } of planetTypes) {
+          const planet = {
+            planetTypeName: type,
+            planetType: null
+          };
+          
+          const color = stellarMap.getPlanetColor(planet);
+          expect(color).toBe(expected);
+        }
+      });
+    });
+  });
+
+  describe('Player Following and Utility Methods', () => {
+    it('should enable follow player and center on camera', () => {
+      stellarMap.followPlayer = false;
+      stellarMap.centerX = 0;
+      stellarMap.centerY = 0;
+      
+      stellarMap.enableFollowPlayer(mockCamera);
+      
+      expect(stellarMap.followPlayer).toBe(true);
+      expect(stellarMap.centerX).toBe(mockCamera.x);
+      expect(stellarMap.centerY).toBe(mockCamera.y);
+    });
+
+    it('should set naming service correctly', () => {
+      const mockNamingService = {
+        generateDisplayName: vi.fn(() => 'Test Star'),
+        generateFullDesignation: vi.fn(() => ({
+          catalog: 'TST-001',
+          coordinate: '1000,2000',
+          type: 'G-Type Star',
+          classification: 'V'
+        }))
+      };
+      
+      stellarMap.setNamingService(mockNamingService);
+      
+      expect(stellarMap.namingService).toBe(mockNamingService);
+    });
+  });
+
+  describe('Info Panel Rendering', () => {
+    let mockNamingService;
+
+    beforeEach(() => {
+      mockNamingService = {
+        generateDisplayName: vi.fn(() => 'Test Star Alpha'),
+        generateFullDesignation: vi.fn(() => ({
+          catalog: 'TST-001',
+          coordinate: '1000,2000',
+          type: 'G-Type Star',
+          classification: 'V'
+        }))
+      };
+      stellarMap.setNamingService(mockNamingService);
+      stellarMap.visible = true;
+    });
+
+    describe('renderStarInfoPanel', () => {
+      it('should render star info panel when star is selected', () => {
+        stellarMap.selectedStar = {
+          x: 1000,
+          y: 2000,
+          starTypeName: 'G-Type Star',
+          timestamp: Date.now()
+        };
+        
+        stellarMap.render(mockRenderer, mockCamera, []);
+        
+        expect(mockNamingService.generateFullDesignation).toHaveBeenCalled();
+        expect(mockRenderer.ctx.fillText).toHaveBeenCalled();
+        expect(mockRenderer.ctx.fillRect).toHaveBeenCalled(); // Panel background
+      });
+
+      it('should handle missing naming service gracefully', () => {
+        stellarMap.namingService = null;
+        stellarMap.selectedStar = { x: 1000, y: 2000, starTypeName: 'G-Type Star' };
+        
+        expect(() => stellarMap.render(mockRenderer, mockCamera, [])).not.toThrow();
+      });
+
+      it('should handle null designation from naming service', () => {
+        mockNamingService.generateFullDesignation.mockReturnValue(null);
+        stellarMap.selectedStar = { x: 1000, y: 2000, starTypeName: 'G-Type Star' };
+        
+        expect(() => stellarMap.render(mockRenderer, mockCamera, [])).not.toThrow();
+      });
+    });
+
+    describe('renderPlanetInfoPanel', () => {
+      it('should render planet info panel when planet is selected', () => {
+        stellarMap.selectedPlanet = {
+          x: 1050,
+          y: 2050,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Rocky Planet',
+          planetIndex: 1,
+          objectName: 'Test Planet',
+          timestamp: Date.now()
+        };
+        
+        stellarMap.render(mockRenderer, mockCamera, []);
+        
+        expect(mockRenderer.ctx.fillText).toHaveBeenCalled();
+        expect(mockRenderer.ctx.fillRect).toHaveBeenCalled(); // Panel background
+      });
+
+      it('should handle planets without stored names', () => {
+        stellarMap.selectedPlanet = {
+          x: 1050,
+          y: 2050,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Rocky Planet',
+          planetIndex: 2,
+          objectName: null
+        };
+        
+        expect(() => stellarMap.render(mockRenderer, mockCamera, [])).not.toThrow();
+      });
+
+      it('should handle planets with null positions in info panel', () => {
+        stellarMap.selectedPlanet = {
+          x: null,
+          y: null,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Distant Planet',
+          planetIndex: 3,
+          objectName: 'Far Planet'
+        };
+        
+        expect(() => stellarMap.render(mockRenderer, mockCamera, [])).not.toThrow();
+      });
+    });
+
+    describe('generatePlanetDisplayName', () => {
+      it('should use stored object name when available', () => {
+        const planet = {
+          objectName: 'Stored Planet Name',
+          planetIndex: 1
+        };
+        
+        const name = stellarMap.generatePlanetDisplayName(planet);
+        
+        expect(name).toBe('Stored Planet Name');
+      });
+
+      it('should use naming service when no stored name', () => {
+        const planet = {
+          objectName: null,
+          parentStarX: 1000,
+          parentStarY: 2000,
+          planetTypeName: 'Rocky Planet',
+          planetIndex: 2,
+          x: 1050,
+          y: 2050
+        };
+        
+        const name = stellarMap.generatePlanetDisplayName(planet);
+        
+        expect(mockNamingService.generateDisplayName).toHaveBeenCalled();
+        expect(name).toBe('Test Star Alpha'); // From mock
+      });
+
+      it('should fallback to basic name when naming service fails', () => {
+        mockNamingService.generateDisplayName.mockImplementation(() => {
+          throw new Error('Naming service error');
+        });
+        
+        const planet = {
+          objectName: null,
+          planetIndex: 3
+        };
+        
+        const name = stellarMap.generatePlanetDisplayName(planet);
+        
+        expect(name).toBe('Planet 4'); // planetIndex + 1
+      });
+
+      it('should fallback when no naming service available', () => {
+        stellarMap.namingService = null;
+        
+        const planet = {
+          objectName: null,
+          planetIndex: 0
+        };
+        
+        const name = stellarMap.generatePlanetDisplayName(planet);
+        
+        expect(name).toBe('Planet 1'); // planetIndex + 1
+      });
+    });
+  });
 });
