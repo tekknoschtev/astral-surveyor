@@ -4,6 +4,7 @@
 // Import dependencies
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { Star, Planet, Moon, PlanetTypes, StarTypes } from '../celestial/celestial.js';
+import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
@@ -37,6 +38,7 @@ interface Chunk {
     planets: Planet[];
     moons: Moon[];
     celestialStars: Star[];
+    nebulae: Nebula[];
 }
 
 interface ActiveObjects {
@@ -44,6 +46,7 @@ interface ActiveObjects {
     planets: Planet[];
     moons: Moon[];
     celestialStars: Star[];
+    nebulae: Nebula[];
 }
 
 interface DiscoveryData {
@@ -51,6 +54,7 @@ interface DiscoveryData {
     timestamp: number;
     starTypeName?: string;
     planetTypeName?: string;
+    nebulaType?: string;
     objectName?: string;
 }
 
@@ -69,6 +73,18 @@ interface DiscoveredPlanet {
     planetTypeName: string;
     planetType: any;
     planetIndex: number;
+    objectName?: string;
+    timestamp: number;
+}
+
+interface DiscoveredNebula {
+    x: number;
+    y: number;
+    nebulaType: string;
+    nebulaTypeData: {
+        name: string;
+        colors?: string[];
+    };
     objectName?: string;
     timestamp: number;
 }
@@ -141,7 +157,8 @@ export class ChunkManager {
             stars: [],
             planets: [],
             moons: [], // Discoverable moons orbiting planets
-            celestialStars: [] // Discoverable stars (different from background stars)
+            celestialStars: [], // Discoverable stars (different from background stars)
+            nebulae: [] // Beautiful gas clouds for tranquil exploration
         };
 
         // Generate stars for this chunk
@@ -321,6 +338,9 @@ export class ChunkManager {
                 this.generateMoonsForPlanet(planet, starSystemRng, chunk);
             }
         }
+
+        // Generate nebulae for this chunk (separate from star systems)
+        this.generateNebulaeForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -546,13 +566,14 @@ export class ChunkManager {
     }
 
     getAllActiveObjects(): ActiveObjects {
-        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [] };
+        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
             objects.planets.push(...chunk.planets);
             objects.moons.push(...chunk.moons);
             objects.celestialStars.push(...chunk.celestialStars);
+            objects.nebulae.push(...chunk.nebulae);
         }
 
         return objects;
@@ -570,6 +591,8 @@ export class ChunkManager {
             discoveryData.starTypeName = object.starTypeName;
         } else if (object.type === 'planet' && object.planetTypeName) {
             discoveryData.planetTypeName = object.planetTypeName;
+        } else if (object.type === 'nebula' && object.nebulaType) {
+            discoveryData.nebulaType = object.nebulaType;
         }
         
         // Store the generated name if provided
@@ -779,6 +802,55 @@ export class ChunkManager {
         
         return discoveredPlanets;
     }
+
+    getDiscoveredNebulae(): DiscoveredNebula[] {
+        const discoveredNebulae: DiscoveredNebula[] = [];
+        
+        // Get all discovered objects that are nebulae  
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('nebula_')) {
+                // Extract coordinates from nebula ID 
+                // Format: nebula_x_y (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const nebulaX = parseInt(parts[1]);
+                    const nebulaY = parseInt(parts[2]);
+                    const nebula = this.findNebulaByPosition(nebulaX, nebulaY);
+                
+                    if (nebula) {
+                    const nebulaData: DiscoveredNebula = {
+                        x: nebula.x,
+                        y: nebula.y,
+                        nebulaType: nebula.nebulaType,
+                        nebulaTypeData: nebula.nebulaTypeData,
+                        objectName: discoveryData.objectName,
+                        timestamp: discoveryData.timestamp
+                    };
+                    
+                    discoveredNebulae.push(nebulaData);
+                    }
+                }
+            }
+        }
+        
+        // Sort by discovery time (most recent first)
+        discoveredNebulae.sort((a, b) => b.timestamp - a.timestamp);
+        console.log(`[ChunkManager] getDiscoveredNebulae returning ${discoveredNebulae.length} nebulae`);
+        return discoveredNebulae;
+    }
+
+    // Helper method to find a nebula by its position in active chunks  
+    private findNebulaByPosition(x: number, y: number): any | null {
+        for (const chunk of this.activeChunks.values()) {
+            for (const nebula of chunk.nebulae) {
+                // Check if nebula position matches (using floor to match getObjectId)
+                if (Math.floor(nebula.x) === x && Math.floor(nebula.y) === y) {
+                    return nebula;
+                }
+            }
+        }
+        return null;
+    }
     
     // Score a potential star system position based on distance from existing systems
     scoreStarSystemPosition(x: number, y: number, currentChunkX: number, currentChunkY: number): number {
@@ -926,6 +998,42 @@ export class ChunkManager {
         
         // Fallback to M-type if something goes wrong
         return StarTypes.M_TYPE;
+    }
+    
+    // Generate nebulae for a chunk - independent of star systems for varied placement
+    generateNebulaeForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // Use separate seed for nebulae generation to avoid correlation with star systems
+        const nebulaeSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
+        const nebulaeRng = new SeededRandom(nebulaeSeed);
+        
+        // Lower probability for nebulae - they should be special discoveries
+        // Most chunks (95%) will have no nebulae for sense of wonder when found
+        const nebulaeRoll = nebulaeRng.nextFloat(0, 1);
+        let nebulaeCount: number;
+        
+        if (nebulaeRoll < 0.95) {
+            nebulaeCount = 0; // 95% chance of no nebulae
+        } else if (nebulaeRoll < 0.98) {
+            nebulaeCount = 1; // 3% chance of 1 nebula
+        } else {
+            nebulaeCount = nebulaeRng.nextInt(1, 2); // 2% chance of 1-2 nebulae (rare clusters)
+        }
+        
+        for (let i = 0; i < nebulaeCount; i++) {
+            // Position nebulae with margin to ensure they fit within chunk
+            const margin = 300; // Larger margin for nebulae since they can be quite large
+            const nebulaX = chunkX * this.chunkSize + nebulaeRng.nextFloat(margin, this.chunkSize - margin);
+            const nebulaY = chunkY * this.chunkSize + nebulaeRng.nextFloat(margin, this.chunkSize - margin);
+            
+            // Select nebula type based on rarity
+            const nebulaType = selectNebulaType(nebulaeRng);
+            
+            // Create the nebula
+            const nebula = new Nebula(nebulaX, nebulaY, nebulaType, nebulaeRng);
+            
+            // Add to chunk
+            chunk.nebulae.push(nebula);
+        }
     }
 }
 

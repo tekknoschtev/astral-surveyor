@@ -157,6 +157,18 @@ export class SoundManager {
                 volume: 0.4,
                 waveform: 'sine'
             },
+            'nebula_discovery': {
+                type: 'oscillator',
+                frequency: 880,
+                frequency2: 1320,  // Perfect fifth for harmonic sparkle
+                duration: 1.0,
+                attack: 0.15,      // Slow attack for ethereal build-up
+                decay: 0.3,        // Gentle decay
+                sustain: 0.2,      // Lower sustain for twinkly effect
+                release: 0.4,      // Long release for ethereal fade
+                volume: 0.45,
+                waveform: 'triangle'  // Triangle wave for softer, warmer sparkle
+            },
             'rare_discovery': {
                 type: 'oscillator',
                 frequency: 65,
@@ -356,6 +368,28 @@ export class SoundManager {
     playMoonDiscovery(): void {
         const config = this.getSoundConfig('moon_discovery');
         if (config) this.playOscillatorSound(config);
+    }
+
+    playNebulaDiscovery(nebulaType: string = 'emission'): void {
+        const config = this.getSoundConfig('nebula_discovery');
+        if (config) {
+            // Vary sparkle based on nebula type for unique sonic identity
+            const variations: Record<string, number> = {
+                'emission': 1.0,      // Bright, warm sparkle
+                'reflection': 1.2,    // Higher, more reflective sparkle  
+                'planetary': 0.9,     // Slightly lower, more contained
+                'dark': 0.7          // Muted, mysterious sparkle
+            };
+            
+            const multiplier = variations[nebulaType] || 1.0;
+            const modifiedConfig = {
+                ...config,
+                frequency: (config.frequency || 880) * multiplier,
+                frequency2: config.frequency2 ? config.frequency2 * multiplier : undefined
+            };
+            
+            this.playOscillatorSound(modifiedConfig);
+        }
     }
 
     playRareDiscovery(): void {

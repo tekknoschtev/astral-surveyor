@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon';
+    type: 'star' | 'planet' | 'moon' | 'nebula';
 }
 
 interface Star extends CelestialObject {
@@ -24,6 +24,14 @@ interface Moon extends CelestialObject {
     type: 'moon';
     parentPlanet?: Planet;
     orbitalDistance?: number;
+}
+
+interface Nebula extends CelestialObject {
+    type: 'nebula';
+    nebulaType?: string;
+    nebulaTypeData?: {
+        name: string;
+    };
 }
 
 // Full designation result for detailed information
@@ -50,6 +58,24 @@ export class NamingService {
         'Volcanic World': 'VL',
         'Frozen World': 'FR'
     };
+
+    // Famous nebula names for authentic astronomical feel
+    private nebulaeNames = [
+        // Classic nebulae names
+        'Eagle', 'Orion', 'Horsehead', 'Crab', 'Ring', 'Cat\'s Eye', 'Helix', 'Rosette',
+        'Veil', 'Lagoon', 'Trifid', 'Swan', 'Pelican', 'North America', 'Heart', 'Soul',
+        'Flame', 'Cone', 'Fox Fur', 'Witch Head', 'California', 'Flaming Star',
+        'Bubble', 'Cocoon', 'Elephant Trunk', 'Pacman', 'Wizard', 'Tulip',
+        // Animal-inspired names  
+        'Lion', 'Bear', 'Dragon', 'Serpent', 'Phoenix', 'Dolphin', 'Seahorse', 'Spider',
+        'Butterfly', 'Jellyfish', 'Starfish', 'Octopus', 'Mantis', 'Scorpion',
+        // Mythological and poetic names
+        'Medusa', 'Perseus', 'Andromeda', 'Cassiopeia', 'Aurora', 'Celestial',
+        'Ethereal', 'Mystic', 'Cosmic', 'Stellar', 'Galactic', 'Nebulous',
+        // Colors and descriptive names
+        'Crimson', 'Azure', 'Emerald', 'Golden', 'Silver', 'Violet', 'Amber',
+        'Crystal', 'Opal', 'Ruby', 'Sapphire', 'Pearl', 'Diamond', 'Prism'
+    ];
 
     /**
      * Generate a deterministic star catalog number based on coordinates
@@ -189,6 +215,42 @@ export class NamingService {
     }
 
     /**
+     * Generate nebula name following astronomical conventions
+     * Combines famous nebula names with catalog numbers and type designations
+     * Examples: "Eagle Nebula", "NGC 4532", "IC 1847"
+     */
+    generateNebulaName(nebula: Nebula): string {
+        // Use deterministic selection based on nebula position
+        const nameIndex = Math.abs(this.hashCoordinate(nebula.x) ^ this.hashCoordinate(nebula.y)) % this.nebulaeNames.length;
+        const baseName = this.nebulaeNames[nameIndex];
+        
+        // 30% chance for famous name only, 70% chance for catalog designation
+        const useSimpleName = (Math.abs(this.hashCoordinate(nebula.x + nebula.y)) % 100) < 30;
+        
+        if (useSimpleName) {
+            return `${baseName} Nebula`;
+        }
+        
+        // Generate catalog designation (NGC/IC style)
+        const catalogNumber = this.generateNebulaCatalogNumber(nebula.x, nebula.y);
+        const catalogType = catalogNumber > 7000 ? 'IC' : 'NGC';
+        
+        return `${catalogType} ${catalogNumber}`;
+    }
+
+    /**
+     * Generate nebula catalog number in NGC/IC style (1-9999 range)
+     */
+    private generateNebulaCatalogNumber(x: number, y: number): number {
+        const hash1 = this.hashCoordinate(x * 1.1); // Slight offset for different distribution
+        const hash2 = this.hashCoordinate(y * 1.3);
+        const combined = (hash1 ^ hash2) >>> 0;
+        
+        // NGC range: 1-7840, IC range: 7841-9999 (historically accurate ranges)
+        return 1 + (combined % 9999);
+    }
+
+    /**
      * Calculate moon's index around its parent planet based on orbital distance
      */
     calculateMoonIndex(moon: Moon): number {
@@ -235,7 +297,7 @@ export class NamingService {
      * Generate short display name for UI contexts
      * Examples: "ASV-2847", "ASV-2847 b"
      */
-    generateDisplayName(object: Star | Planet | Moon | any): string {
+    generateDisplayName(object: Star | Planet | Moon | Nebula | any): string {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || object.starTypeName) {
             const catalogNumber = this.generateStarCatalogNumber(object.x, object.y);
@@ -244,6 +306,8 @@ export class NamingService {
             return this.generatePlanetName(object as Planet);
         } else if (object.type === 'moon') {
             return this.generateMoonName(object as Moon);
+        } else if (object.type === 'nebula') {
+            return this.generateNebulaName(object as Nebula);
         }
         
         return 'Unknown Object';
@@ -253,7 +317,7 @@ export class NamingService {
      * Generate full scientific designation with all details
      * Used for detailed information panels and exports
      */
-    generateFullDesignation(object: Star | Planet | Moon | any): FullDesignation | null {
+    generateFullDesignation(object: Star | Planet | Moon | Nebula | any): FullDesignation | null {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || object.starTypeName) {
             const standardName = this.generateStarName(object as Star);
@@ -273,6 +337,16 @@ export class NamingService {
                 parentStar: planet.parentStar ? this.generateDisplayName(planet.parentStar) : 'Unknown Star',
                 orbitalIndex: this.calculatePlanetIndex(planet) + 1
             };
+        } else if (object.type === 'nebula') {
+            const nebula = object as Nebula;
+            const nebulaName = this.generateNebulaName(nebula);
+            const coordName = this.generateCoordinateDesignation(nebula.x, nebula.y);
+            return {
+                catalog: nebulaName,
+                coordinate: coordName,
+                type: nebula.nebulaTypeData?.name || 'Unknown Nebula',
+                classification: this.getNebulaClassification(nebula.nebulaType)
+            };
         }
         
         return null;
@@ -281,15 +355,32 @@ export class NamingService {
     /**
      * Check if an object deserves special recognition (rare discoveries)
      */
-    isNotableDiscovery(object: Star | Planet | Moon | any): boolean {
+    isNotableDiscovery(object: Star | Planet | Moon | Nebula | any): boolean {
         if (object.type === 'star') {
             const rareStars = ['Neutron Star', 'White Dwarf', 'Blue Giant', 'Red Giant'];
             return rareStars.includes(object.starTypeName);
         } else if (object.type === 'planet') {
             const rarePlanets = ['Exotic World', 'Volcanic World', 'Frozen World'];
             return rarePlanets.includes(object.planetTypeName);
+        } else if (object.type === 'nebula') {
+            // All nebulae are notable due to their rarity (5% spawn chance)
+            return true;
         }
         
         return false;
+    }
+
+    /**
+     * Get nebula classification for scientific designation
+     */
+    private getNebulaClassification(nebulaType?: string): string | null {
+        const classifications: Record<string, string> = {
+            'emission': 'H II Region',
+            'reflection': 'Reflection Cloud', 
+            'planetary': 'Planetary Nebula',
+            'dark': 'Dark Cloud'
+        };
+        
+        return nebulaType ? classifications[nebulaType] || null : null;
     }
 }
