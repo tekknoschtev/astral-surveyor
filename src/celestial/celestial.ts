@@ -27,6 +27,17 @@ interface RingConfig {
     hasShimmer?: boolean;
 }
 
+interface AtmosphereConfig {
+    layers: number;           // Number of haze layers
+    thickness: number;        // How far atmosphere extends from planet
+    density: number;          // Base opacity (0-1)
+    color: string;           // Base atmospheric color
+    hasWeatherPatterns?: boolean;  // Moving cloud effects
+    hasAuroras?: boolean;     // Polar light effects
+    auroraColors?: string[];  // Aurora color palette
+    weatherSpeed?: number;    // Speed of weather animation
+}
+
 interface PlanetVisualEffects {
     hasAtmosphere?: boolean;
     hasCraters?: boolean;
@@ -39,6 +50,7 @@ interface PlanetVisualEffects {
     hasShimmer?: boolean;
     hasRings?: boolean | number;
     ringConfig?: RingConfig;
+    atmosphereConfig?: AtmosphereConfig;  // Enhanced atmospheric effects
 }
 
 interface Sunspot {
@@ -413,15 +425,9 @@ export class Planet extends CelestialObject {
                 renderer.ctx.restore();
             }
             
-            // Draw atmosphere if planet has one
+            // Draw enhanced atmosphere if planet has one
             if (this.visualEffects.hasAtmosphere) {
-                const atmosphereRadius = this.radius + 3;
-                const atmosphereColor = this.lightenColor(this.color, 0.4);
-                renderer.ctx.strokeStyle = atmosphereColor + '80'; // Semi-transparent
-                renderer.ctx.lineWidth = 2;
-                renderer.ctx.beginPath();
-                renderer.ctx.arc(screenX, screenY, atmosphereRadius, 0, Math.PI * 2);
-                renderer.ctx.stroke();
+                this.renderEnhancedAtmosphere(renderer, screenX, screenY);
             }
             
             // Draw main planet
@@ -610,6 +616,128 @@ export class Planet extends CelestialObject {
             ctx.beginPath();
             ctx.arc(screenX, screenY, this.radius + 2, 0, Math.PI * 2);
             ctx.stroke();
+        }
+    }
+
+    renderEnhancedAtmosphere(renderer: Renderer, screenX: number, screenY: number): void {
+        const ctx = renderer.ctx;
+        const atmosphereConfig = this.visualEffects.atmosphereConfig;
+        
+        if (!atmosphereConfig) {
+            // Fallback to simple atmosphere if no config
+            const atmosphereRadius = this.radius + 3;
+            const atmosphereColor = this.lightenColor(this.color, 0.4);
+            ctx.strokeStyle = atmosphereColor + '80'; // Semi-transparent
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, atmosphereRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            return;
+        }
+
+        // Multi-layer atmospheric haze
+        this.renderAtmosphericLayers(ctx, screenX, screenY, atmosphereConfig);
+        
+        // Weather patterns (if enabled)
+        if (atmosphereConfig.hasWeatherPatterns) {
+            this.renderWeatherPatterns(ctx, screenX, screenY, atmosphereConfig);
+        }
+        
+        // Aurora effects (if enabled)
+        if (atmosphereConfig.hasAuroras && atmosphereConfig.auroraColors) {
+            this.renderAuroras(ctx, screenX, screenY, atmosphereConfig);
+        }
+    }
+
+    private renderAtmosphericLayers(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, config: AtmosphereConfig): void {
+        for (let layer = 0; layer < config.layers; layer++) {
+            const layerRadius = this.radius + (config.thickness * (layer + 1) / config.layers);
+            const layerOpacity = config.density * (1 - layer / config.layers); // Fade outer layers
+            
+            // Create radial gradient for each layer
+            const gradient = ctx.createRadialGradient(
+                screenX, screenY, this.radius + (config.thickness * layer / config.layers),
+                screenX, screenY, layerRadius
+            );
+            
+            const opacityHex = Math.floor(layerOpacity * 255).toString(16).padStart(2, '0');
+            gradient.addColorStop(0, config.color + opacityHex);
+            gradient.addColorStop(1, config.color + '00'); // Fully transparent
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, layerRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    private renderWeatherPatterns(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, config: AtmosphereConfig): void {
+        const time = Date.now() * 0.001; // Convert to seconds
+        const weatherSpeed = config.weatherSpeed || 1.0;
+        
+        // Create subtle, slow-moving cloud-like patterns
+        for (let i = 0; i < 3; i++) {
+            const angle = (time * weatherSpeed * 0.1) + (i * Math.PI * 0.67); // Offset each pattern
+            const patternRadius = this.radius + config.thickness * 0.7;
+            const patternX = screenX + Math.cos(angle) * (this.radius * 0.3);
+            const patternY = screenY + Math.sin(angle) * (this.radius * 0.3);
+            
+            // Create small cloud-like effects
+            const gradient = ctx.createRadialGradient(
+                patternX, patternY, 0,
+                patternX, patternY, this.radius * 0.4
+            );
+            
+            const alpha = (Math.sin(time * weatherSpeed + i) * 0.15 + 0.2) * config.density;
+            const alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+            gradient.addColorStop(0, config.color + alphaHex);
+            gradient.addColorStop(1, config.color + '00');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(patternX, patternY, this.radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    private renderAuroras(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, config: AtmosphereConfig): void {
+        if (!config.auroraColors) return;
+        
+        const time = Date.now() * 0.001;
+        const auroraRadius = this.radius + config.thickness * 0.8;
+        
+        // Render auroras at polar regions (top and bottom of planet)
+        for (let pole = 0; pole < 2; pole++) {
+            const poleY = screenY + (pole === 0 ? -1 : 1) * this.radius * 0.8;
+            
+            // Multiple aurora bands
+            for (let band = 0; band < config.auroraColors.length; band++) {
+                const color = config.auroraColors[band];
+                const bandOffset = band * 8; // Spread bands vertically
+                const currentY = poleY + (pole === 0 ? bandOffset : -bandOffset);
+                
+                // Create shimmering aurora effect
+                const intensity = Math.sin(time * 2 + band * Math.PI * 0.5) * 0.4 + 0.6;
+                const alphaHex = Math.floor(intensity * 0.6 * 255).toString(16).padStart(2, '0');
+                
+                // Aurora shape - elongated horizontally like real auroras
+                const gradient = ctx.createLinearGradient(
+                    screenX - this.radius, currentY,
+                    screenX + this.radius, currentY
+                );
+                gradient.addColorStop(0, color + '00');
+                gradient.addColorStop(0.3, color + alphaHex);
+                gradient.addColorStop(0.7, color + alphaHex);
+                gradient.addColorStop(1, color + '00');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(
+                    screenX - this.radius * 0.9, 
+                    currentY - 2, 
+                    this.radius * 1.8, 
+                    4
+                );
+            }
         }
     }
 }
@@ -1136,7 +1264,17 @@ export const PlanetTypes: Record<string, PlanetType> = {
         visualEffects: {
             hasAtmosphere: true,
             hasCraters: false,
-            hasStripes: true // Represents currents/weather patterns
+            hasStripes: true, // Represents currents/weather patterns
+            atmosphereConfig: {
+                layers: 3,
+                thickness: 12,
+                density: 0.3,
+                color: '#87CEEB', // Light blue atmospheric haze
+                hasWeatherPatterns: true,
+                hasAuroras: true,
+                auroraColors: ['#00FFFF', '#40E0D0', '#1E90FF'], // Cyan, turquoise, blue
+                weatherSpeed: 0.8
+            }
         }
     },
     GAS_GIANT: {
@@ -1157,6 +1295,15 @@ export const PlanetTypes: Record<string, PlanetType> = {
                 colors: ['#D4AF37', '#CD853F', '#B8860B'], // Golden/brown ring particles
                 opacity: 0.7,
                 bandCount: 3
+            },
+            atmosphereConfig: {
+                layers: 4, // Thick atmosphere
+                thickness: 20,
+                density: 0.4,
+                color: '#F4A460', // Sandy brown atmospheric haze
+                hasWeatherPatterns: true,
+                hasAuroras: false, // Gas giants typically don't have visible auroras
+                weatherSpeed: 1.2 // Faster weather due to massive size
             }
         }
     },
@@ -1229,6 +1376,16 @@ export const PlanetTypes: Record<string, PlanetType> = {
                 opacity: 0.8,
                 bandCount: 4,
                 hasShimmer: true // Rings also shimmer
+            },
+            atmosphereConfig: {
+                layers: 5, // Very complex atmosphere
+                thickness: 15,
+                density: 0.25, // Subtle, mysterious
+                color: '#DA70D6', // Magenta atmospheric haze
+                hasWeatherPatterns: true,
+                hasAuroras: true,
+                auroraColors: ['#FF69B4', '#00FFFF', '#9370DB', '#FFD700'], // Multi-colored exotic auroras
+                weatherSpeed: 0.5 // Slower, more ethereal
             }
         }
     }
