@@ -60,6 +60,15 @@ interface Sunspot {
     intensity: number;  // Darkness intensity (0-1)
 }
 
+interface CoronaConfig {
+    layers: number;           // Number of corona layers (2-4)
+    intensity: number;        // Base brightness multiplier (0.3-1.0)
+    temperature: number;      // Color temperature modifier (0.5-2.0)
+    asymmetry: number;        // Directional variation factor (0.0-0.5)
+    fluctuation: number;      // Dynamic intensity variation (0.0-0.3)
+    colors: string[];         // Corona color palette based on temperature
+}
+
 interface StarVisualEffects {
     hasCorona?: boolean;
     hasPulsing?: boolean;
@@ -68,6 +77,7 @@ interface StarVisualEffects {
     hasSwirling?: boolean;
     hasSunspots?: boolean;
     coronaSize?: number;
+    coronaConfig?: CoronaConfig;  // Enhanced corona configuration
     pulseSpeed?: number;
     radiationIntensity?: number;
     swirlSpeed?: number;
@@ -897,20 +907,9 @@ export class Star extends CelestialObject {
     renderVisualEffects(renderer: Renderer, screenX: number, screenY: number): void {
         const ctx = renderer.ctx;
         
-        // Draw corona effect
+        // Draw enhanced corona effect
         if (this.visualEffects.hasCorona && this.visualEffects.coronaSize) {
-            const coronaRadius = this.radius * this.visualEffects.coronaSize;
-            const gradient = ctx.createRadialGradient(
-                screenX, screenY, this.radius,
-                screenX, screenY, coronaRadius
-            );
-            gradient.addColorStop(0, this.color + '20'); // Semi-transparent
-            gradient.addColorStop(1, this.color + '00'); // Fully transparent
-            
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, coronaRadius, 0, Math.PI * 2);
-            ctx.fill();
+            this.renderEnhancedCorona(ctx, screenX, screenY);
         }
         
         // Draw radiation effects for high-energy stars
@@ -1021,6 +1020,173 @@ export class Star extends CelestialObject {
                     ctx.fill();
                 }
             }
+        }
+    }
+
+    // Enhanced corona rendering with multi-layer effects
+    renderEnhancedCorona(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
+        const time = Date.now() * 0.001;
+        const config = this.visualEffects.coronaConfig;
+        const baseCoronaRadius = this.radius * (this.visualEffects.coronaSize || 1.2);
+        
+        // Use default configuration if none provided
+        const coronaLayers = config?.layers || 3;
+        const baseIntensity = config?.intensity || 0.6;
+        const asymmetryFactor = config?.asymmetry || 0.02;
+        const fluctuationAmount = config?.fluctuation || 0.1;
+        
+        // Calculate dynamic intensity variations
+        const fluctuation = Math.sin(time * 0.5 + Math.cos(time * 0.3) * 0.5) * fluctuationAmount + 1.0;
+        const intensity = baseIntensity * fluctuation;
+        
+        // Get corona colors (fallback to star color variants)
+        const coronaColors = config?.colors || this.generateCoronaColors();
+        
+        // Calculate asymmetry offset for directional corona streams
+        const asymmetryX = Math.cos(time * 0.2) * asymmetryFactor * this.radius;
+        const asymmetryY = Math.sin(time * 0.15) * asymmetryFactor * this.radius;
+        
+        // Render corona layers from outermost to innermost
+        for (let layer = coronaLayers - 1; layer >= 0; layer--) {
+            const layerProgress = layer / (coronaLayers - 1); // 0.0 to 1.0 (inner to outer)
+            const layerRadius = this.radius + (baseCoronaRadius - this.radius) * (0.3 + layerProgress * 0.7);
+            const layerIntensity = intensity * (1.0 - layerProgress * 0.7); // Inner layers brighter
+            
+            // Choose color for this layer
+            const colorIndex = Math.floor(layerProgress * (coronaColors.length - 1));
+            const layerColor = coronaColors[colorIndex];
+            
+            // Create layer-specific asymmetry
+            const layerAsymmetryX = asymmetryX * (1 + layerProgress * 0.5);
+            const layerAsymmetryY = asymmetryY * (1 + layerProgress * 0.5);
+            const coronaCenterX = screenX + layerAsymmetryX;
+            const coronaCenterY = screenY + layerAsymmetryY;
+            
+            // Create radial gradient for this layer
+            const gradient = ctx.createRadialGradient(
+                coronaCenterX, coronaCenterY, this.radius * (0.8 + layerProgress * 0.2),
+                coronaCenterX, coronaCenterY, layerRadius
+            );
+            
+            // Dynamic opacity based on layer and intensity
+            const innerOpacity = Math.floor(layerIntensity * 0.3 * 255).toString(16).padStart(2, '0');
+            const outerOpacity = '00'; // Fully transparent
+            
+            gradient.addColorStop(0, layerColor + innerOpacity);
+            gradient.addColorStop(0.6, layerColor + Math.floor(layerIntensity * 0.1 * 255).toString(16).padStart(2, '0'));
+            gradient.addColorStop(1, layerColor + outerOpacity);
+            
+            // Render this corona layer
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(coronaCenterX, coronaCenterY, layerRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add subtle corona streamers for outer layers
+            if (layer >= coronaLayers - 2) {
+                // Offset time for each layer to create variation
+                const layerTimeOffset = layer * 1.3; // Different timing per layer
+                this.renderCoronaStreamers(ctx, coronaCenterX, coronaCenterY, layerRadius, layerColor, layerIntensity * 0.4, time, layerTimeOffset, layer);
+            }
+        }
+    }
+    
+    // Render subtle corona streamers for enhanced realism
+    private renderCoronaStreamers(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, radius: number, color: string, intensity: number, time: number, layerTimeOffset: number = 0, layer: number = 0): void {
+        // Determine streamer count and behavior based on star type
+        let streamerCount = this.getStreamerCountForStarType();
+        const layerTime = time + layerTimeOffset;
+        
+        // For sun-like stars, use probability-based streamer spawning
+        if (this.shouldUseProbabilisticStreamers()) {
+            streamerCount = this.getProbabilisticStreamerCount(layerTime, layer);
+        }
+        
+        const baseOpacity = Math.floor(intensity * 255).toString(16).padStart(2, '0');
+        
+        for (let i = 0; i < streamerCount; i++) {
+            // Add layer-specific angle offset to prevent perfect alignment
+            const layerAngleOffset = layer * 0.7; // Different starting positions per layer
+            const angle = (i / streamerCount) * Math.PI * 2 + layerTime * 0.1 + layerAngleOffset;
+            const streamerLength = radius * (1.2 + Math.sin(layerTime * 0.8 + i + layer) * 0.3);
+            const streamerWidth = 3 + Math.sin(layerTime * 0.6 + i * 0.5 + layer * 0.3) * 1;
+            
+            // Calculate streamer endpoints
+            const innerRadius = radius * 0.9;
+            const outerRadius = streamerLength;
+            const startX = centerX + Math.cos(angle) * innerRadius;
+            const startY = centerY + Math.sin(angle) * innerRadius;
+            const endX = centerX + Math.cos(angle) * outerRadius;
+            const endY = centerY + Math.sin(angle) * outerRadius;
+            
+            // Create linear gradient for streamer
+            const streamerGradient = ctx.createLinearGradient(startX, startY, endX, endY);
+            streamerGradient.addColorStop(0, color + baseOpacity);
+            streamerGradient.addColorStop(0.7, color + Math.floor(intensity * 0.3 * 255).toString(16).padStart(2, '0'));
+            streamerGradient.addColorStop(1, color + '00');
+            
+            // Draw streamer
+            ctx.strokeStyle = streamerGradient;
+            ctx.lineWidth = streamerWidth;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+    }
+    
+    // Determine streamer count based on star type
+    private getStreamerCountForStarType(): number {
+        switch (this.starTypeName) {
+            case 'G-Type Star':         return 2; // Sun-like: rare streamers
+            case 'K-Type Star':         return 2; // Orange dwarf: rare streamers  
+            case 'M-Type Star':         return 1; // Red dwarf: very rare streamers
+            case 'Red Giant':           return 4; // Large, complex magnetic field
+            case 'Blue Giant':          return 6; // Energetic, many streamers
+            case 'White Dwarf':         return 1; // Compact, minimal activity
+            case 'Neutron Star':        return 0; // No streamers, just intense corona
+            default:                    return 2; // Default for unknown types
+        }
+    }
+    
+    // Check if this star type should use probabilistic (rare) streamers  
+    private shouldUseProbabilisticStreamers(): boolean {
+        return ['G-Type Star', 'K-Type Star', 'M-Type Star'].includes(this.starTypeName);
+    }
+    
+    // Get probabilistic streamer count for sun-like stars (simulate rare flares)
+    private getProbabilisticStreamerCount(time: number, layer: number): number {
+        const maxStreamers = this.getStreamerCountForStarType();
+        
+        // Use different random seeds for each layer to avoid identical patterns
+        const seed = Math.sin(time * 0.05 + layer * 2.1) * Math.cos(time * 0.03 + layer * 1.7);
+        
+        // Only show streamers occasionally (like real solar flares)
+        const probability = Math.abs(seed);
+        if (probability < 0.7) return 0; // 70% of time: no streamers
+        if (probability < 0.9) return 1; // 20% of time: 1 streamer  
+        return maxStreamers;             // 10% of time: max streamers
+    }
+    
+    // Generate corona colors based on star temperature and type
+    generateCoronaColors(): string[] {
+        const config = this.visualEffects.coronaConfig;
+        const temperature = config?.temperature || 1.0;
+        
+        // Temperature-based color generation
+        if (temperature >= 1.8) {
+            // Very hot - blue-white corona (Blue Giants, White Dwarfs)
+            return [this.lightenColor('#88ddff', 0.3), this.lightenColor('#aaeeff', 0.2), '#ffffff'];
+        } else if (temperature >= 1.3) {
+            // Hot - white-yellow corona (G-type stars)
+            return [this.lightenColor(this.color, 0.4), this.lightenColor(this.color, 0.6), '#ffffcc'];
+        } else if (temperature >= 0.8) {
+            // Medium - yellow-orange corona (K-type stars)
+            return [this.lightenColor(this.color, 0.3), this.lightenColor(this.color, 0.5), this.lightenColor('#ffaa44', 0.3)];
+        } else {
+            // Cool - red-orange corona (M-type, Red Giants)
+            return [this.lightenColor(this.color, 0.2), this.lightenColor(this.color, 0.4), this.lightenColor('#ff6644', 0.2)];
         }
     }
     
@@ -1406,6 +1572,14 @@ export const StarTypes: Record<string, StarType> = {
             hasPulsing: false,
             hasRadiation: false,
             coronaSize: 1.2,
+            coronaConfig: {
+                layers: 3,
+                intensity: 0.7,
+                temperature: 1.3,
+                asymmetry: 0.03,
+                fluctuation: 0.1,
+                colors: ['#ffdd88', '#ffffcc', '#ffffff']
+            },
             hasSwirling: true,
             swirlSpeed: 0.3,
             hasSunspots: true,
@@ -1426,6 +1600,14 @@ export const StarTypes: Record<string, StarType> = {
             hasPulsing: false,
             hasRadiation: false,
             coronaSize: 1.1,
+            coronaConfig: {
+                layers: 3,
+                intensity: 0.6,
+                temperature: 1.0,
+                asymmetry: 0.02,
+                fluctuation: 0.08,
+                colors: ['#ffaa44', '#ffcc88', '#ffeeaa']
+            },
             hasSwirling: true,
             swirlSpeed: 0.25
         }
@@ -1439,10 +1621,18 @@ export const StarTypes: Record<string, StarType> = {
         discoveryValue: 1,
         rarity: 0.25, // 25% - very common in reality
         visualEffects: {
-            hasCorona: false, // Dimmer corona
+            hasCorona: true, // Subtle corona for red dwarfs
             hasPulsing: false,
             hasRadiation: false,
-            coronaSize: 1.0,
+            coronaSize: 1.05,
+            coronaConfig: {
+                layers: 2,
+                intensity: 0.4,
+                temperature: 0.7,
+                asymmetry: 0.02,
+                fluctuation: 0.05,
+                colors: ['#ff6644', '#ff8866', '#ffaa88']
+            },
             hasSwirling: true,
             swirlSpeed: 0.2
         }
@@ -1460,6 +1650,14 @@ export const StarTypes: Record<string, StarType> = {
             hasPulsing: true, // Variable star
             hasRadiation: false,
             coronaSize: 1.5,
+            coronaConfig: {
+                layers: 4,
+                intensity: 0.8,
+                temperature: 0.8,
+                asymmetry: 0.05,
+                fluctuation: 0.15,
+                colors: ['#ff4422', '#ff6644', '#ff8866', '#ffaa88']
+            },
             pulseSpeed: 0.5, // Much slower, more tranquil
             hasSwirling: true,
             swirlSpeed: 0.15 // Slow, majestic swirls
@@ -1478,6 +1676,14 @@ export const StarTypes: Record<string, StarType> = {
             hasPulsing: false,
             hasRadiation: true, // Strong stellar wind
             coronaSize: 1.8,
+            coronaConfig: {
+                layers: 4,
+                intensity: 0.9,
+                temperature: 2.0,
+                asymmetry: 0.04,
+                fluctuation: 0.12,
+                colors: ['#88ddff', '#aaeeff', '#ccffff', '#ffffff']
+            },
             radiationIntensity: 0.3,
             hasSwirling: true,
             swirlSpeed: 0.5 // Fast, energetic swirls
@@ -1492,10 +1698,18 @@ export const StarTypes: Record<string, StarType> = {
         discoveryValue: 3,
         rarity: 0.04, // 4% - stellar remnants
         visualEffects: {
-            hasCorona: false,
+            hasCorona: true, // Intense but compact corona
             hasPulsing: false,
             hasRadiation: false,
             coronaSize: 0.8,
+            coronaConfig: {
+                layers: 2,
+                intensity: 0.9,
+                temperature: 2.0,
+                asymmetry: 0.01,
+                fluctuation: 0.08,
+                colors: ['#ffffff', '#eeeeff', '#ddddff']
+            },
             hasShimmer: true, // Hot surface effects
             hasSwirling: false, // Too small for visible swirls
             swirlSpeed: 0
@@ -1510,10 +1724,18 @@ export const StarTypes: Record<string, StarType> = {
         discoveryValue: 5,
         rarity: 0.01, // 1% - ultra-rare stellar remnants
         visualEffects: {
-            hasCorona: false,
+            hasCorona: true, // Minimal but extremely intense corona
             hasPulsing: true, // Pulsar effects
             hasRadiation: true, // Intense radiation
             coronaSize: 0.5,
+            coronaConfig: {
+                layers: 2,
+                intensity: 1.0,
+                temperature: 2.2,
+                asymmetry: 0.01,
+                fluctuation: 0.2,
+                colors: ['#ddddff', '#bbbbff', '#9999ff']
+            },
             pulseSpeed: 1.2, // Still faster than others but much more gentle
             radiationIntensity: 0.8,
             hasSwirling: false, // Too small and too extreme
