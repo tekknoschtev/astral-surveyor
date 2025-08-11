@@ -408,11 +408,11 @@ describe('Camera Physics and Movement', () => {
     it('should format distance correctly', () => {
       // Test kilometers (current system uses km not m)
       camera.sessionDistanceTraveled = 5000; // 5000 pixels = 50000 km (with 10000 scale)
-      expect(camera.getFormattedDistance()).toMatch(/50000\.0 km/);
+      expect(camera.getFormattedDistance()).toMatch(/50,000\.0 km/);
       
       // Test kilometers
       camera.sessionDistanceTraveled = 50000; // 50000 pixels = 500000 km (with 10000 scale)
-      expect(camera.getFormattedDistance()).toMatch(/500000\.0 km/);
+      expect(camera.getFormattedDistance()).toMatch(/500,000\.0 km/);
       
       // Test AU (current system uses AU not Mm)
       camera.sessionDistanceTraveled = 15000000; // Large distance converts to AU
