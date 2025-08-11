@@ -100,5 +100,5 @@ jobs:
         serve -s . -p 3000 &
         SERVER_PID=$!
         sleep 3
-        curl -f http://localhost:3000/game.html || exit 1
+        curl -f http://localhost:3000/ || exit 1
         kill $SERVER_PID
