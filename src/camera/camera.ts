@@ -231,11 +231,11 @@ export class Camera {
         const au = kilometers / 149597870.7;
         
         if (au < 0.5) {
-            return `${kilometers.toFixed(1)} km`;
+            return `${kilometers.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})} km`;
         } else if (au < 1000) {
-            return `${au.toFixed(2)} AU`;
+            return `${au.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} AU`;
         } else {
-            return `${(au / 1000).toFixed(1)} kAU`;
+            return `${(au / 1000).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})} kAU`;
         }
     }
 
@@ -247,13 +247,13 @@ export class Camera {
         const au = kilometers / 149597870.7;
         
         if (au < 0.5) {
-            return `${kilometers.toFixed(1)} km`;
+            return `${kilometers.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})} km`;
         } else if (au < 1000) {
-            return `${au.toFixed(2)} AU`;
+            return `${au.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} AU`;
         } else if (au < 1000000) {
-            return `${(au / 1000).toFixed(1)} kAU`;
+            return `${(au / 1000).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})} kAU`;
         } else {
-            return `${(au / 1000000).toFixed(2)} MAU`;
+            return `${(au / 1000000).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} MAU`;
         }
     }
 
@@ -272,20 +272,20 @@ export class Camera {
             // Show in km/h for very slow speeds
             const kmPerHour = kmPerSecond * 3600;
             if (kmPerHour < 1) {
-                return `${Math.round(kmPerHour * 10) / 10} km/h`;
+                return `${(Math.round(kmPerHour * 10) / 10).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})} km/h`;
             } else {
-                return `${Math.round(kmPerHour).toLocaleString()} km/h`;
+                return `${Math.round(kmPerHour).toLocaleString('en-US')} km/h`;
             }
         } else if (kmPerSecond < 100000) {
             // Show in km/s for moderate to high speeds
-            return `${Math.round(kmPerSecond * 10) / 10} km/s`;
+            return `${(Math.round(kmPerSecond * 10) / 10).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})} km/s`;
         } else {
             // For very high speeds, show in AU/s
             const auPerSecond = kmPerSecond / 149597870.7;
             if (auPerSecond < 1) {
-                return `${Math.round(auPerSecond * 1000000) / 1000000} AU/s`;
+                return `${(Math.round(auPerSecond * 1000000) / 1000000).toLocaleString('en-US', {minimumFractionDigits: 6, maximumFractionDigits: 6})} AU/s`;
             } else {
-                return `${Math.round(auPerSecond * 100) / 100} AU/s`;
+                return `${(Math.round(auPerSecond * 100) / 100).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} AU/s`;
             }
         }
     }
