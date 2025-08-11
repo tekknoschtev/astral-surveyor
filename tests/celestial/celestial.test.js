@@ -275,9 +275,13 @@ describe('Star Class', () => {
         createRadialGradient: vi.fn(() => ({
           addColorStop: vi.fn()
         })),
+        createLinearGradient: vi.fn(() => ({
+          addColorStop: vi.fn()
+        })),
         fillStyle: '',
         strokeStyle: '',
         lineWidth: 0,
+        lineCap: 'round',
         beginPath: vi.fn(),
         arc: vi.fn(),
         ellipse: vi.fn(),
@@ -753,5 +757,331 @@ describe('Planet and Star Type Definitions', () => {
   it('should have star rarities that sum to approximately 1.0', () => {
     const totalRarity = Object.values(StarTypes).reduce((sum, type) => sum + type.rarity, 0);
     expect(totalRarity).toBeCloseTo(1.0, 1);
+  });
+});
+
+describe('Enhanced Corona System', () => {
+  let mockRenderer;
+  let mockCanvas;
+  let mockContext;
+  
+  beforeEach(() => {
+    // Reset Math.random for deterministic tests
+    resetMockMathRandom();
+    
+    // Create comprehensive mock canvas context
+    mockContext = {
+      fillStyle: '#000000',
+      strokeStyle: '#000000',
+      lineWidth: 1,
+      globalAlpha: 1,
+      lineCap: 'round',
+      
+      // Drawing methods
+      fillRect: vi.fn(),
+      clearRect: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      
+      // Gradient methods
+      createRadialGradient: vi.fn(() => ({
+        addColorStop: vi.fn()
+      })),
+      createLinearGradient: vi.fn(() => ({
+        addColorStop: vi.fn()
+      }))
+    };
+    
+    mockCanvas = {
+      width: 800,
+      height: 600,
+      getContext: vi.fn(() => mockContext)
+    };
+    
+    mockRenderer = {
+      canvas: mockCanvas,
+      ctx: mockContext,
+      drawCircle: vi.fn()
+    };
+  });
+  
+  describe('CoronaConfig Interface', () => {
+    it('should have all star types with proper corona configurations', () => {
+      const starTypesWithCorona = Object.values(StarTypes).filter(type => type.visualEffects.hasCorona);
+      
+      expect(starTypesWithCorona.length).toBeGreaterThan(5); // Most stars should have coronas
+      
+      starTypesWithCorona.forEach(starType => {
+        if (starType.visualEffects.coronaConfig) {
+          const config = starType.visualEffects.coronaConfig;
+          
+          // Validate configuration structure
+          expect(config.layers).toBeDefined();
+          expect(config.intensity).toBeDefined();
+          expect(config.temperature).toBeDefined();
+          expect(config.asymmetry).toBeDefined();
+          expect(config.fluctuation).toBeDefined();
+          expect(config.colors).toBeDefined();
+          
+          // Validate reasonable ranges
+          expect(config.layers).toBeGreaterThanOrEqual(2);
+          expect(config.layers).toBeLessThanOrEqual(4);
+          expect(config.intensity).toBeGreaterThanOrEqual(0.3);
+          expect(config.intensity).toBeLessThanOrEqual(1.0);
+          expect(config.asymmetry).toBeGreaterThanOrEqual(0.0);
+          expect(config.asymmetry).toBeLessThanOrEqual(0.1); // Should be subtle after our fix
+          expect(Array.isArray(config.colors)).toBe(true);
+          expect(config.colors.length).toBeGreaterThanOrEqual(2);
+        }
+      });
+    });
+    
+    it('should have star-type specific corona properties', () => {
+      // G-Type stars should have balanced coronas
+      const gType = StarTypes.G_TYPE;
+      expect(gType.visualEffects.coronaConfig.layers).toBe(3);
+      expect(gType.visualEffects.coronaConfig.temperature).toBe(1.3);
+      expect(gType.visualEffects.coronaConfig.colors).toContain('#ffdd88');
+      
+      // Blue Giants should have intense coronas
+      const blueGiant = StarTypes.BLUE_GIANT;
+      expect(blueGiant.visualEffects.coronaConfig.layers).toBe(4);
+      expect(blueGiant.visualEffects.coronaConfig.temperature).toBe(2.0);
+      expect(blueGiant.visualEffects.coronaConfig.intensity).toBe(0.9);
+      
+      // Neutron Stars should have minimal but intense coronas
+      const neutronStar = StarTypes.NEUTRON_STAR;
+      expect(neutronStar.visualEffects.coronaConfig.layers).toBe(2);
+      expect(neutronStar.visualEffects.coronaConfig.temperature).toBe(2.2);
+      expect(neutronStar.visualEffects.coronaConfig.intensity).toBe(1.0);
+    });
+  });
+  
+  describe('Corona Color Generation', () => {
+    it('should generate temperature-based colors for different star types', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      
+      // G-Type star should generate warm colors
+      const colors = star.generateCoronaColors();
+      expect(Array.isArray(colors)).toBe(true);
+      expect(colors.length).toBe(3);
+      
+      // Colors should be hex format
+      colors.forEach(color => {
+        expect(color).toMatch(/^#[0-9a-f]{6}$/i);
+      });
+    });
+    
+    it('should generate different colors for different temperature ranges', () => {
+      // Test hot star (Blue Giant)
+      const hotStar = new Star(0, 0, StarTypes.BLUE_GIANT);
+      const hotColors = hotStar.generateCoronaColors();
+      
+      // Test cool star (M-Type)  
+      const coolStar = new Star(0, 0, StarTypes.M_TYPE);
+      const coolColors = coolStar.generateCoronaColors();
+      
+      // Should generate different color palettes
+      expect(hotColors).not.toEqual(coolColors);
+    });
+    
+    it('should fallback to auto-generated colors when no config provided', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      star.visualEffects.coronaConfig = null; // Remove config
+      
+      const colors = star.generateCoronaColors();
+      expect(Array.isArray(colors)).toBe(true);
+      expect(colors.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+  
+  describe('Streamer Count Logic', () => {
+    it('should return correct streamer counts for different star types', () => {
+      const gTypeStar = new Star(0, 0, StarTypes.G_TYPE);
+      expect(gTypeStar.getStreamerCountForStarType()).toBe(2);
+      
+      const blueGiant = new Star(0, 0, StarTypes.BLUE_GIANT);
+      expect(blueGiant.getStreamerCountForStarType()).toBe(6);
+      
+      const neutronStar = new Star(0, 0, StarTypes.NEUTRON_STAR);
+      expect(neutronStar.getStreamerCountForStarType()).toBe(0);
+      
+      const redGiant = new Star(0, 0, StarTypes.RED_GIANT);
+      expect(redGiant.getStreamerCountForStarType()).toBe(4);
+    });
+    
+    it('should identify sun-like stars for probabilistic streamers', () => {
+      const gTypeStar = new Star(0, 0, StarTypes.G_TYPE);
+      expect(gTypeStar.shouldUseProbabilisticStreamers()).toBe(true);
+      
+      const kTypeStar = new Star(0, 0, StarTypes.K_TYPE);
+      expect(kTypeStar.shouldUseProbabilisticStreamers()).toBe(true);
+      
+      const blueGiant = new Star(0, 0, StarTypes.BLUE_GIANT);
+      expect(blueGiant.shouldUseProbabilisticStreamers()).toBe(false);
+    });
+    
+    it('should generate probabilistic streamer counts within expected ranges', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      const maxStreamers = star.getStreamerCountForStarType();
+      
+      // Test multiple time values to ensure probabilistic behavior
+      const results = [];
+      for (let time = 0; time < 100; time += 1) {
+        const count = star.getProbabilisticStreamerCount(time, 0);
+        results.push(count);
+        
+        // Count should never exceed max for this star type
+        expect(count).toBeLessThanOrEqual(maxStreamers);
+        expect(count).toBeGreaterThanOrEqual(0);
+      }
+      
+      // Should have variation in results (not all the same)
+      const uniqueResults = [...new Set(results)];
+      expect(uniqueResults.length).toBeGreaterThan(1);
+      
+      // Should include 0 (no streamers) most of the time
+      expect(results).toContain(0);
+    });
+  });
+  
+  describe('Corona Rendering Integration', () => {
+    it('should call enhanced corona rendering when star has corona', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      const renderSpy = vi.spyOn(star, 'renderEnhancedCorona').mockImplementation(() => {});
+      
+      star.renderVisualEffects(mockRenderer, 100, 100);
+      
+      expect(renderSpy).toHaveBeenCalledWith(mockContext, 100, 100);
+    });
+    
+    it('should not call enhanced corona rendering when star lacks corona', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      star.visualEffects.hasCorona = false;
+      
+      const renderSpy = vi.spyOn(star, 'renderEnhancedCorona').mockImplementation(() => {});
+      
+      star.renderVisualEffects(mockRenderer, 100, 100);
+      
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+    
+    it('should create appropriate number of gradients for corona layers', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      const expectedLayers = star.visualEffects.coronaConfig.layers;
+      
+      star.renderEnhancedCorona(mockContext, 100, 100);
+      
+      // Should create one radial gradient per layer
+      expect(mockContext.createRadialGradient).toHaveBeenCalledTimes(expectedLayers);
+    });
+    
+    it('should handle missing corona configuration gracefully', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      star.visualEffects.coronaConfig = null; // Remove config
+      
+      // Should not throw error
+      expect(() => {
+        star.renderEnhancedCorona(mockContext, 100, 100);
+      }).not.toThrow();
+      
+      // Should still create gradients with default values
+      expect(mockContext.createRadialGradient).toHaveBeenCalled();
+    });
+  });
+  
+  describe('Corona Asymmetry and Animation', () => {
+    it('should apply subtle asymmetry that changes over time', () => {
+      const star = new Star(0, 0, StarTypes.BLUE_GIANT);
+      
+      // Mock Date.now to control time
+      const originalDateNow = Date.now;
+      Date.now = vi.fn().mockReturnValue(1000);
+      
+      star.renderEnhancedCorona(mockContext, 100, 100);
+      const calls1 = [...mockContext.createRadialGradient.mock.calls];
+      
+      // Change time and render again
+      Date.now = vi.fn().mockReturnValue(5000);
+      mockContext.createRadialGradient.mockClear();
+      
+      star.renderEnhancedCorona(mockContext, 100, 100);
+      const calls2 = [...mockContext.createRadialGradient.mock.calls];
+      
+      // Gradient centers should be slightly different due to asymmetry animation
+      expect(calls1).not.toEqual(calls2);
+      
+      // Restore original Date.now
+      Date.now = originalDateNow;
+    });
+    
+    it('should use reduced asymmetry values after our fixes', () => {
+      // All star types should have subtle asymmetry (≤ 0.05)
+      Object.values(StarTypes).forEach(starType => {
+        if (starType.visualEffects.coronaConfig) {
+          expect(starType.visualEffects.coronaConfig.asymmetry).toBeLessThanOrEqual(0.05);
+        }
+      });
+    });
+  });
+  
+  describe('Performance and Edge Cases', () => {
+    it('should handle zero-sized corona gracefully', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      star.visualEffects.coronaSize = 0;
+      
+      expect(() => {
+        star.renderEnhancedCorona(mockContext, 100, 100);
+      }).not.toThrow();
+    });
+    
+    it('should handle extremely large corona sizes', () => {
+      const star = new Star(0, 0, StarTypes.RED_GIANT);
+      star.visualEffects.coronaSize = 10; // Very large
+      
+      expect(() => {
+        star.renderEnhancedCorona(mockContext, 100, 100);
+      }).not.toThrow();
+    });
+    
+    it('should handle missing color configurations', () => {
+      const star = new Star(0, 0, StarTypes.G_TYPE);
+      star.visualEffects.coronaConfig.colors = []; // Empty colors
+      
+      expect(() => {
+        star.renderEnhancedCorona(mockContext, 100, 100);
+      }).not.toThrow();
+    });
+    
+    it('should render different layers with different timing offsets', () => {
+      const star = new Star(0, 0, StarTypes.BLUE_GIANT); // Has 4 layers, should have 2 streamer calls
+      const streamerSpy = vi.spyOn(star, 'renderCoronaStreamers').mockImplementation(() => {});
+      
+      star.renderEnhancedCorona(mockContext, 100, 100);
+      
+      // Should call renderCoronaStreamers for outer layers (last 2 layers of 4)
+      const calls = streamerSpy.mock.calls;
+      expect(calls.length).toBe(2); // Blue Giant has 4 layers, outer 2 get streamers
+      
+      // Check that different parameters are passed to each call
+      // Each call should have: (ctx, centerX, centerY, radius, color, intensity, time, layerTimeOffset, layer)
+      expect(calls[0]).not.toEqual(calls[1]);
+      
+      // Specifically check that layer numbers are different
+      const layerNumbers = calls.map(call => call[7]); // 8th parameter is layer number  
+      expect(layerNumbers[0]).not.toBe(layerNumbers[1]);
+      expect(layerNumbers[0]).toBeGreaterThanOrEqual(2); // Should be outer layers
+      expect(layerNumbers[1]).toBeGreaterThanOrEqual(2); // Should be outer layers
+      
+      // Also verify basic parameters are correct
+      expect(calls[0][0]).toBe(mockContext); // ctx parameter
+      // centerX and centerY will be modified by asymmetry, so just verify they are numbers (asymmetry is working correctly)
+      expect(typeof calls[0][1]).toBe('number'); // centerX parameter (with asymmetry offset applied)
+      expect(typeof calls[0][2]).toBe('number'); // centerY parameter (with asymmetry offset applied)
+    });
   });
 });
