@@ -29,14 +29,16 @@ interface ActiveObjects {
     planets: any[];
     moons: any[];
     celestialStars: any[];
+    nebulae: any[];
 }
 
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon';
+    type: 'star' | 'planet' | 'moon' | 'nebula';
     x: number;
     y: number;
     starTypeName?: string;
     planetTypeName?: string;
+    nebulaTypeData?: { name: string };
     updatePosition?(deltaTime: number): void;
     checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
     render(renderer: Renderer, camera: Camera): void;
@@ -210,7 +212,8 @@ export class Game {
                 // Handle stellar map interactions (simplified) - only if not panning
                 const discoveredStars = this.chunkManager.getDiscoveredStars();
                 const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
-                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discoveredStars, this.renderer.canvas, discoveredPlanets);
+                const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
+                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discoveredStars, this.renderer.canvas, discoveredPlanets, discoveredNebulae);
             }
         }
         
@@ -224,7 +227,8 @@ export class Game {
         if (this.stellarMap.isVisible()) {
             const discoveredStars = this.chunkManager.getDiscoveredStars();
             const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discoveredStars, discoveredPlanets);
+            const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discoveredStars, discoveredPlanets, discoveredNebulae);
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);
@@ -237,7 +241,7 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae];
         
         // Update orbital positions for all planets and moons
         for (const planet of activeObjects.planets) {
@@ -281,7 +285,9 @@ export class Game {
                 // Generate proper astronomical name for the discovery
                 const objectName = this.namingService.generateDisplayName(obj);
                 const objectType = obj.type === 'planet' ? obj.planetTypeName : 
-                                  obj.type === 'moon' ? 'Moon' : obj.starTypeName;
+                                  obj.type === 'moon' ? 'Moon' : 
+                                  obj.type === 'nebula' ? (obj as any).nebulaTypeData?.name || 'Nebula' :
+                                  obj.starTypeName;
                 
                 // Add discovery with proper name
                 this.discoveryDisplay.addDiscovery(objectName, objectType || 'Unknown');
@@ -351,6 +357,9 @@ export class Game {
         } else if (obj.type === 'moon') {
             // All moon discoveries are notable due to smaller discovery radius
             return true;
+        } else if (obj.type === 'nebula') {
+            // All nebulae are rare and notable discoveries
+            return true;
         }
         return false;
     }
@@ -385,6 +394,9 @@ export class Game {
             this.soundManager.playPlanetDiscovery(obj.planetTypeName);
         } else if (obj.type === 'moon') {
             this.soundManager.playMoonDiscovery();
+        } else if (obj.type === 'nebula') {
+            // Play special sparkly nebula discovery sound
+            this.soundManager.playNebulaDiscovery((obj as any).nebulaType || 'emission');
         }
         
         // Play additional rare discovery sound for special objects
@@ -435,6 +447,13 @@ export class Game {
         
         // Render celestial objects from active chunks
         const activeObjects = this.chunkManager.getAllActiveObjects();
+        
+        // Render nebulae first (background layer)
+        for (const obj of activeObjects.nebulae) {
+            obj.render(this.renderer, this.camera);
+        }
+        
+        // Then render stars, planets, and moons (foreground layers)
         for (const obj of activeObjects.planets) {
             obj.render(this.renderer, this.camera);
         }
@@ -454,7 +473,8 @@ export class Game {
         // Render stellar map overlay (renders on top of everything)
         const discoveredStars = this.chunkManager.getDiscoveredStars();
         const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets);
+        const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);

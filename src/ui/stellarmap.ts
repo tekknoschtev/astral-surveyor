@@ -32,6 +32,18 @@ interface PlanetLike {
     timestamp?: number;
 }
 
+interface NebulaLike {
+    x: number;
+    y: number;
+    nebulaType: string;
+    nebulaTypeData?: {
+        name: string;
+        colors?: string[];
+    };
+    objectName?: string;
+    timestamp?: number;
+}
+
 interface NamingService {
     generateDisplayName(object: any): string;
     generateFullDesignation(object: any): {
@@ -57,6 +69,8 @@ export class StellarMap {
     hoveredStar: StarLike | null;
     selectedPlanet: PlanetLike | null;
     hoveredPlanet: PlanetLike | null;
+    selectedNebula: NebulaLike | null;
+    hoveredNebula: NebulaLike | null;
     namingService: NamingService | null;
     
     // Interactive panning state
@@ -85,6 +99,8 @@ export class StellarMap {
         this.hoveredStar = null;
         this.selectedPlanet = null;
         this.hoveredPlanet = null;
+        this.selectedNebula = null;
+        this.hoveredNebula = null;
         this.namingService = null; // Will be injected
         
         // Interactive panning state
@@ -234,7 +250,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -245,14 +261,17 @@ export class StellarMap {
         if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedNebula = null;
             return false;
         }
         
         // Find closest celestial object to click position (prioritize planets if in detail view)
         let closestStar: StarLike | null = null;
         let closestPlanet: PlanetLike | null = null;
+        let closestNebula: NebulaLike | null = null;
         let closestStarDistance = Infinity;
         let closestPlanetDistance = Infinity;
+        let closestNebulaDistance = Infinity;
         const clickThreshold = 10; // pixels
         
         // Check for planet clicks first (in detail view)
@@ -294,16 +313,47 @@ export class StellarMap {
             }
         }
         
-        // Select the closest object (prioritize planets if they're closer)
-        if (closestPlanet && closestPlanetDistance <= closestStarDistance) {
+        // Check for nebula clicks (visible at all zoom levels)
+        if (discoveredNebulae) {
+            for (const nebula of discoveredNebulae) {
+                // Skip nebulae without position data
+                if (nebula.x === null || nebula.y === null) continue;
+                
+                const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * worldToMapScale;
+                const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * worldToMapScale;
+                
+                // Check if nebula is within map bounds and click threshold
+                // Use larger threshold for nebulae since they're rendered as larger clouds
+                const nebulaClickThreshold = Math.max(15, clickThreshold);
+                if (nebulaMapX >= mapX && nebulaMapX <= mapX + mapWidth && 
+                    nebulaMapY >= mapY && nebulaMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - nebulaMapX)**2 + (mouseY - nebulaMapY)**2);
+                    if (distance <= nebulaClickThreshold && distance < closestNebulaDistance) {
+                        closestNebula = nebula;
+                        closestNebulaDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Select the closest object (prioritize order: planets > nebulae > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
+            this.selectedNebula = null;
+        } else if (closestNebula && closestNebulaDistance <= closestStarDistance) {
+            this.selectedNebula = closestNebula;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
             this.selectedPlanet = null;
+            this.selectedNebula = null;
         } else {
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedNebula = null;
         }
         
         return true; // Consumed the event
@@ -318,12 +368,13 @@ export class StellarMap {
         // Reset hover state - will be set by detectHoverTarget when called from game.ts
         this.hoveredStar = null;
         this.hoveredPlanet = null;
+        this.hoveredNebula = null;
         
         // Update cursor based on hover state
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -334,6 +385,7 @@ export class StellarMap {
         if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
+            this.hoveredNebula = null;
             this.updateCursor(canvas);
             return;
         }
@@ -341,8 +393,10 @@ export class StellarMap {
         // Find closest celestial object to mouse position (prioritize planets if in detail view)
         let closestStar: StarLike | null = null;
         let closestPlanet: PlanetLike | null = null;
+        let closestNebula: NebulaLike | null = null;
         let closestStarDistance = Infinity;
         let closestPlanetDistance = Infinity;
+        let closestNebulaDistance = Infinity;
         const hoverThreshold = 15; // Slightly larger than click threshold for better UX
         
         // Check for planet hover first (in detail view)
@@ -384,16 +438,47 @@ export class StellarMap {
             }
         }
         
-        // Set hover state (prioritize planets if they're closer)
-        if (closestPlanet && closestPlanetDistance <= closestStarDistance) {
+        // Check for nebula hover (visible at all zoom levels)
+        if (discoveredNebulae) {
+            for (const nebula of discoveredNebulae) {
+                // Skip nebulae without position data
+                if (nebula.x === null || nebula.y === null) continue;
+                
+                const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * worldToMapScale;
+                const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * worldToMapScale;
+                
+                // Check if nebula is within map bounds and hover threshold
+                // Use larger threshold for nebulae since they're rendered as larger clouds
+                const nebulaHoverThreshold = Math.max(20, hoverThreshold);
+                if (nebulaMapX >= mapX && nebulaMapX <= mapX + mapWidth && 
+                    nebulaMapY >= mapY && nebulaMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - nebulaMapX)**2 + (mouseY - nebulaMapY)**2);
+                    if (distance <= nebulaHoverThreshold && distance < closestNebulaDistance) {
+                        closestNebula = nebula;
+                        closestNebulaDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Set hover state (prioritize order: planets > nebulae > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance)) {
             this.hoveredPlanet = closestPlanet;
             this.hoveredStar = null;
+            this.hoveredNebula = null;
+        } else if (closestNebula && closestNebulaDistance <= closestStarDistance) {
+            this.hoveredNebula = closestNebula;
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
         } else if (closestStar) {
             this.hoveredStar = closestStar;
             this.hoveredPlanet = null;
+            this.hoveredNebula = null;
         } else {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
+            this.hoveredNebula = null;
         }
         
         // Update cursor based on hover state
@@ -401,7 +486,7 @@ export class StellarMap {
     }
     
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet) {
+        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula) {
             canvas.style.cursor = 'pointer';
         } else if (this.visible) {
             // Use crosshair for map navigation when visible
@@ -461,7 +546,7 @@ export class StellarMap {
         this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.01);
     }
 
-    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null): void {
+    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -508,6 +593,14 @@ export class StellarMap {
         // Draw discovered planets (only in detail view)
         if (this.zoomLevel > 3.0 && discoveredPlanets) {
             this.renderDiscoveredPlanets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredPlanets);
+        }
+
+        // Draw discovered nebulae (larger scale objects, visible at all zoom levels for debugging)
+        if (discoveredNebulae && discoveredNebulae.length > 0) {
+            console.log(`[StellarMap] Rendering ${discoveredNebulae.length} nebulae on map`);
+            this.renderDiscoveredNebulae(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredNebulae);
+        } else {
+            console.log(`[StellarMap] No nebulae to render: ${discoveredNebulae ? discoveredNebulae.length : 'null'}`);
         }
         
         // Draw origin (0,0) marker
@@ -742,6 +835,131 @@ export class StellarMap {
                 }
             }
         }
+    }
+
+    renderDiscoveredNebulae(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredNebulae: NebulaLike[]): void {
+        if (!discoveredNebulae) return;
+
+        for (const nebula of discoveredNebulae) {
+            // Convert world coordinates to map coordinates
+            const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * scale;
+            const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * scale;
+            
+            // Calculate nebula size (nebulae are large objects, so scale appropriately)
+            const baseSize = 8; // Larger than planets but smaller than stars on the map
+            const nebulaSize = Math.max(4, baseSize * this.zoomLevel * 0.5);
+            
+            // Check if nebula is within map bounds (with margin for large size)
+            const margin = nebulaSize + 10;
+            if (nebulaMapX >= mapX - margin && nebulaMapX <= mapX + mapWidth + margin && 
+                nebulaMapY >= mapY - margin && nebulaMapY <= mapY + mapHeight + margin) {
+                
+                // Get nebula colors based on type
+                const nebulaColors = this.getNebulaColors(nebula);
+                
+                // Draw nebula as a soft, glowing cloud
+                ctx.save();
+                
+                // Create radial gradient for nebula effect
+                const gradient = ctx.createRadialGradient(
+                    nebulaMapX, nebulaMapY, 0,
+                    nebulaMapX, nebulaMapY, nebulaSize * 2
+                );
+                gradient.addColorStop(0, nebulaColors.core + '60'); // Semi-transparent core
+                gradient.addColorStop(0.5, nebulaColors.mid + '30'); // Fainter middle
+                gradient.addColorStop(1, nebulaColors.edge + '10');  // Very faint edge
+                
+                // Draw the nebula glow
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(nebulaMapX, nebulaMapY, nebulaSize * 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw the solid center 
+                ctx.fillStyle = nebulaColors.core + '80';
+                ctx.beginPath();
+                ctx.arc(nebulaMapX, nebulaMapY, nebulaSize * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add selection highlight if this nebula is selected
+                if (this.selectedNebula === nebula) {
+                    ctx.strokeStyle = this.currentPositionColor;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    const highlightRadius = nebulaSize + 2;
+                    ctx.arc(nebulaMapX, nebulaMapY, highlightRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Add hover highlight if this nebula is hovered
+                if (this.hoveredNebula === nebula) {
+                    ctx.strokeStyle = this.currentPositionColor + '60'; // Semi-transparent hover
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    const hoverRadius = nebulaSize + 1;
+                    ctx.arc(nebulaMapX, nebulaMapY, hoverRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+                
+                // Render nebula label if zoomed in enough
+                if (this.zoomLevel > 2.0 || this.selectedNebula === nebula) {
+                    this.renderNebulaLabel(ctx, nebula, nebulaMapX, nebulaMapY);
+                }
+            }
+        }
+    }
+
+    getNebulaColors(nebula: NebulaLike): { core: string; mid: string; edge: string } {
+        // Color schemes based on nebula type
+        const colorSchemes: Record<string, { core: string; mid: string; edge: string }> = {
+            'emission': { 
+                core: '#ff6b6b',    // Red-orange core
+                mid: '#ff8e53',     // Orange middle  
+                edge: '#ff6b9d'     // Pink edge
+            },
+            'reflection': {
+                core: '#4ecdc4',    // Teal core
+                mid: '#45b7d1',     // Blue middle
+                edge: '#96ceb4'     // Green edge
+            },
+            'planetary': {
+                core: '#a8e6cf',    // Light green core
+                mid: '#7fcdcd',     // Cyan middle
+                edge: '#81ecec'     // Light cyan edge
+            },
+            'dark': {
+                core: '#2c3e50',    // Dark blue-gray core
+                mid: '#34495e',     // Lighter gray middle
+                edge: '#4a6741'     // Dark green edge
+            }
+        };
+        
+        return colorSchemes[nebula.nebulaType] || colorSchemes['emission'];
+    }
+
+    renderNebulaLabel(ctx: CanvasRenderingContext2D, nebula: NebulaLike, nebulaMapX: number, nebulaMapY: number): void {
+        if (!this.namingService) return;
+        
+        const nebulaName = nebula.objectName || this.namingService.generateDisplayName(nebula);
+        
+        ctx.save();
+        ctx.fillStyle = '#e8f4fd';
+        ctx.font = '10px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        
+        // Draw text background for readability
+        const textWidth = ctx.measureText(nebulaName).width;
+        const bgPadding = 3;
+        ctx.fillStyle = '#000000B0';
+        ctx.fillRect(nebulaMapX - textWidth/2 - bgPadding, nebulaMapY + 12, textWidth + bgPadding*2, 12);
+        
+        // Draw label text
+        ctx.fillStyle = '#e8f4fd';
+        ctx.fillText(nebulaName, nebulaMapX, nebulaMapY + 22);
+        
+        ctx.restore();
     }
 
     renderOrbitalCircles(ctx: CanvasRenderingContext2D, starMapX: number, starMapY: number, planets: PlanetLike[], scale: number, mapX: number, mapY: number, mapWidth: number, mapHeight: number): void {
@@ -1025,11 +1243,13 @@ export class StellarMap {
         const coordWidth = ctx.measureText(coordText).width;
         ctx.fillText(coordText, canvas.width - coordWidth - 20, canvas.height - 50);
         
-        // Information panel for selected star or planet
+        // Information panel for selected star, planet, or nebula
         if (this.selectedStar && this.namingService) {
             this.renderStarInfoPanel(ctx, canvas);
         } else if (this.selectedPlanet && this.namingService) {
             this.renderPlanetInfoPanel(ctx, canvas);
+        } else if (this.selectedNebula && this.namingService) {
+            this.renderNebulaInfoPanel(ctx, canvas);
         }
     }
 
@@ -1140,6 +1360,72 @@ export class StellarMap {
             const date = new Date(this.selectedPlanet.timestamp);
             const dateStr = date.toLocaleDateString();
             ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
+    }
+
+    renderNebulaInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        if (!this.selectedNebula || !this.namingService) return;
+        
+        // Panel dimensions and position
+        const panelWidth = 300;
+        const panelHeight = 120;
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel content
+        ctx.fillStyle = '#b0c4d4';
+        ctx.font = '12px "Courier New", monospace';
+        
+        let lineY = panelY + 20;
+        const lineHeight = 14;
+        
+        // Nebula designation using naming service
+        const nebulaName = this.generateNebulaDisplayName(this.selectedNebula);
+        ctx.fillText(`Designation: ${nebulaName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Nebula type
+        ctx.fillText(`Type: ${this.selectedNebula.nebulaType}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Nebula position
+        if (this.selectedNebula.x !== null && this.selectedNebula.y !== null) {
+            ctx.fillText(`Position: (${Math.round(this.selectedNebula.x)}, ${Math.round(this.selectedNebula.y)})`, panelX + 10, lineY);
+            lineY += lineHeight;
+        }
+        
+        // Discovery timestamp if available
+        if (this.selectedNebula.timestamp) {
+            const date = new Date(this.selectedNebula.timestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
+    }
+
+    generateNebulaDisplayName(nebula: NebulaLike): string {
+        // Use stored nebula name from discovery data if available
+        if (nebula.objectName) {
+            return nebula.objectName;
+        }
+
+        // Fallback to naming service if no stored name
+        if (!this.namingService) {
+            return `Nebula`;
+        }
+
+        // Generate name using naming service
+        try {
+            return this.namingService.generateDisplayName(nebula);
+        } catch (error) {
+            console.warn('Failed to generate nebula name:', error);
+            return `Nebula`;
         }
     }
 

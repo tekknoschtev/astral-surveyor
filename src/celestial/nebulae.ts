@@ -43,9 +43,9 @@ export const NebulaTypes: Record<string, NebulaType> = {
     emission: {
         name: 'Emission Nebula',
         colors: ['#ff6b6b', '#ff8e53', '#ff6b9d'], // Red-orange hydrogen emissions
-        sizeRange: [80, 150],
+        sizeRange: [200, 400], // Much larger for impressive visual impact
         densityRange: [0.6, 0.9],
-        particleRange: [30, 60],
+        particleRange: [80, 150], // More particles for the larger size
         rarity: 0.4, // Most common
         discoveryValue: 25,
         description: 'Glowing clouds of ionized hydrogen gas'
@@ -53,9 +53,9 @@ export const NebulaTypes: Record<string, NebulaType> = {
     reflection: {
         name: 'Reflection Nebula', 
         colors: ['#4ecdc4', '#45b7d1', '#96ceb4'], // Blue-white reflected starlight
-        sizeRange: [60, 120],
+        sizeRange: [150, 350], // Larger size range
         densityRange: [0.5, 0.8], 
-        particleRange: [25, 45],
+        particleRange: [60, 120], // More particles for larger nebula
         rarity: 0.3,
         discoveryValue: 35,
         description: 'Dust clouds reflecting nearby starlight'
@@ -63,9 +63,9 @@ export const NebulaTypes: Record<string, NebulaType> = {
     planetary: {
         name: 'Planetary Nebula',
         colors: ['#a8e6cf', '#7fcdcd', '#81ecec'], // Green-blue ionized gas
-        sizeRange: [40, 80],
+        sizeRange: [120, 250], // Smaller than others but still much larger than before
         densityRange: [0.8, 1.0],
-        particleRange: [20, 40],
+        particleRange: [50, 100], // More particles for better density
         rarity: 0.2,
         discoveryValue: 60,
         description: 'Beautiful shells of gas from dying stars'
@@ -73,9 +73,9 @@ export const NebulaTypes: Record<string, NebulaType> = {
     dark: {
         name: 'Dark Nebula',
         colors: ['#2c3e50', '#34495e', '#4a6741'], // Dark, muted colors
-        sizeRange: [100, 200],
+        sizeRange: [250, 500], // Largest nebulae for dramatic dark cloud effect
         densityRange: [0.3, 0.6],
-        particleRange: [15, 30],
+        particleRange: [40, 80], // More particles despite lower density for coverage
         rarity: 0.1, // Rarest
         discoveryValue: 80,
         description: 'Dense clouds of dust blocking background light'
@@ -176,6 +176,24 @@ export class Nebula extends CelestialObject {
         this.particles.sort((a, b) => a.layer - b.layer);
     }
 
+    checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
+        if (this.discovered) {
+            return false;
+        }
+
+        // Nebulae use distance-based discovery (like planets/moons)
+        const distance = Math.sqrt(
+            Math.pow(camera.x - this.x, 2) + Math.pow(camera.y - this.y, 2)
+        );
+
+        if (distance <= this.discoveryDistance) {
+            this.discovered = true;
+            return true; // Newly discovered
+        }
+        
+        return false;
+    }
+    
     shouldDiscover(ship: any, camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
         if (this.discovered) {
             return false;
