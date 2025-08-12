@@ -607,7 +607,9 @@ export class Game {
         
         // Render wormholes (prominent foreground layer, after stars)
         for (const obj of activeObjects.wormholes) {
-            obj.render(this.renderer, this.camera);
+            // Get destination preview objects for gravitational lensing
+            const destinationPreview = this.getDestinationPreviewObjects(obj);
+            obj.render(this.renderer, this.camera, destinationPreview);
         }
         
         this.starParticles.render(this.renderer, this.camera);
@@ -657,6 +659,73 @@ export class Game {
             ctx.arc(x, y, 2, 0, Math.PI * 2);
             ctx.fill();
         }
+    }
+
+    getDestinationPreviewObjects(wormhole: any): any[] {
+        // Get objects near the destination wormhole for gravitational lensing preview
+        if (!wormhole.twinX || !wormhole.twinY) return [];
+        
+        const destinationX = wormhole.twinX;
+        const destinationY = wormhole.twinY;
+        const previewRadius = 300; // 300 pixel radius around destination
+        
+        // Get all objects from chunks near the destination
+        const destinationObjects: any[] = [];
+        
+        // Sample objects from chunks around destination area
+        const chunkSize = 2000; // Should match ChunkManager.CHUNK_SIZE
+        const chunksToCheck = [
+            { x: Math.floor(destinationX / chunkSize), y: Math.floor(destinationY / chunkSize) },
+            { x: Math.floor((destinationX - chunkSize) / chunkSize), y: Math.floor(destinationY / chunkSize) },
+            { x: Math.floor((destinationX + chunkSize) / chunkSize), y: Math.floor(destinationY / chunkSize) },
+            { x: Math.floor(destinationX / chunkSize), y: Math.floor((destinationY - chunkSize) / chunkSize) },
+            { x: Math.floor(destinationX / chunkSize), y: Math.floor((destinationY + chunkSize) / chunkSize) },
+        ];
+        
+        for (const chunkCoord of chunksToCheck) {
+            const chunkKey = `${chunkCoord.x},${chunkCoord.y}`;
+            
+            // Ensure chunk exists for preview
+            this.chunkManager.ensureChunkExists(chunkCoord.x, chunkCoord.y);
+            const chunk = this.chunkManager.getChunk(chunkKey);
+            
+            if (chunk) {
+                // Check all object types within preview radius
+                const allObjects = [
+                    ...chunk.celestialStars,
+                    ...chunk.planets, 
+                    ...chunk.moons,
+                    ...chunk.nebulae,
+                    ...chunk.asteroidGardens,
+                    ...chunk.wormholes.filter((w: any) => w.uniqueId !== wormhole.uniqueId) // Exclude self
+                ];
+                
+                for (const obj of allObjects) {
+                    const distance = Math.sqrt(
+                        Math.pow(obj.x - destinationX, 2) + Math.pow(obj.y - destinationY, 2)
+                    );
+                    
+                    if (distance <= previewRadius) {
+                        // Create preview object with relative positioning
+                        const relativeX = obj.x - destinationX;
+                        const relativeY = obj.y - destinationY;
+                        
+                        destinationObjects.push({
+                            ...obj,
+                            relativeX,
+                            relativeY,
+                            distance,
+                            type: obj.type
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Sort by distance (closest first) and limit to prevent performance issues
+        return destinationObjects
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 8); // Limit to 8 objects for performance
     }
 }
 

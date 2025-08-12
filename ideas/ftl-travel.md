@@ -47,9 +47,11 @@ Wormholes will be extremely rare, naturally occurring phenomena that allow for i
 - [x] Integrate with camera system for smooth positioning
 
 ### 5. **Navigation & UI Integration**
-- [ ] Update stellar map to show wormhole pairs with connecting dashed lines
+- [x] Update stellar map to show wormhole pairs with connecting dashed lines
+- [x] Create distinct wormhole icons on map (spiral symbol with α/β indicators)
+- [x] Add interactive hover/selection support with proper cursor management
+- [x] Implement smart labeling with names and twin coordinates at zoom levels
 - [ ] Add wormhole filtering and zoom-to-wormhole functionality  
-- [ ] Create distinct wormhole icons on map (spiral symbol with α/β indicators)
 - [ ] Integrate with discovery logbook for travel history tracking
 - [ ] Add coordinate sharing support for wormhole locations
 

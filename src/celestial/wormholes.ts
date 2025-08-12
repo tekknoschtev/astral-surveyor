@@ -198,7 +198,7 @@ export class Wormhole extends CelestialObject {
         }
     }
 
-    render(renderer: Renderer, camera: Camera): void {
+    render(renderer: Renderer, camera: Camera, destinationPreview?: any[]): void {
         const [screenX, screenY] = camera.worldToScreen(
             this.x, 
             this.y, 
@@ -225,8 +225,8 @@ export class Wormhole extends CelestialObject {
         // Render swirling particles
         this.renderParticles(ctx, screenX, screenY);
         
-        // Render central aperture (the "hole" effect)
-        this.renderAperture(ctx, screenX, screenY);
+        // Render central aperture (the "hole" effect with gravitational lensing)
+        this.renderAperture(ctx, screenX, screenY, destinationPreview);
         
         // Render discovery indicator if discovered
         if (this.discovered) {
@@ -330,11 +330,16 @@ export class Wormhole extends CelestialObject {
         }
     }
 
-    private renderAperture(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
-        // Create the central "hole" effect - this will later show lensing preview
+    private renderAperture(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, destinationPreview?: any[]): void {
         const apertureRadius = this.radius * 0.4;
         
-        // For now, just render as a dark center with subtle edge glow
+        // Create clipping mask for the aperture
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, apertureRadius, 0, Math.PI * 2);
+        ctx.clip();
+        
+        // Render dark background first
         const gradient = ctx.createRadialGradient(
             screenX, screenY, 0,
             screenX, screenY, apertureRadius
@@ -348,6 +353,116 @@ export class Wormhole extends CelestialObject {
         ctx.beginPath();
         ctx.arc(screenX, screenY, apertureRadius, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Render gravitational lensing preview if destination objects are available
+        if (destinationPreview && destinationPreview.length > 0) {
+            this.renderLensingPreview(ctx, screenX, screenY, apertureRadius, destinationPreview);
+        }
+        
+        ctx.restore();
+        
+        // Add subtle aperture rim glow
+        ctx.strokeStyle = this.wormholeType.colors[0] + '60';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, apertureRadius, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    private renderLensingPreview(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, apertureRadius: number, previewObjects: any[]): void {
+        // Scale factor for rendering objects within the aperture
+        const previewScale = apertureRadius / 150; // 150px preview area maps to aperture
+        const maxDistance = 300; // Max distance we're previewing from destination
+        
+        ctx.save();
+        
+        // Slight transparency for lensing effect
+        ctx.globalAlpha = 0.7;
+        
+        for (const obj of previewObjects) {
+            // Calculate scaled position within aperture
+            const scaledX = centerX + (obj.relativeX * previewScale);
+            const scaledY = centerY + (obj.relativeY * previewScale);
+            
+            // Skip if object would be outside aperture (shouldn't happen with proper filtering)
+            const distanceFromCenter = Math.sqrt(Math.pow(scaledX - centerX, 2) + Math.pow(scaledY - centerY, 2));
+            if (distanceFromCenter > apertureRadius * 0.9) continue;
+            
+            // Render different object types with simplified visuals
+            this.renderPreviewObject(ctx, scaledX, scaledY, obj, previewScale);
+        }
+        
+        ctx.restore();
+        
+        // Add subtle lensing distortion effect
+        this.renderLensingDistortion(ctx, centerX, centerY, apertureRadius);
+    }
+
+    private renderPreviewObject(ctx: CanvasRenderingContext2D, x: number, y: number, obj: any, scale: number): void {
+        const size = Math.max(1, (obj.radius || 10) * scale * 0.3); // Scale down object sizes
+        
+        switch (obj.type) {
+            case 'star':
+                // Simplified star rendering
+                ctx.fillStyle = obj.color || '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add star glow
+                ctx.fillStyle = (obj.color || '#FFFFFF') + '40';
+                ctx.beginPath();
+                ctx.arc(x, y, size * 2, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+                
+            case 'planet':
+                // Simplified planet rendering
+                ctx.fillStyle = obj.color || '#8B4513';
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+                
+            case 'nebula':
+                // Simplified nebula rendering
+                const nebulaColors = ['#FF69B4', '#9370DB', '#00CED1'];
+                ctx.fillStyle = (nebulaColors[obj.nebulaType] || nebulaColors[0]) + '60';
+                ctx.beginPath();
+                ctx.arc(x, y, size * 2, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+                
+            case 'wormhole':
+                // Simplified wormhole rendering (just a swirl)
+                ctx.strokeStyle = this.wormholeType.colors[0];
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.stroke();
+                break;
+                
+            default:
+                // Generic object (asteroids, moons, etc.)
+                ctx.fillStyle = obj.color || '#888888';
+                ctx.beginPath();
+                ctx.arc(x, y, size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+        }
+    }
+
+    private renderLensingDistortion(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, apertureRadius: number): void {
+        // Add subtle concentric rings to show gravitational lensing effect
+        ctx.strokeStyle = this.wormholeType.accentColors[0] + '20';
+        ctx.lineWidth = 1;
+        
+        for (let i = 1; i <= 3; i++) {
+            const ringRadius = (apertureRadius * i) / 4;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
 
     private renderDiscoveryIndicator(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {

@@ -591,6 +591,16 @@ export class ChunkManager {
         }
     }
 
+    // Public method to access chunks for gravitational lensing preview
+    getChunk(chunkKey: string): Chunk | undefined {
+        return this.activeChunks.get(chunkKey);
+    }
+
+    // Generate a chunk if it doesn't exist (used for preview system)
+    ensureChunkExists(chunkX: number, chunkY: number): void {
+        this.generateChunk(chunkX, chunkY);
+    }
+
     getAllActiveObjects(): ActiveObjects {
         const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [], wormholes: [] };
         
