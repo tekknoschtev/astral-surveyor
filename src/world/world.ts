@@ -7,6 +7,7 @@ import { Star, Planet, Moon, PlanetTypes, StarTypes } from '../celestial/celesti
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
+import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
@@ -43,6 +44,7 @@ interface Chunk {
     nebulae: Nebula[];
     asteroidGardens: AsteroidGarden[];
     wormholes: Wormhole[];
+    blackholes: BlackHole[];
 }
 
 interface ActiveObjects {
@@ -53,6 +55,7 @@ interface ActiveObjects {
     nebulae: Nebula[];
     asteroidGardens: AsteroidGarden[];
     wormholes: Wormhole[];
+    blackholes: BlackHole[];
 }
 
 interface DiscoveryData {
@@ -178,7 +181,8 @@ export class ChunkManager {
             celestialStars: [], // Discoverable stars (different from background stars)
             nebulae: [], // Beautiful gas clouds for tranquil exploration
             asteroidGardens: [], // Scattered fields of glittering rocks
-            wormholes: [] // Extremely rare spacetime anomalies for FTL travel
+            wormholes: [], // Extremely rare spacetime anomalies for FTL travel
+            blackholes: [] // Ultra-rare cosmic phenomena with universe reset
         };
 
         // Generate stars for this chunk
@@ -367,6 +371,9 @@ export class ChunkManager {
         
         // Generate wormholes for this chunk (extremely rare)
         this.generateWormholesForChunk(chunkX, chunkY, chunk);
+        
+        // Generate black holes for this chunk (ultra-rare - cosmic reset points)
+        this.generateBlackHolesForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -602,7 +609,7 @@ export class ChunkManager {
     }
 
     getAllActiveObjects(): ActiveObjects {
-        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [], wormholes: [] };
+        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
@@ -612,6 +619,7 @@ export class ChunkManager {
             objects.nebulae.push(...chunk.nebulae);
             objects.asteroidGardens.push(...chunk.asteroidGardens);
             objects.wormholes.push(...chunk.wormholes);
+            objects.blackholes.push(...chunk.blackholes);
         }
 
         return objects;
@@ -1315,6 +1323,98 @@ export class ChunkManager {
         remoteChunkX: number,
         remoteChunkY: number
     }>();
+
+    // Generate black holes for a chunk - ultra-rare cosmic phenomena
+    generateBlackHolesForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // Use separate seed for black hole generation to avoid correlation with other objects
+        const blackHoleSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
+        const blackHoleRng = new SeededRandom(blackHoleSeed);
+        
+        // Ultra-rare chance: 0.0001% (1 in 1,000,000 chance)  
+        // This means roughly 1 black hole every 1,000,000 chunks
+        const blackHoleChance = 0.000001;
+        
+        if (blackHoleRng.next() > blackHoleChance) {
+            return; // No black hole in this chunk
+        }
+        
+        console.log(`🕳️ Generating ultra-rare BLACK HOLE in chunk (${chunkX}, ${chunkY})!`);
+        
+        // Position black hole in chunk center for maximum isolation
+        // Black holes need significant space due to their massive gravitational influence
+        const centerX = chunkX * this.chunkSize + (this.chunkSize / 2);
+        const centerY = chunkY * this.chunkSize + (this.chunkSize / 2);
+        
+        // Check for conflicts with existing celestial objects
+        let hasConflict = false;
+        const minDistance = 2000; // 2000px minimum distance from any major object
+        
+        // Check celestial stars in this chunk
+        for (const star of chunk.celestialStars) {
+            const distance = Math.sqrt(Math.pow(star.x - centerX, 2) + Math.pow(star.y - centerY, 2));
+            if (distance < minDistance) {
+                hasConflict = true;
+                break;
+            }
+        }
+        
+        // Check neighboring chunks for conflicts (black holes dominate large areas)
+        if (!hasConflict) {
+            const checkRadius = 3; // Check 3x3 grid of chunks around this one
+            for (let dx = -checkRadius; dx <= checkRadius; dx++) {
+                for (let dy = -checkRadius; dy <= checkRadius; dy++) {
+                    const neighborChunkX = chunkX + dx;
+                    const neighborChunkY = chunkY + dy;
+                    const neighborKey = this.getChunkKey(neighborChunkX, neighborChunkY);
+                    
+                    if (this.activeChunks.has(neighborKey)) {
+                        const neighborChunk = this.activeChunks.get(neighborKey)!;
+                        
+                        // Check for celestial stars in neighbor chunks
+                        for (const star of neighborChunk.celestialStars) {
+                            const distance = Math.sqrt(Math.pow(star.x - centerX, 2) + Math.pow(star.y - centerY, 2));
+                            if (distance < minDistance) {
+                                hasConflict = true;
+                                break;
+                            }
+                        }
+                        
+                        // Check for other black holes in neighbor chunks
+                        for (const blackHole of neighborChunk.blackholes) {
+                            const distance = Math.sqrt(Math.pow(blackHole.x - centerX, 2) + Math.pow(blackHole.y - centerY, 2));
+                            if (distance < minDistance * 2) { // Black holes need even more space from each other
+                                hasConflict = true;
+                                break;
+                            }
+                        }
+                        
+                        if (hasConflict) break;
+                    }
+                }
+                if (hasConflict) break;
+            }
+        }
+        
+        if (hasConflict) {
+            console.log(`🕳️ Black hole generation cancelled due to proximity to existing objects in chunk (${chunkX}, ${chunkY})`);
+            return;
+        }
+        
+        // Generate the black hole - most are stellar mass, very few supermassive
+        const blackHole = generateBlackHole(centerX, centerY, blackHoleRng);
+        
+        // Add the black hole to this chunk
+        chunk.blackholes.push(blackHole);
+        
+        console.log(`🕳️ BLACK HOLE generated successfully at (${centerX.toFixed(0)}, ${centerY.toFixed(0)}) - Type: ${blackHole.blackHoleTypeName}`);
+    }
+
+    // Clear all chunks and discovered objects (for universe reset)
+    clearAllChunks(): void {
+        this.activeChunks.clear();
+        this.discoveredObjects.clear();
+        console.log('🌌 All chunks cleared for universe regeneration');
+    }
 }
 
 // Infinite starfield using chunk-based generation with parallax layers

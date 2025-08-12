@@ -37,6 +37,9 @@ let UNIVERSE_SEED = 0;
 // Global starting coordinates from URL parameters (if provided)
 let STARTING_COORDINATES: { x: number; y: number } | null = null;
 
+// Universe reset tracking for cosmic rebirth system
+let UNIVERSE_RESET_COUNT = 0;
+
 // Improved hash function for deterministic position-based seeds
 // Uses proper bit mixing to eliminate patterns and artifacts
 export function hashPosition(x: number, y: number): number {
@@ -159,3 +162,57 @@ export function generateShareableURL(currentX: number, currentY: number, windowO
 export const getUniverseSeed = (): number => UNIVERSE_SEED;
 export const setUniverseSeed = (seed: number): void => { UNIVERSE_SEED = seed; };
 export const getStartingCoordinates = (): { x: number; y: number } | null => STARTING_COORDINATES;
+
+// Universe reset system for black hole singularity encounters
+export const getUniverseResetCount = (): number => UNIVERSE_RESET_COUNT;
+
+// Generate a new universe seed using cosmic principles
+export function generateNewUniverseSeed(): number {
+    // Use current time and reset count to ensure uniqueness
+    const timeComponent = Date.now() % 1000000; // Last 6 digits of timestamp
+    const resetComponent = UNIVERSE_RESET_COUNT * 12345; // Reset count multiplier
+    const cosmicVariation = Math.floor(Math.random() * 999999); // Random cosmic factor
+    
+    // Combine components to create new seed
+    let newSeed = timeComponent + resetComponent + cosmicVariation;
+    
+    // Ensure seed is within valid range
+    newSeed = newSeed % 2147483647;
+    if (newSeed <= 0) newSeed += 2147483646;
+    
+    return newSeed;
+}
+
+// Reset universe with new seed while preserving player progress
+export interface UniverseResetOptions {
+    preserveDiscoveries?: boolean;
+    newSpawnPosition?: { x: number; y: number };
+    resetMessage?: string;
+}
+
+export function resetUniverse(options: UniverseResetOptions = {}): number {
+    const oldSeed = UNIVERSE_SEED;
+    const newSeed = generateNewUniverseSeed();
+    
+    // Update global state
+    UNIVERSE_SEED = newSeed;
+    UNIVERSE_RESET_COUNT++;
+    
+    // Clear starting coordinates (will spawn at safe location)
+    STARTING_COORDINATES = options.newSpawnPosition || null;
+    
+    console.log(`🕳️ COSMIC REBIRTH: Universe ${UNIVERSE_RESET_COUNT}`);
+    console.log(`   Old Seed: ${oldSeed} → New Seed: ${newSeed}`);
+    if (options.preserveDiscoveries) {
+        console.log(`   📚 Discovery logbook preserved across cosmic transition`);
+    }
+    
+    return newSeed;
+}
+
+// Get safe spawn position away from immediate dangers
+export function generateSafeSpawnPosition(): { x: number; y: number } {
+    // Spawn at origin or a safe distance from any potential hazards
+    // In a fresh universe, (0,0) should be safe as no black holes spawn there
+    return { x: 0, y: 0 };
+}
