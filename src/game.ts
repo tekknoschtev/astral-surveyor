@@ -83,6 +83,10 @@ export class Game {
     lastTime: number;
     animationId: number;
     gameStartingPosition: GameStartingPosition;
+    
+    // Black hole warning state tracking
+    lastBlackHoleWarnings: Map<string, { time: number, level: number }>;
+    warningCooldown: number;
 
     constructor(canvas: HTMLCanvasElement) {
         this.renderer = new Renderer(canvas);
@@ -112,6 +116,10 @@ export class Game {
         // Distance saving timer (save every 5 seconds)
         this.distanceSaveTimer = 0;
         this.distanceSaveInterval = 5.0;
+        
+        // Black hole warning system - prevent spam notifications
+        this.lastBlackHoleWarnings = new Map();
+        this.warningCooldown = 2.0; // 2 seconds between repeated warnings
         
         // Connect naming service to stellar map
         this.stellarMap.setNamingService(this.namingService as any);
@@ -301,8 +309,13 @@ export class Game {
                     this.camera.velocityY += gravEffects.pullForceY * deltaTime;
                 }
                 
-                // Handle proximity warnings (will be implemented in Phase 1.3)
-                // TODO: Display warnings based on gravEffects.warningLevel
+                // Handle proximity warnings - Phase 1 Safety System
+                if (gravEffects.warningLevel > 0) {
+                    const warningMessage = blackHole.getProximityWarning();
+                    if (warningMessage) {
+                        this.displayBlackHoleWarning(warningMessage, gravEffects.warningLevel, gravEffects.isPastEventHorizon, blackHole.uniqueId);
+                    }
+                }
             }
             
             // Check for singularity collision (universe reset)
@@ -488,6 +501,36 @@ export class Game {
             setTimeout(() => {
                 this.soundManager.playRareDiscovery();
             }, 300); // Delay for layered effect
+        }
+    }
+
+    displayBlackHoleWarning(message: string, warningLevel: number, isPastEventHorizon: boolean, blackHoleId: string): void {
+        const currentTime = Date.now() / 1000; // Convert to seconds
+        const lastWarning = this.lastBlackHoleWarnings.get(blackHoleId);
+        
+        // Check if we should show warning (different level or enough time passed)
+        const shouldShowWarning = !lastWarning || 
+                                 lastWarning.level !== warningLevel ||
+                                 (currentTime - lastWarning.time) >= this.warningCooldown;
+        
+        if (shouldShowWarning) {
+            // Display proximity warning with appropriate urgency indicators
+            if (isPastEventHorizon) {
+                // Critical warning - past event horizon
+                this.discoveryDisplay.addNotification(`🚨 CRITICAL: ${message}`);
+            } else if (warningLevel >= 2) {
+                // High danger warning
+                this.discoveryDisplay.addNotification(`🔥 DANGER: ${message}`);
+            } else {
+                // Caution level warning
+                this.discoveryDisplay.addNotification(`⚠️ CAUTION: ${message}`);
+            }
+            
+            // Update warning tracking
+            this.lastBlackHoleWarnings.set(blackHoleId, {
+                time: currentTime,
+                level: warningLevel
+            });
         }
     }
 

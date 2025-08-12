@@ -1,5 +1,30 @@
 // Black Holes - Ultra-rare cosmic phenomena with universe reset mechanics
 // TypeScript implementation with comprehensive gravitational physics
+//
+// 🕳️ IMPLEMENTATION STATUS:
+// ✅ Phase 1 COMPLETE: Foundation & Core System
+//    - BlackHole class with full gravitational physics
+//    - Ultra-rare spawning (0.0001% chance - 1 per million chunks)  
+//    - Two types: Stellar Mass (95%) and Supermassive (5%)
+//    - Progressive warning system (4 levels: Safe → Caution → Danger → Event Horizon)
+//    - Proximity alerts with throttling to prevent notification spam
+//    - Singularity collision detection for universe reset
+//    - Complete integration: discovery, naming, world generation, game loop
+//    - Scientific naming: BH-1234 SMH (Stellar Mass) / BH-1234 SMBH (Supermassive)
+//
+// 🚧 Phase 2 Pending: Visual Rendering & Effects
+//    - Accretion disk animation with layered depth effects
+//    - Corona flickering and pulsing at event horizon edge
+//    - Event horizon void rendering with gravitational lensing
+//    - Dynamic particle effects around disk rim
+//    - Scale-appropriate rendering for massive cosmic objects
+//
+// 🚧 Phase 4 Pending: Universe Reset Mechanics  
+//    - Singularity collision → universe seed regeneration
+//    - Discovery logbook preservation across resets
+//    - Cosmic transition sequence (fade to cosmic colors → Big Bang emergence)
+//    - Reset statistics tracking (universes explored)
+//    - Safe respawn positioning in new universe
 
 import { SeededRandom } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
