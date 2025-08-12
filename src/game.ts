@@ -16,7 +16,10 @@ import { SoundManager } from './audio/soundmanager.js';
 import { 
     initializeUniverseSeed, 
     getStartingCoordinates, 
-    generateShareableURL 
+    generateShareableURL,
+    resetUniverse,
+    generateSafeSpawnPosition,
+    getUniverseResetCount
 } from './utils/random.js';
 
 // Interface definitions
@@ -87,6 +90,11 @@ export class Game {
     // Black hole warning state tracking
     lastBlackHoleWarnings: Map<string, { time: number, level: number }>;
     warningCooldown: number;
+    
+    // Universe reset state tracking
+    isResettingUniverse: boolean;
+    resetStartTime: number;
+    resetDuration: number;
 
     constructor(canvas: HTMLCanvasElement) {
         this.renderer = new Renderer(canvas);
@@ -120,6 +128,11 @@ export class Game {
         // Black hole warning system - prevent spam notifications
         this.lastBlackHoleWarnings = new Map();
         this.warningCooldown = 2.0; // 2 seconds between repeated warnings
+        
+        // Universe reset system - cosmic rebirth mechanics
+        this.isResettingUniverse = false;
+        this.resetStartTime = 0;
+        this.resetDuration = 3.0; // 3 seconds for cosmic transition
         
         // Connect naming service to stellar map
         this.stellarMap.setNamingService(this.namingService as any);
@@ -183,6 +196,12 @@ export class Game {
         if (this.isTraversing) {
             this.updateTraversal(deltaTime);
             return; // Skip normal updates during traversal
+        }
+        
+        // Handle universe reset transition
+        if (this.isResettingUniverse) {
+            this.updateUniverseReset(deltaTime);
+            return; // Skip normal updates during cosmic transition
         }
         
         // Resume audio context on first user interaction (required by browsers)
@@ -320,8 +339,9 @@ export class Game {
             
             // Check for singularity collision (universe reset)
             if (blackHole.checkSingularityCollision && blackHole.checkSingularityCollision(this.camera)) {
-                // TODO: Implement universe reset mechanics in Phase 4
-                console.log('🕳️ SINGULARITY COLLISION - Universe reset would trigger here');
+                if (!this.isResettingUniverse) {
+                    this.initiateUniverseReset();
+                }
             }
         }
         
@@ -642,14 +662,83 @@ export class Game {
         }
     }
 
+    initiateUniverseReset(): void {
+        // Start cosmic transition sequence
+        this.isResettingUniverse = true;
+        this.resetStartTime = 0;
+        
+        console.log('🕳️ SINGULARITY COLLISION - Initiating cosmic rebirth...');
+        
+        // Show critical notification
+        this.discoveryDisplay.addNotification('🚨 Singularity Contact - Cosmic Rebirth Initiated');
+    }
+
+    updateUniverseReset(deltaTime: number): void {
+        this.resetStartTime += deltaTime;
+        
+        // Complete reset at midpoint (1.5 seconds in)
+        if (this.resetStartTime >= this.resetDuration / 2 && this.resetStartTime - deltaTime < this.resetDuration / 2) {
+            // Preserve discovery data
+            const discoveries = this.discoveryLogbook.getDiscoveries();
+            
+            // Reset universe with new seed
+            const newSeed = resetUniverse({
+                preserveDiscoveries: true,
+                newSpawnPosition: generateSafeSpawnPosition(),
+                resetMessage: 'Cosmic Rebirth Complete'
+            });
+            
+            // Respawn at safe location
+            const safePosition = generateSafeSpawnPosition();
+            this.camera.x = safePosition.x;
+            this.camera.y = safePosition.y;
+            this.camera.velocityX = 0;
+            this.camera.velocityY = 0;
+            
+            // Clear chunk data to force regeneration with new seed
+            this.chunkManager.clearAllChunks();
+            this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+            
+            // Restore discovery data
+            for (const discovery of discoveries) {
+                this.discoveryLogbook.addDiscovery(discovery.name, discovery.type, discovery.timestamp);
+            }
+            
+            // Show rebirth notification
+            const resetCount = getUniverseResetCount();
+            this.discoveryDisplay.addNotification(`✨ Cosmic Rebirth Complete - Universe ${resetCount}`);
+            this.discoveryDisplay.addNotification(`📚 Discovery logbook preserved (${discoveries.length} entries)`);
+            
+            console.log(`✨ COSMIC REBIRTH COMPLETE - Welcome to Universe ${resetCount}`);
+        }
+        
+        // End reset transition
+        if (this.resetStartTime >= this.resetDuration) {
+            // Reset state
+            this.isResettingUniverse = false;
+        }
+    }
+
     render(): void {
         this.renderer.clear();
         
-        // Calculate fade alpha for traversal effect
+        // Calculate fade alpha for traversal and universe reset effects
         let fadeAlpha = 0;
+        let isCosmicTransition = false;
+        
         if (this.isTraversing) {
             const progress = this.traversalStartTime / this.traversalDuration;
             // Fade to black in first half, fade from black in second half
+            if (progress < 0.5) {
+                fadeAlpha = progress * 2; // 0 to 1
+            } else {
+                fadeAlpha = 2 - (progress * 2); // 1 to 0
+            }
+            fadeAlpha = Math.min(1, Math.max(0, fadeAlpha));
+        } else if (this.isResettingUniverse) {
+            isCosmicTransition = true;
+            const progress = this.resetStartTime / this.resetDuration;
+            // Cosmic transition: fade to cosmic colors, then fade from cosmic colors
             if (progress < 0.5) {
                 fadeAlpha = progress * 2; // 0 to 1
             } else {
@@ -712,15 +801,28 @@ export class Game {
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
         
-        // Render traversal fade effect (on top of everything)
+        // Render transition fade effects (on top of everything)
         if (fadeAlpha > 0) {
             const ctx = this.renderer.ctx;
-            ctx.fillStyle = `rgba(0, 0, 15, ${fadeAlpha})`; // Very dark blue-black
-            ctx.fillRect(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
             
-            // Add subtle particle tunnel effect at peak fade
-            if (fadeAlpha > 0.8) {
-                this.renderTraversalTunnel(ctx, fadeAlpha);
+            if (isCosmicTransition) {
+                // Cosmic transition with deep space colors
+                ctx.fillStyle = `rgba(8, 0, 20, ${fadeAlpha})`; // Deep cosmic purple-black
+                ctx.fillRect(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
+                
+                // Add cosmic rebirth effect at peak fade
+                if (fadeAlpha > 0.8) {
+                    this.renderCosmicRebirth(ctx, fadeAlpha);
+                }
+            } else {
+                // Wormhole traversal fade
+                ctx.fillStyle = `rgba(0, 0, 15, ${fadeAlpha})`; // Very dark blue-black
+                ctx.fillRect(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
+                
+                // Add subtle particle tunnel effect at peak fade
+                if (fadeAlpha > 0.8) {
+                    this.renderTraversalTunnel(ctx, fadeAlpha);
+                }
             }
         }
     }
@@ -741,6 +843,64 @@ export class Game {
             ctx.fillStyle = `rgba(100, 150, 255, ${particleAlpha})`;
             ctx.beginPath();
             ctx.arc(x, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    renderCosmicRebirth(ctx: CanvasRenderingContext2D, intensity: number): void {
+        const centerX = this.renderer.canvas.width / 2;
+        const centerY = this.renderer.canvas.height / 2;
+        const time = this.resetStartTime * 2; // Slower, more majestic animation
+        
+        // Cosmic background with swirling energies
+        const cosmicAlpha = (intensity - 0.8) * 5; // Scale from 0.8-1.0 to 0-1.0
+        
+        // Draw expanding cosmic rings (Big Bang effect)
+        for (let i = 0; i < 8; i++) {
+            const radius = 30 + (i * 40) + (time * 20);
+            const ringAlpha = cosmicAlpha * (1 - i / 8) * 0.3;
+            
+            // Cosmic colors: deep purples, blues, and hints of gold
+            const colors = [
+                `rgba(120, 80, 255, ${ringAlpha})`, // Cosmic purple
+                `rgba(80, 120, 255, ${ringAlpha})`, // Deep blue  
+                `rgba(255, 200, 80, ${ringAlpha})`, // Cosmic gold
+                `rgba(180, 100, 255, ${ringAlpha})` // Magenta
+            ];
+            
+            ctx.strokeStyle = colors[i % colors.length];
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Central cosmic singularity point
+        const singularityAlpha = cosmicAlpha * Math.sin(time * 3) * 0.5 + cosmicAlpha * 0.5;
+        ctx.fillStyle = `rgba(255, 255, 255, ${singularityAlpha})`;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Radiating cosmic energy particles
+        for (let i = 0; i < 30; i++) {
+            const angle = (i / 30) * Math.PI * 2 + time * 0.5;
+            const distance = 20 + (time * 40) + Math.sin(time * 2 + i) * 20;
+            const x = centerX + Math.cos(angle) * distance;
+            const y = centerY + Math.sin(angle) * distance;
+            
+            const particleAlpha = cosmicAlpha * (1 - (distance / 200)) * 0.8;
+            
+            // Alternate cosmic colors for particles
+            const particleColors = [
+                `rgba(255, 180, 255, ${particleAlpha})`, // Pink
+                `rgba(180, 255, 255, ${particleAlpha})`, // Cyan
+                `rgba(255, 255, 180, ${particleAlpha})`, // Light yellow
+            ];
+            
+            ctx.fillStyle = particleColors[i % particleColors.length];
+            ctx.beginPath();
+            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
             ctx.fill();
         }
     }

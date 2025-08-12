@@ -1408,6 +1408,13 @@ export class ChunkManager {
         
         console.log(`🕳️ BLACK HOLE generated successfully at (${centerX.toFixed(0)}, ${centerY.toFixed(0)}) - Type: ${blackHole.blackHoleTypeName}`);
     }
+
+    // Clear all chunks and discovered objects (for universe reset)
+    clearAllChunks(): void {
+        this.activeChunks.clear();
+        this.discoveredObjects.clear();
+        console.log('🌌 All chunks cleared for universe regeneration');
+    }
 }
 
 // Infinite starfield using chunk-based generation with parallax layers

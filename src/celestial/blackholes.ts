@@ -1,12 +1,3 @@
-// Black Holes - Ultra-rare cosmic phenomena with universe reset mechanics
-// TypeScript implementation with comprehensive gravitational physics
-//
-// 🕳️ IMPLEMENTATION STATUS:
-// ✅ Phase 1 COMPLETE: Foundation & Core System
-// ✅ Phase 2 COMPLETE: Visual Rendering & Effects  
-// ✅ Phase 3 COMPLETE: World Generation & Rarity System
-// 🚧 Phase 4 Pending: Universe Reset Mechanics (Next to implement)
-
 import { SeededRandom } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
 
