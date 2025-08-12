@@ -181,6 +181,34 @@ export class SoundManager {
                 volume: 0.6,
                 waveform: 'sine'
             },
+            'wormhole_discovery': {
+                type: 'oscillator',
+                frequency: 55,        // Deep, resonant fundamental frequency
+                frequency2: 110,      // Perfect octave for harmonic depth
+                duration: 2.0,        // Long duration for cosmic significance
+                attack: 0.3,          // Slow build for mysterious emergence
+                decay: 0.4,           // Extended decay for ethereal quality
+                sustain: 0.3,         // Sustained presence
+                release: 0.8,         // Very long release for haunting fade
+                volume: 0.7,          // Prominent but not overwhelming
+                waveform: 'sawtooth', // Rich harmonics for otherworldly character
+                filterFreq: 200,      // Low-pass filter for deep space ambiance
+                filterQ: 1.2          // Moderate resonance for character
+            },
+            'wormhole_traversal': {
+                type: 'oscillator',
+                frequency: 80,        // Mid-low frequency for dimensional shift
+                frequency2: 120,      // Perfect fifth for stability in chaos
+                duration: 1.5,        // Duration matches traversal time
+                attack: 0.1,          // Quick onset for sudden shift
+                decay: 0.2,           // Brief decay
+                sustain: 0.6,         // Strong sustain during transition
+                release: 0.4,         // Moderate release for soft landing
+                volume: 0.65,
+                waveform: 'triangle', // Softer than sawtooth but richer than sine
+                filterFreq: 400,      // Slightly higher filter for movement sense
+                filterQ: 1.5          // More resonance for dramatic effect
+            },
             'map_toggle': {
                 type: 'oscillator',
                 frequency: 800,
@@ -262,9 +290,22 @@ export class SoundManager {
                 gainNode.gain.setValueAtTime(volume * sustain, now + duration - release);
                 gainNode.gain.linearRampToValueAtTime(0, now + duration);
                 
+                // Apply filter if specified
+                let outputNode: AudioNode = gainNode;
+                if (config.filterFreq) {
+                    const filter = this.context.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(config.filterFreq, now);
+                    if (config.filterQ) {
+                        filter.Q.setValueAtTime(config.filterQ, now);
+                    }
+                    gainNode.connect(filter);
+                    outputNode = filter;
+                }
+                
                 // Connect and play
                 oscillator.connect(gainNode);
-                gainNode.connect(this.effectsGain);
+                outputNode.connect(this.effectsGain);
                 
                 oscillator.start(now);
                 oscillator.stop(now + duration);
@@ -394,6 +435,16 @@ export class SoundManager {
 
     playRareDiscovery(): void {
         const config = this.getSoundConfig('rare_discovery');
+        if (config) this.playOscillatorSound(config);
+    }
+
+    playWormholeDiscovery(): void {
+        const config = this.getSoundConfig('wormhole_discovery');
+        if (config) this.playOscillatorSound(config);
+    }
+
+    playWormholeTraversal(): void {
+        const config = this.getSoundConfig('wormhole_traversal');
         if (config) this.playOscillatorSound(config);
     }
 

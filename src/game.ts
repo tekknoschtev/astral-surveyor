@@ -443,8 +443,8 @@ export class Game {
             // Play asteroid garden discovery sound (use planet discovery as base sound)
             this.soundManager.playPlanetDiscovery('Asteroid Garden');
         } else if (obj.type === 'wormhole') {
-            // Play unique wormhole discovery sound (use nebula discovery as base)
-            this.soundManager.playNebulaDiscovery('wormhole');
+            // Play unique wormhole discovery sound - deep, resonant, otherworldly
+            this.soundManager.playWormholeDiscovery();
         }
         
         // Play additional rare discovery sound for special objects
@@ -523,8 +523,8 @@ export class Game {
         this.camera.velocityX = 0;
         this.camera.velocityY = 0;
         
-        // Play traversal sound effect (use rare discovery sound for now)
-        this.soundManager.playRareDiscovery();
+        // Play dedicated wormhole traversal sound effect
+        this.soundManager.playWormholeTraversal();
         
         const destinationDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
         console.log(`🌀 Starting wormhole traversal: ${wormhole.pairId} → destination ${destinationDesignation}`);
