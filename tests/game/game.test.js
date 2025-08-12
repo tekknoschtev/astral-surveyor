@@ -431,7 +431,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [],
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       
@@ -486,7 +487,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: mockObjects,
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
 
       game.update(0.016);
@@ -539,7 +541,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [],
         moons: [],
         celestialStars: [mockStar],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
 
       game.update(0.016);
@@ -567,7 +570,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [mockPlanet],
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
 
       game.update(0.016);
@@ -592,7 +596,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [],
         moons: [mockMoon],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
 
       game.update(0.016);
@@ -681,7 +686,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [],
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
     });
@@ -723,7 +729,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [{ render: vi.fn() }],
         moons: [{ render: vi.fn() }],
         celestialStars: [{ render: vi.fn() }],
-        nebulae: [{ render: vi.fn() }]
+        nebulae: [{ render: vi.fn() }],
+        asteroidGardens: [{ render: vi.fn() }]
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -777,7 +784,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [],
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       game.discoveryLogbook.isMouseOver = vi.fn().mockReturnValue(false);
@@ -844,7 +852,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [mockObject],
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
 
       expect(() => game.update(0.016)).not.toThrow();
@@ -856,7 +865,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         planets: [],
         moons: [],
         celestialStars: [],
-        nebulae: []
+        nebulae: [],
+        asteroidGardens: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
