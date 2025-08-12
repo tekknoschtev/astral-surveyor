@@ -5,6 +5,7 @@
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { Star, Planet, Moon, PlanetTypes, StarTypes } from '../celestial/celestial.js';
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
+import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
@@ -39,6 +40,7 @@ interface Chunk {
     moons: Moon[];
     celestialStars: Star[];
     nebulae: Nebula[];
+    asteroidGardens: AsteroidGarden[];
 }
 
 interface ActiveObjects {
@@ -47,6 +49,7 @@ interface ActiveObjects {
     moons: Moon[];
     celestialStars: Star[];
     nebulae: Nebula[];
+    asteroidGardens: AsteroidGarden[];
 }
 
 interface DiscoveryData {
@@ -158,7 +161,8 @@ export class ChunkManager {
             planets: [],
             moons: [], // Discoverable moons orbiting planets
             celestialStars: [], // Discoverable stars (different from background stars)
-            nebulae: [] // Beautiful gas clouds for tranquil exploration
+            nebulae: [], // Beautiful gas clouds for tranquil exploration
+            asteroidGardens: [] // Scattered fields of glittering rocks
         };
 
         // Generate stars for this chunk
@@ -341,6 +345,9 @@ export class ChunkManager {
 
         // Generate nebulae for this chunk (separate from star systems)
         this.generateNebulaeForChunk(chunkX, chunkY, chunk);
+        
+        // Generate asteroid gardens for this chunk
+        this.generateAsteroidGardensForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -566,7 +573,7 @@ export class ChunkManager {
     }
 
     getAllActiveObjects(): ActiveObjects {
-        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [] };
+        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
@@ -574,6 +581,7 @@ export class ChunkManager {
             objects.moons.push(...chunk.moons);
             objects.celestialStars.push(...chunk.celestialStars);
             objects.nebulae.push(...chunk.nebulae);
+            objects.asteroidGardens.push(...chunk.asteroidGardens);
         }
 
         return objects;
@@ -1033,6 +1041,78 @@ export class ChunkManager {
             
             // Add to chunk
             chunk.nebulae.push(nebula);
+        }
+    }
+    
+    // Generate asteroid gardens for a chunk - scattered fields for exploration
+    generateAsteroidGardensForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // Use separate seed for asteroid generation to avoid correlation with other objects
+        const asteroidSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x456789AB;
+        const asteroidRng = new SeededRandom(asteroidSeed);
+        
+        // Moderate probability for asteroid gardens - more common than nebulae but still special
+        // Most chunks (85%) will have no asteroid gardens, creating anticipation for discovery
+        const asteroidRoll = asteroidRng.nextFloat(0, 1);
+        let asteroidCount: number;
+        
+        if (asteroidRoll < 0.85) {
+            asteroidCount = 0; // 85% chance of no asteroid gardens
+        } else if (asteroidRoll < 0.95) {
+            asteroidCount = 1; // 10% chance of 1 asteroid garden
+        } else {
+            asteroidCount = asteroidRng.nextInt(1, 2); // 5% chance of 1-2 asteroid gardens (rare multiple fields)
+        }
+        
+        for (let i = 0; i < asteroidCount; i++) {
+            // Position asteroid gardens with margin to ensure they fit within chunk
+            // Use larger margin since asteroid gardens can be quite spread out
+            const margin = 250; 
+            const asteroidX = chunkX * this.chunkSize + asteroidRng.nextFloat(margin, this.chunkSize - margin);
+            const asteroidY = chunkY * this.chunkSize + asteroidRng.nextFloat(margin, this.chunkSize - margin);
+            
+            // Avoid placing asteroid gardens too close to existing star systems
+            // This ensures they feel like independent discoveries rather than orbital debris
+            let validPosition = true;
+            for (const star of chunk.celestialStars) {
+                const distance = Math.sqrt(
+                    Math.pow(asteroidX - star.x, 2) + Math.pow(asteroidY - star.y, 2)
+                );
+                if (distance < 400) { // Minimum distance from stars
+                    validPosition = false;
+                    break;
+                }
+            }
+            
+            // If too close to a star system, try a different position (simple retry)
+            if (!validPosition) {
+                const retryX = chunkX * this.chunkSize + asteroidRng.nextFloat(margin, this.chunkSize - margin);
+                const retryY = chunkY * this.chunkSize + asteroidRng.nextFloat(margin, this.chunkSize - margin);
+                
+                // Check retry position
+                validPosition = true;
+                for (const star of chunk.celestialStars) {
+                    const distance = Math.sqrt(
+                        Math.pow(retryX - star.x, 2) + Math.pow(retryY - star.y, 2)
+                    );
+                    if (distance < 400) {
+                        validPosition = false;
+                        break;
+                    }
+                }
+                
+                // If retry also fails, skip this asteroid garden (maintain quality over quantity)
+                if (!validPosition) {
+                    continue;
+                }
+                
+                // Use retry position
+                const asteroidGarden = new AsteroidGarden(retryX, retryY, selectAsteroidGardenType(asteroidRng), asteroidRng);
+                chunk.asteroidGardens.push(asteroidGarden);
+            } else {
+                // Original position is valid
+                const asteroidGarden = new AsteroidGarden(asteroidX, asteroidY, selectAsteroidGardenType(asteroidRng), asteroidRng);
+                chunk.asteroidGardens.push(asteroidGarden);
+            }
         }
     }
 }
