@@ -93,7 +93,7 @@ export class Nebula extends CelestialObject {
     id: string;
 
     constructor(x: number, y: number, nebulaType: string, random: SeededRandom) {
-        super(x, y, 'nebula' as any);
+        super(x, y, 'nebula');
         
         this.nebulaType = nebulaType;
         this.nebulaTypeData = NebulaTypes[nebulaType];

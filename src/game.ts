@@ -241,7 +241,7 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae];
+        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens] as any[];
         
         // Update orbital positions for all planets and moons
         for (const planet of activeObjects.planets) {
@@ -287,6 +287,7 @@ export class Game {
                 const objectType = obj.type === 'planet' ? obj.planetTypeName : 
                                   obj.type === 'moon' ? 'Moon' : 
                                   obj.type === 'nebula' ? (obj as any).nebulaTypeData?.name || 'Nebula' :
+                                  obj.type === 'asteroids' ? (obj as any).gardenTypeData?.name || 'Asteroid Garden' :
                                   obj.starTypeName;
                 
                 // Add discovery with proper name
@@ -360,6 +361,10 @@ export class Game {
         } else if (obj.type === 'nebula') {
             // All nebulae are rare and notable discoveries
             return true;
+        } else if (obj.type === 'asteroids') {
+            // Rare mineral and crystalline asteroid gardens are notable
+            const gardenType = (obj as any).gardenType;
+            return gardenType === 'rare_minerals' || gardenType === 'crystalline' || gardenType === 'icy';
         }
         return false;
     }
@@ -397,6 +402,9 @@ export class Game {
         } else if (obj.type === 'nebula') {
             // Play special sparkly nebula discovery sound
             this.soundManager.playNebulaDiscovery((obj as any).nebulaType || 'emission');
+        } else if (obj.type === 'asteroids') {
+            // Play asteroid garden discovery sound (use planet discovery as base sound)
+            this.soundManager.playPlanetDiscovery('Asteroid Garden');
         }
         
         // Play additional rare discovery sound for special objects
@@ -450,6 +458,11 @@ export class Game {
         
         // Render nebulae first (background layer)
         for (const obj of activeObjects.nebulae) {
+            obj.render(this.renderer, this.camera);
+        }
+        
+        // Then render asteroid gardens (mid-background layer)
+        for (const obj of activeObjects.asteroidGardens) {
             obj.render(this.renderer, this.camera);
         }
         
