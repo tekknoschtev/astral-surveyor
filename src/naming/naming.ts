@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole';
 }
 
 interface Star extends CelestialObject {
@@ -32,6 +32,13 @@ interface Nebula extends CelestialObject {
     nebulaTypeData?: {
         name: string;
     };
+}
+
+interface Wormhole extends CelestialObject {
+    type: 'wormhole';
+    wormholeId?: string;
+    designation?: 'alpha' | 'beta';
+    pairId?: string;
 }
 
 // Full designation result for detailed information
@@ -251,6 +258,41 @@ export class NamingService {
     }
 
     /**
+     * Generate wormhole name following scientific convention
+     * Uses the wormholeId from the paired system with designation suffix
+     * Examples: "WH-1234-α", "WH-1234-β"
+     */
+    generateWormholeName(wormhole: Wormhole): string {
+        // Use the pairId if available (includes designation), otherwise construct it
+        if (wormhole.pairId) {
+            return wormhole.pairId;
+        }
+        
+        // Fallback construction if pairId is not available
+        if (wormhole.wormholeId && wormhole.designation) {
+            const designationSymbol = wormhole.designation === 'alpha' ? 'α' : 'β';
+            return `${wormhole.wormholeId}-${designationSymbol}`;
+        }
+        
+        // Final fallback - generate from coordinates
+        const catalogNumber = this.generateWormholeCatalogNumber(wormhole.x, wormhole.y);
+        const designationSymbol = wormhole.designation === 'alpha' ? 'α' : 'β';
+        return `WH-${catalogNumber}-${designationSymbol}`;
+    }
+
+    /**
+     * Generate wormhole catalog number based on position
+     */
+    private generateWormholeCatalogNumber(x: number, y: number): number {
+        const hash1 = this.hashCoordinate(x * 0.7); // Different multipliers for unique distribution
+        const hash2 = this.hashCoordinate(y * 0.9);
+        const combined = (hash1 ^ hash2) >>> 0;
+        
+        // Wormhole range: 1000-9999 (4-digit numbers for rarity)
+        return 1000 + (combined % 9000);
+    }
+
+    /**
      * Calculate moon's index around its parent planet based on orbital distance
      */
     calculateMoonIndex(moon: Moon): number {
@@ -297,7 +339,7 @@ export class NamingService {
      * Generate short display name for UI contexts
      * Examples: "ASV-2847", "ASV-2847 b"
      */
-    generateDisplayName(object: Star | Planet | Moon | Nebula | any): string {
+    generateDisplayName(object: Star | Planet | Moon | Nebula | Wormhole | any): string {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || object.starTypeName) {
             const catalogNumber = this.generateStarCatalogNumber(object.x, object.y);
@@ -308,6 +350,8 @@ export class NamingService {
             return this.generateMoonName(object as Moon);
         } else if (object.type === 'nebula') {
             return this.generateNebulaName(object as Nebula);
+        } else if (object.type === 'wormhole') {
+            return this.generateWormholeName(object as Wormhole);
         }
         
         return 'Unknown Object';
@@ -317,7 +361,7 @@ export class NamingService {
      * Generate full scientific designation with all details
      * Used for detailed information panels and exports
      */
-    generateFullDesignation(object: Star | Planet | Moon | Nebula | any): FullDesignation | null {
+    generateFullDesignation(object: Star | Planet | Moon | Nebula | Wormhole | any): FullDesignation | null {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || object.starTypeName) {
             const standardName = this.generateStarName(object as Star);
@@ -347,6 +391,17 @@ export class NamingService {
                 type: nebula.nebulaTypeData?.name || 'Unknown Nebula',
                 classification: this.getNebulaClassification(nebula.nebulaType)
             };
+        } else if (object.type === 'wormhole') {
+            const wormhole = object as Wormhole;
+            const wormholeName = this.generateWormholeName(wormhole);
+            const coordName = this.generateCoordinateDesignation(wormhole.x, wormhole.y);
+            const twinDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
+            return {
+                catalog: wormholeName,
+                coordinate: coordName,
+                type: 'Stable Traversable Wormhole',
+                classification: `Einstein-Rosen Bridge (Paired with ${wormhole.wormholeId}-${twinDesignation})`
+            };
         }
         
         return null;
@@ -355,7 +410,7 @@ export class NamingService {
     /**
      * Check if an object deserves special recognition (rare discoveries)
      */
-    isNotableDiscovery(object: Star | Planet | Moon | Nebula | any): boolean {
+    isNotableDiscovery(object: Star | Planet | Moon | Nebula | Wormhole | any): boolean {
         if (object.type === 'star') {
             const rareStars = ['Neutron Star', 'White Dwarf', 'Blue Giant', 'Red Giant'];
             return rareStars.includes(object.starTypeName);
@@ -364,6 +419,9 @@ export class NamingService {
             return rarePlanets.includes(object.planetTypeName);
         } else if (object.type === 'nebula') {
             // All nebulae are notable due to their rarity (5% spawn chance)
+            return true;
+        } else if (object.type === 'wormhole') {
+            // All wormholes are extremely notable due to ultra-rarity (0.0005% spawn chance)
             return true;
         }
         

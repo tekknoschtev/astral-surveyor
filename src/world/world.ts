@@ -6,6 +6,7 @@ import { SeededRandom, hashPosition } from '../utils/random.js';
 import { Star, Planet, Moon, PlanetTypes, StarTypes } from '../celestial/celestial.js';
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
+import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
@@ -41,6 +42,7 @@ interface Chunk {
     celestialStars: Star[];
     nebulae: Nebula[];
     asteroidGardens: AsteroidGarden[];
+    wormholes: Wormhole[];
 }
 
 interface ActiveObjects {
@@ -50,6 +52,7 @@ interface ActiveObjects {
     celestialStars: Star[];
     nebulae: Nebula[];
     asteroidGardens: AsteroidGarden[];
+    wormholes: Wormhole[];
 }
 
 interface DiscoveryData {
@@ -97,6 +100,18 @@ interface DiscoveredMoon {
     y: number;
     parentPlanetX: number;
     parentPlanetY: number;
+    timestamp: number;
+}
+
+interface DiscoveredWormhole {
+    x: number;
+    y: number;
+    wormholeId: string;
+    designation: 'alpha' | 'beta';
+    pairId: string;
+    twinX: number;
+    twinY: number;
+    objectName?: string;
     timestamp: number;
 }
 
@@ -162,7 +177,8 @@ export class ChunkManager {
             moons: [], // Discoverable moons orbiting planets
             celestialStars: [], // Discoverable stars (different from background stars)
             nebulae: [], // Beautiful gas clouds for tranquil exploration
-            asteroidGardens: [] // Scattered fields of glittering rocks
+            asteroidGardens: [], // Scattered fields of glittering rocks
+            wormholes: [] // Extremely rare spacetime anomalies for FTL travel
         };
 
         // Generate stars for this chunk
@@ -348,6 +364,9 @@ export class ChunkManager {
         
         // Generate asteroid gardens for this chunk
         this.generateAsteroidGardensForChunk(chunkX, chunkY, chunk);
+        
+        // Generate wormholes for this chunk (extremely rare)
+        this.generateWormholesForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -573,7 +592,7 @@ export class ChunkManager {
     }
 
     getAllActiveObjects(): ActiveObjects {
-        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [] };
+        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [], wormholes: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
@@ -582,6 +601,7 @@ export class ChunkManager {
             objects.celestialStars.push(...chunk.celestialStars);
             objects.nebulae.push(...chunk.nebulae);
             objects.asteroidGardens.push(...chunk.asteroidGardens);
+            objects.wormholes.push(...chunk.wormholes);
         }
 
         return objects;
@@ -1115,6 +1135,123 @@ export class ChunkManager {
             }
         }
     }
+
+    // Generate wormholes for a chunk - extremely rare spacetime anomalies
+    generateWormholesForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // Use separate seed for wormhole generation to avoid correlation with other objects
+        const wormholeSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x789ABCDE;
+        const wormholeRng = new SeededRandom(wormholeSeed);
+        
+        // Ultra-rare probability for wormholes - creating true sense of wonder when found
+        // 99.95% of chunks will have no wormholes (approximately 1 every 2000 chunks)
+        const wormholeRoll = wormholeRng.nextFloat(0, 1);
+        
+        if (wormholeRoll >= 0.0005) {
+            return; // No wormhole in this chunk (99.95% of the time)
+        }
+        
+        // This chunk gets a wormhole! Generate its pair location
+        // Use deterministic algorithm to ensure pairs always exist
+        const wormholeId = this.generateWormholeId(chunkX, chunkY, wormholeRng);
+        const pairLocation = this.generateWormholePairLocation(chunkX, chunkY, wormholeRng);
+        
+        // Position wormhole within this chunk with good margin
+        const margin = 300; // Large margin to ensure wormholes don't conflict with other objects
+        const wormholeX = chunkX * this.chunkSize + wormholeRng.nextFloat(margin, this.chunkSize - margin);
+        const wormholeY = chunkY * this.chunkSize + wormholeRng.nextFloat(margin, this.chunkSize - margin);
+        
+        // Ensure wormhole is far enough from star systems (they are cosmic-scale phenomena)
+        let validPosition = true;
+        for (const star of chunk.celestialStars) {
+            const distance = Math.sqrt(
+                Math.pow(wormholeX - star.x, 2) + Math.pow(wormholeY - star.y, 2)
+            );
+            if (distance < 500) { // Minimum 500px from star systems
+                validPosition = false;
+                break;
+            }
+        }
+        
+        // If position conflicts with star system, try alternative position
+        let finalX = wormholeX;
+        let finalY = wormholeY;
+        
+        if (!validPosition) {
+            // Try placing at chunk edge instead (wormholes as boundary phenomena)
+            const edgeChoice = wormholeRng.nextInt(0, 4);
+            const edgeMargin = 100;
+            
+            switch (edgeChoice) {
+                case 0: // Top edge
+                    finalX = chunkX * this.chunkSize + wormholeRng.nextFloat(edgeMargin, this.chunkSize - edgeMargin);
+                    finalY = chunkY * this.chunkSize + edgeMargin;
+                    break;
+                case 1: // Right edge
+                    finalX = (chunkX + 1) * this.chunkSize - edgeMargin;
+                    finalY = chunkY * this.chunkSize + wormholeRng.nextFloat(edgeMargin, this.chunkSize - edgeMargin);
+                    break;
+                case 2: // Bottom edge
+                    finalX = chunkX * this.chunkSize + wormholeRng.nextFloat(edgeMargin, this.chunkSize - edgeMargin);
+                    finalY = (chunkY + 1) * this.chunkSize - edgeMargin;
+                    break;
+                case 3: // Left edge
+                    finalX = chunkX * this.chunkSize + edgeMargin;
+                    finalY = chunkY * this.chunkSize + wormholeRng.nextFloat(edgeMargin, this.chunkSize - edgeMargin);
+                    break;
+            }
+        }
+        
+        // Generate the wormhole pair
+        const [alphaWormhole, betaWormhole] = generateWormholePair(
+            finalX, finalY, 
+            pairLocation.x, pairLocation.y, 
+            wormholeId, 
+            wormholeRng
+        );
+        
+        // Add the local wormhole to this chunk
+        chunk.wormholes.push(alphaWormhole);
+        
+        // Store pair information for future chunk generation
+        this.pendingWormholePairs.set(wormholeId, {
+            localWormhole: alphaWormhole,
+            remoteWormhole: betaWormhole,
+            remoteChunkX: Math.floor(pairLocation.x / this.chunkSize),
+            remoteChunkY: Math.floor(pairLocation.y / this.chunkSize)
+        });
+    }
+    
+    private generateWormholeId(chunkX: number, chunkY: number, rng: SeededRandom): string {
+        // Generate unique but predictable wormhole ID
+        const baseId = Math.abs(hashPosition(chunkX, chunkY)) % 9999;
+        return `WH-${baseId.toString().padStart(4, '0')}`;
+    }
+    
+    private generateWormholePairLocation(chunkX: number, chunkY: number, rng: SeededRandom): { x: number, y: number } {
+        // Generate distant but deterministic pair location
+        // Ensure pairs are separated by significant distance (multiple chunks)
+        const minDistance = this.chunkSize * 5; // At least 5 chunks away
+        const maxDistance = this.chunkSize * 20; // At most 20 chunks away
+        
+        const angle = rng.nextFloat(0, Math.PI * 2);
+        const distance = rng.nextFloat(minDistance, maxDistance);
+        
+        const originX = (chunkX + 0.5) * this.chunkSize;
+        const originY = (chunkY + 0.5) * this.chunkSize;
+        
+        const pairX = originX + Math.cos(angle) * distance;
+        const pairY = originY + Math.sin(angle) * distance;
+        
+        return { x: pairX, y: pairY };
+    }
+    
+    // Store for managing wormhole pairs across chunks
+    private pendingWormholePairs = new Map<string, {
+        localWormhole: Wormhole,
+        remoteWormhole: Wormhole,
+        remoteChunkX: number,
+        remoteChunkY: number
+    }>();
 }
 
 // Infinite starfield using chunk-based generation with parallax layers
