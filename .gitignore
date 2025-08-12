@@ -1,5 +1,5 @@
 /screenshots-for-feedback/
-SCRATCHPAD.md
+ideas/SCRATCHPAD.md
 /.idea/
 /.claude/
 
@@ -20,3 +20,7 @@ dist/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Ideation and Spoilers
+docs/
+ideas/

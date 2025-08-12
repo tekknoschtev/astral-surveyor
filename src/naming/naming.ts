@@ -251,6 +251,41 @@ export class NamingService {
     }
 
     /**
+     * Generate asteroid garden name following astronomical field/belt naming conventions
+     * Examples: "ASV-1234 Belt A", "ASV-1234 Field", "ASV-1234 Cluster"
+     */
+    generateAsteroidGardenName(garden: any): string {
+        // Generate base catalog number using star catalog system
+        const catalogNumber = this.generateStarCatalogNumber(garden.x, garden.y);
+        const baseName = `${this.catalogPrefix}-${catalogNumber}`;
+        
+        // Select designation suffix based on garden type
+        let suffix: string;
+        switch (garden.gardenType) {
+            case 'metallic':
+                suffix = 'Belt A'; // Classic asteroid belt designation
+                break;
+            case 'crystalline':
+                suffix = 'Field C'; // Crystalline field
+                break;
+            case 'carbonaceous':
+                suffix = 'Belt B'; // Secondary belt
+                break;
+            case 'icy':
+                suffix = 'Ring'; // Ice ring system
+                break;
+            case 'rare_minerals':
+                suffix = 'Cluster'; // Rare mineral cluster
+                break;
+            default:
+                suffix = 'Field'; // Generic field designation
+                break;
+        }
+        
+        return `${baseName} ${suffix}`;
+    }
+
+    /**
      * Calculate moon's index around its parent planet based on orbital distance
      */
     calculateMoonIndex(moon: Moon): number {
@@ -308,6 +343,8 @@ export class NamingService {
             return this.generateMoonName(object as Moon);
         } else if (object.type === 'nebula') {
             return this.generateNebulaName(object as Nebula);
+        } else if (object.type === 'asteroids') {
+            return this.generateAsteroidGardenName(object);
         }
         
         return 'Unknown Object';
@@ -347,6 +384,16 @@ export class NamingService {
                 type: nebula.nebulaTypeData?.name || 'Unknown Nebula',
                 classification: this.getNebulaClassification(nebula.nebulaType)
             };
+        } else if (object.type === 'asteroids') {
+            const garden = object;
+            const gardenName = this.generateAsteroidGardenName(garden);
+            const coordName = this.generateCoordinateDesignation(garden.x, garden.y);
+            return {
+                catalog: gardenName,
+                coordinate: coordName,
+                type: garden.gardenTypeData?.name || 'Asteroid Garden',
+                classification: this.getAsteroidGardenClassification(garden.gardenType)
+            };
         }
         
         return null;
@@ -365,6 +412,10 @@ export class NamingService {
         } else if (object.type === 'nebula') {
             // All nebulae are notable due to their rarity (5% spawn chance)
             return true;
+        } else if (object.type === 'asteroids') {
+            // Rare mineral, crystalline, and icy gardens are notable
+            const rareGardens = ['rare_minerals', 'crystalline', 'icy'];
+            return rareGardens.includes(object.gardenType);
         }
         
         return false;
@@ -382,5 +433,20 @@ export class NamingService {
         };
         
         return nebulaType ? classifications[nebulaType] || null : null;
+    }
+
+    /**
+     * Get asteroid garden classification for scientific designation
+     */
+    private getAsteroidGardenClassification(gardenType?: string): string | null {
+        const classifications: Record<string, string> = {
+            'metallic': 'M-Type Belt',
+            'crystalline': 'C-Type Field',
+            'carbonaceous': 'C-Type Belt',
+            'icy': 'K-Type Ring',
+            'rare_minerals': 'X-Type Cluster'
+        };
+        
+        return gardenType ? classifications[gardenType] || null : null;
     }
 }
