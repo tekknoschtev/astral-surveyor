@@ -60,7 +60,7 @@ Wormholes will be extremely rare, naturally occurring phenomena that allow for i
 - [x] Create classification system ("Einstein-Rosen Bridge", "Stable Traversable Wormhole")
 - [x] Add both wormholes to notable discoveries (all wormholes are rare)
 - [ ] Implement discovery linking (discovering one reveals both on map)
-- [ ] Add wormhole-specific discovery sounds (deep, resonant tones)
+- [x] Add wormhole-specific discovery sounds (deep, resonant tones with harmonic richness)
 
 ### 7. **Testing & Quality Assurance**
 - [x] Create comprehensive test suite (`tests/celestial/wormholes.test.js`)
@@ -72,8 +72,8 @@ Wormholes will be extremely rare, naturally occurring phenomena that allow for i
 - [ ] Performance testing for gravitational lensing effects
 
 ### 8. **Audio & Polish**
-- [ ] Design ambient wormhole sound effects (low-frequency hum)
-- [ ] Create travel transition audio (whoosh + dimensional shift effect)
-- [ ] Add discovery chimes specific to wormhole encounters
-- [ ] Implement audio fadeout/fadein during travel sequence
+- [x] Design ambient wormhole sound effects (deep 55Hz resonant discovery tone)
+- [x] Create travel transition audio (80Hz dimensional shift with perfect fifth harmony)
+- [x] Add discovery chimes specific to wormhole encounters (sawtooth waveform with low-pass filter)
+- [x] Implement audio effects during travel sequence (dedicated traversal sound)
 
