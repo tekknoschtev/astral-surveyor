@@ -110,11 +110,11 @@ interface StarType {
 export abstract class CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
     discovered: boolean = false;
     discoveryDistance: number = 50;
 
-    constructor(x: number, y: number, type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole') {
+    constructor(x: number, y: number, type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole') {
         this.x = x;
         this.y = y;
         this.type = type;

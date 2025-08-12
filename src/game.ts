@@ -34,7 +34,7 @@ interface ActiveObjects {
 }
 
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
     x: number;
     y: number;
     starTypeName?: string;
@@ -43,6 +43,7 @@ interface CelestialObject {
     wormholeId?: string;
     designation?: 'alpha' | 'beta';
     pairId?: string;
+    blackHoleTypeName?: string;
     updatePosition?(deltaTime: number): void;
     update?(deltaTime: number): void;
     checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
@@ -263,7 +264,7 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes] as any[];
+        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes] as any[];
         
         // Update orbital positions for all planets and moons
         for (const planet of activeObjects.planets) {
@@ -281,6 +282,33 @@ export class Game {
         for (const wormhole of activeObjects.wormholes) {
             if (wormhole.update) {
                 wormhole.update(deltaTime);
+            }
+        }
+        
+        // Update black hole animations and apply gravitational effects
+        for (const blackHole of activeObjects.blackholes) {
+            if (blackHole.update) {
+                blackHole.update(deltaTime);
+            }
+            
+            // Apply gravitational effects to camera/ship
+            if (blackHole.updateGravitationalEffects) {
+                const gravEffects = blackHole.updateGravitationalEffects(this.camera, deltaTime);
+                
+                // Apply gravitational pull to ship movement
+                if (gravEffects.pullForceX !== 0 || gravEffects.pullForceY !== 0) {
+                    this.camera.velocityX += gravEffects.pullForceX * deltaTime;
+                    this.camera.velocityY += gravEffects.pullForceY * deltaTime;
+                }
+                
+                // Handle proximity warnings (will be implemented in Phase 1.3)
+                // TODO: Display warnings based on gravEffects.warningLevel
+            }
+            
+            // Check for singularity collision (universe reset)
+            if (blackHole.checkSingularityCollision && blackHole.checkSingularityCollision(this.camera)) {
+                // TODO: Implement universe reset mechanics in Phase 4
+                console.log('🕳️ SINGULARITY COLLISION - Universe reset would trigger here');
             }
         }
         
@@ -322,6 +350,7 @@ export class Game {
                                   obj.type === 'nebula' ? (obj as any).nebulaTypeData?.name || 'Nebula' :
                                   obj.type === 'asteroids' ? (obj as any).gardenTypeData?.name || 'Asteroid Garden' :
                                   obj.type === 'wormhole' ? 'Stable Traversable Wormhole' :
+                                  obj.type === 'blackhole' ? obj.blackHoleTypeName || 'Black Hole' :
                                   obj.starTypeName;
                 
                 // Add discovery with proper name
@@ -402,6 +431,9 @@ export class Game {
         } else if (obj.type === 'wormhole') {
             // All wormholes are extremely rare and notable discoveries
             return true;
+        } else if (obj.type === 'blackhole') {
+            // All black holes are ultra-rare, cosmic discoveries of ultimate significance
+            return true;
         }
         return false;
     }
@@ -445,6 +477,10 @@ export class Game {
         } else if (obj.type === 'wormhole') {
             // Play unique wormhole discovery sound - deep, resonant, otherworldly
             this.soundManager.playWormholeDiscovery();
+        } else if (obj.type === 'blackhole') {
+            // Play ultra-rare black hole discovery sound - deep, ominous, cosmic
+            // TODO: Add dedicated black hole discovery sound in Phase 6
+            this.soundManager.playWormholeDiscovery(); // Temporary - use wormhole sound
         }
         
         // Play additional rare discovery sound for special objects
@@ -610,6 +646,11 @@ export class Game {
             // Get destination preview objects for gravitational lensing
             const destinationPreview = this.getDestinationPreviewObjects(obj);
             obj.render(this.renderer, this.camera, destinationPreview);
+        }
+        
+        // Render black holes (ultra-prominent cosmic phenomena - dominating layer)
+        for (const obj of activeObjects.blackholes) {
+            obj.render(this.renderer, this.camera);
         }
         
         this.starParticles.render(this.renderer, this.camera);

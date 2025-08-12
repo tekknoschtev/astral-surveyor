@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole';
 }
 
 interface Star extends CelestialObject {
@@ -39,6 +39,12 @@ interface Wormhole extends CelestialObject {
     wormholeId?: string;
     designation?: 'alpha' | 'beta';
     pairId?: string;
+}
+
+interface BlackHole extends CelestialObject {
+    type: 'blackhole';
+    blackHoleTypeName?: string;
+    uniqueId?: string;
 }
 
 // Full designation result for detailed information
@@ -293,6 +299,41 @@ export class NamingService {
     }
 
     /**
+     * Generate black hole name following astronomical convention
+     * Uses position-based catalog numbers with BH prefix
+     * Examples: "BH-1234", "BH-8765 SMH" (Stellar Mass Hole), "BH-2345 SMBH" (Supermassive Black Hole)
+     */
+    generateBlackHoleName(blackHole: BlackHole): string {
+        const catalogNumber = this.generateBlackHoleCatalogNumber(blackHole.x, blackHole.y);
+        const baseName = `BH-${catalogNumber}`;
+        
+        // Add classification suffix for scientific accuracy
+        if (blackHole.blackHoleTypeName) {
+            let classification = '';
+            if (blackHole.blackHoleTypeName === 'Stellar Mass Black Hole') {
+                classification = ' SMH'; // Stellar Mass Hole
+            } else if (blackHole.blackHoleTypeName === 'Supermassive Black Hole') {
+                classification = ' SMBH'; // Supermassive Black Hole
+            }
+            return baseName + classification;
+        }
+        
+        return baseName;
+    }
+
+    /**
+     * Generate black hole catalog number based on position
+     */
+    private generateBlackHoleCatalogNumber(x: number, y: number): number {
+        const hash1 = this.hashCoordinate(x * 0.3); // Different multipliers for unique distribution
+        const hash2 = this.hashCoordinate(y * 0.5);
+        const combined = (hash1 ^ hash2) >>> 0;
+        
+        // Black hole range: 1000-9999 (4-digit numbers for ultra-rarity)
+        return 1000 + (combined % 9000);
+    }
+
+    /**
      * Generate asteroid garden name following astronomical field/belt naming conventions
      * Examples: "ASV-1234 Belt A", "ASV-1234 Field", "ASV-1234 Cluster"
      */
@@ -387,6 +428,8 @@ export class NamingService {
             return this.generateNebulaName(object as Nebula);
         } else if (object.type === 'wormhole') {
             return this.generateWormholeName(object as Wormhole);
+        } else if (object.type === 'blackhole') {
+            return this.generateBlackHoleName(object as BlackHole);
         } else if (object.type === 'asteroids') {
             return this.generateAsteroidGardenName(object);
         }
@@ -398,7 +441,7 @@ export class NamingService {
      * Generate full scientific designation with all details
      * Used for detailed information panels and exports
      */
-    generateFullDesignation(object: Star | Planet | Moon | Nebula | Wormhole | any): FullDesignation | null {
+    generateFullDesignation(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | any): FullDesignation | null {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || object.starTypeName) {
             const standardName = this.generateStarName(object as Star);
@@ -439,6 +482,17 @@ export class NamingService {
                 type: 'Stable Traversable Wormhole',
                 classification: `Einstein-Rosen Bridge (Paired with ${wormhole.wormholeId}-${twinDesignation})`
             };
+        } else if (object.type === 'blackhole') {
+            const blackHole = object as BlackHole;
+            const blackHoleName = this.generateBlackHoleName(blackHole);
+            const coordName = this.generateCoordinateDesignation(blackHole.x, blackHole.y);
+            const massClass = blackHole.blackHoleTypeName === 'Supermassive Black Hole' ? 'Supermassive' : 'Stellar Mass';
+            return {
+                catalog: blackHoleName,
+                coordinate: coordName,
+                type: blackHole.blackHoleTypeName || 'Black Hole',
+                classification: `${massClass} Gravitational Singularity (Universe Reset Point)`
+            };
         } else if (object.type === 'asteroids') {
             const garden = object;
             const gardenName = this.generateAsteroidGardenName(garden);
@@ -457,7 +511,7 @@ export class NamingService {
     /**
      * Check if an object deserves special recognition (rare discoveries)
      */
-    isNotableDiscovery(object: Star | Planet | Moon | Nebula | Wormhole | any): boolean {
+    isNotableDiscovery(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | any): boolean {
         if (object.type === 'star') {
             const rareStars = ['Neutron Star', 'White Dwarf', 'Blue Giant', 'Red Giant'];
             return rareStars.includes(object.starTypeName);
@@ -469,6 +523,9 @@ export class NamingService {
             return true;
         } else if (object.type === 'wormhole') {
             // All wormholes are extremely notable due to ultra-rarity (0.0005% spawn chance)
+            return true;
+        } else if (object.type === 'blackhole') {
+            // All black holes are ultra-notable due to extreme rarity (0.0001% spawn chance) and cosmic significance
             return true;
         } else if (object.type === 'asteroids') {
             // Rare mineral, crystalline, and icy gardens are notable
