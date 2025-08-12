@@ -867,6 +867,46 @@ export class ChunkManager {
         return discoveredNebulae;
     }
 
+    getDiscoveredWormholes(): DiscoveredWormhole[] {
+        const discoveredWormholes: DiscoveredWormhole[] = [];
+        
+        // Get all discovered objects that are wormholes
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('wormhole_')) {
+                // Extract coordinates and designation from wormhole ID
+                // Format: wormhole_x_y_designation (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 4) {
+                    const wormholeX = parseInt(parts[1]);
+                    const wormholeY = parseInt(parts[2]);
+                    const designation = parts[3] as 'alpha' | 'beta';
+                    const wormhole = this.findWormholeByPosition(wormholeX, wormholeY, designation);
+                
+                    if (wormhole) {
+                        const wormholeData: DiscoveredWormhole = {
+                            x: wormhole.x,
+                            y: wormhole.y,
+                            wormholeId: wormhole.wormholeId,
+                            designation: wormhole.designation,
+                            pairId: wormhole.pairId,
+                            twinX: wormhole.twinX,
+                            twinY: wormhole.twinY,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                        
+                        discoveredWormholes.push(wormholeData);
+                    }
+                }
+            }
+        }
+        
+        // Sort by discovery time (most recent first)
+        discoveredWormholes.sort((a, b) => b.timestamp - a.timestamp);
+        console.log(`[ChunkManager] getDiscoveredWormholes returning ${discoveredWormholes.length} wormholes`);
+        return discoveredWormholes;
+    }
+
     // Helper method to find a nebula by its position in active chunks  
     private findNebulaByPosition(x: number, y: number): any | null {
         for (const chunk of this.activeChunks.values()) {
@@ -874,6 +914,19 @@ export class ChunkManager {
                 // Check if nebula position matches (using floor to match getObjectId)
                 if (Math.floor(nebula.x) === x && Math.floor(nebula.y) === y) {
                     return nebula;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Helper method to find a wormhole by its position and designation in active chunks
+    private findWormholeByPosition(x: number, y: number, designation: 'alpha' | 'beta'): any | null {
+        for (const chunk of this.activeChunks.values()) {
+            for (const wormhole of chunk.wormholes) {
+                // Check if wormhole position and designation match (using floor to match getObjectId)
+                if (Math.floor(wormhole.x) === x && Math.floor(wormhole.y) === y && wormhole.designation === designation) {
+                    return wormhole;
                 }
             }
         }

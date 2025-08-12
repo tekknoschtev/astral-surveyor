@@ -620,7 +620,8 @@ export class Game {
         const discoveredStars = this.chunkManager.getDiscoveredStars();
         const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
         const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae);
+        const discoveredWormholes = this.chunkManager.getDiscoveredWormholes();
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae, discoveredWormholes);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
