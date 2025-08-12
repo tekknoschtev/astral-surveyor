@@ -43,8 +43,15 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/gam
 - **Multiple Control Schemes**: Full keyboard, mouse, and touch support for any device
 - **Emergency Controls**: Instant braking and precise maneuvering for careful exploration
 
+### 🌀 **FTL Travel via Wormholes**
+- **Rare Cosmic Phenomena**: Extremely rare wormhole pairs (~1 per 2000 chunks) enable instantaneous travel across vast distances
+- **Gravitational Lensing**: Peer through wormhole apertures to see celestial objects waiting at the destination
+- **Scientific Naming**: Greek letter designations (α/β) distinguish paired wormholes with proper astronomical classification
+- **Serene Traversal**: Smooth, momentum-preserving travel with tranquil visual and audio transitions
+
 ### 🎵 **Immersive Audio Design**
 - **Discovery Chimes**: Unique audio signatures for each celestial object type - from deep stellar tones to delicate moon chimes
+- **Wormhole Audio**: Deep, resonant 55Hz discovery tones and otherworldly traversal effects with harmonic richness
 - **Tranquil Sound Design**: Peaceful discovery tones designed to enhance wonder without overwhelming the exploration experience
 - **Full Control**: Toggle mute instantly with 'H' key, settings saved automatically
 
@@ -81,12 +88,14 @@ The universe reveals its secrets at different scales:
 - **🌟 Stars**: Discoverable from 480-540+ pixels away - perfect for long-range navigation and ensuring you never miss a system while cruising at high speeds
 - **🪐 Planets**: Discoverable from ~38-50 pixels - requiring closer approach for detailed study
 - **🌙 Moons**: Discoverable from ~27-30 pixels - intimate encounters with the smallest worlds
+- **🌀 Wormholes**: Discoverable from ~110-120 pixels - rare cosmic phenomena for instantaneous FTL travel
 
 ### **Astronomical Naming**
 Every discovery receives a professional IAU-inspired designation:
 - **Stars**: "ASV-2847 G" (Astral Survey Vessel catalog number + stellar classification)
 - **Planets**: "ASV-2847 b", "ASV-2847 c" (system + orbital designation)
 - **Moons**: "ASV-2847 b I", "ASV-2847 c II" (planet + Roman numeral)
+- **Wormholes**: "WH-1234-α", "WH-1234-β" (paired Einstein-Rosen bridges with Greek letter designations)
 
 ### **Procedural Generation**
 The universe is deterministically generated using seeded algorithms:
@@ -120,6 +129,15 @@ Discover 7 distinct world types, each with unique characteristics:
 | **Frozen** | 8% | Crystalline formations, glow, **30% have icy rings** | Rare |
 | **Volcanic** | 5% | Lava flows, intense glow effects | Rare |
 | **Exotic** | 2% | Purple shimmer, **50% have colorful rings** | Ultra-rare |
+
+### **Wormhole Phenomena**
+Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL travel:
+
+| Type | Rarity | Features | Experience |
+|------|--------|----------|------------|
+| **Stable Traversable** | 0.05% | Swirling vortex with gravitational lensing | **Visual preview of destination objects within aperture** |
+| - | *~1 per 2000 chunks* | **Paired α/β designations** | **Deep, resonant discovery tones** |
+| - | *Extremely valuable* | **Momentum-preserving traversal** | **Serene dimensional shift effects** |
 
 ## 🛠️ Technical Features
 

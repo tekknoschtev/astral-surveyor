@@ -30,16 +30,21 @@ interface ActiveObjects {
     moons: any[];
     celestialStars: any[];
     nebulae: any[];
+    wormholes: any[];
 }
 
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole';
     x: number;
     y: number;
     starTypeName?: string;
     planetTypeName?: string;
     nebulaTypeData?: { name: string };
+    wormholeId?: string;
+    designation?: 'alpha' | 'beta';
+    pairId?: string;
     updatePosition?(deltaTime: number): void;
+    update?(deltaTime: number): void;
     checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
     render(renderer: Renderer, camera: Camera): void;
 }
@@ -63,6 +68,12 @@ export class Game {
     // Track previous ship state for audio triggers
     previousThrustState: boolean;
     previousBrakeState: boolean;
+    
+    // Wormhole traversal transition state
+    isTraversing: boolean;
+    traversalStartTime: number;
+    traversalDuration: number;
+    traversalDestination?: { x: number; y: number; velocityX: number; velocityY: number; wormhole: any };
     
     // Distance saving timer (save every 5 seconds)
     distanceSaveTimer: number;
@@ -91,6 +102,11 @@ export class Game {
         // Track previous ship state for audio triggers
         this.previousThrustState = false;
         this.previousBrakeState = false;
+        
+        // Initialize wormhole traversal state
+        this.isTraversing = false;
+        this.traversalStartTime = 0;
+        this.traversalDuration = 2.0; // 2 second transition
         
         // Distance saving timer (save every 5 seconds)
         this.distanceSaveTimer = 0;
@@ -153,6 +169,12 @@ export class Game {
 
     update(deltaTime: number): void {
         this.input.update(deltaTime);
+        
+        // Handle wormhole traversal transition
+        if (this.isTraversing) {
+            this.updateTraversal(deltaTime);
+            return; // Skip normal updates during traversal
+        }
         
         // Resume audio context on first user interaction (required by browsers)
         // Note: This functionality is temporarily disabled to fix TypeScript compilation
@@ -241,7 +263,7 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens] as any[];
+        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes] as any[];
         
         // Update orbital positions for all planets and moons
         for (const planet of activeObjects.planets) {
@@ -255,10 +277,21 @@ export class Game {
             }
         }
         
+        // Update wormhole animations and effects
+        for (const wormhole of activeObjects.wormholes) {
+            if (wormhole.update) {
+                wormhole.update(deltaTime);
+            }
+        }
+        
         // Restore discovery state for newly loaded objects
         this.chunkManager.restoreDiscoveryState(celestialObjects);
         
         this.camera.update(this.input as any, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
+        
+        // Check for wormhole traversal
+        this.checkWormholeTraversal(activeObjects.wormholes);
+        
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
         this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
         
@@ -288,6 +321,7 @@ export class Game {
                                   obj.type === 'moon' ? 'Moon' : 
                                   obj.type === 'nebula' ? (obj as any).nebulaTypeData?.name || 'Nebula' :
                                   obj.type === 'asteroids' ? (obj as any).gardenTypeData?.name || 'Asteroid Garden' :
+                                  obj.type === 'wormhole' ? 'Stable Traversable Wormhole' :
                                   obj.starTypeName;
                 
                 // Add discovery with proper name
@@ -365,6 +399,9 @@ export class Game {
             // Rare mineral and crystalline asteroid gardens are notable
             const gardenType = (obj as any).gardenType;
             return gardenType === 'rare_minerals' || gardenType === 'crystalline' || gardenType === 'icy';
+        } else if (obj.type === 'wormhole') {
+            // All wormholes are extremely rare and notable discoveries
+            return true;
         }
         return false;
     }
@@ -405,6 +442,9 @@ export class Game {
         } else if (obj.type === 'asteroids') {
             // Play asteroid garden discovery sound (use planet discovery as base sound)
             this.soundManager.playPlanetDiscovery('Asteroid Garden');
+        } else if (obj.type === 'wormhole') {
+            // Play unique wormhole discovery sound - deep, resonant, otherworldly
+            this.soundManager.playWormholeDiscovery();
         }
         
         // Play additional rare discovery sound for special objects
@@ -449,8 +489,96 @@ export class Game {
         }
     }
 
+    checkWormholeTraversal(wormholes: any[]): void {
+        // Skip if already traversing or if stellar map is open
+        if (this.isTraversing || this.stellarMap.isVisible()) {
+            return;
+        }
+
+        for (const wormhole of wormholes) {
+            if (wormhole.canTraverse && wormhole.canTraverse(this.camera)) {
+                // Ship is within wormhole - initiate traversal
+                this.initiateWormholeTraversal(wormhole);
+                return; // Only traverse one wormhole per frame
+            }
+        }
+    }
+
+    initiateWormholeTraversal(wormhole: any): void {
+        // Start traversal transition
+        this.isTraversing = true;
+        this.traversalStartTime = 0;
+        
+        // Store destination and momentum
+        const destination = wormhole.getDestinationCoordinates();
+        this.traversalDestination = {
+            x: destination.x,
+            y: destination.y,
+            velocityX: this.camera.velocityX,
+            velocityY: this.camera.velocityY,
+            wormhole: wormhole
+        };
+        
+        // Stop ship movement during traversal
+        this.camera.velocityX = 0;
+        this.camera.velocityY = 0;
+        
+        // Play dedicated wormhole traversal sound effect
+        this.soundManager.playWormholeTraversal();
+        
+        const destinationDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
+        console.log(`🌀 Starting wormhole traversal: ${wormhole.pairId} → destination ${destinationDesignation}`);
+    }
+
+    updateTraversal(deltaTime: number): void {
+        if (!this.traversalDestination) return;
+        
+        this.traversalStartTime += deltaTime;
+        
+        // Complete traversal at midpoint (1 second in)
+        if (this.traversalStartTime >= this.traversalDuration / 2 && this.traversalStartTime - deltaTime < this.traversalDuration / 2) {
+            // Teleport to destination
+            this.camera.x = this.traversalDestination.x;
+            this.camera.y = this.traversalDestination.y;
+            
+            // Update chunks for new location
+            this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+            
+            // Show traversal notification
+            const destinationDesignation = this.traversalDestination.wormhole.designation === 'alpha' ? 'β' : 'α';
+            this.discoveryDisplay.addNotification(`Traversed to ${this.traversalDestination.wormhole.wormholeId}-${destinationDesignation}`);
+            
+            console.log(`🌀 Completed wormhole traversal to ${destinationDesignation}`);
+        }
+        
+        // End traversal
+        if (this.traversalStartTime >= this.traversalDuration) {
+            // Restore momentum
+            this.camera.velocityX = this.traversalDestination.velocityX;
+            this.camera.velocityY = this.traversalDestination.velocityY;
+            
+            // Reset traversal state
+            this.isTraversing = false;
+            this.traversalDestination = undefined;
+        }
+    }
+
     render(): void {
         this.renderer.clear();
+        
+        // Calculate fade alpha for traversal effect
+        let fadeAlpha = 0;
+        if (this.isTraversing) {
+            const progress = this.traversalStartTime / this.traversalDuration;
+            // Fade to black in first half, fade from black in second half
+            if (progress < 0.5) {
+                fadeAlpha = progress * 2; // 0 to 1
+            } else {
+                fadeAlpha = 2 - (progress * 2); // 1 to 0
+            }
+            fadeAlpha = Math.min(1, Math.max(0, fadeAlpha));
+        }
+        
         this.starField.render(this.renderer, this.camera);
         
         // Render celestial objects from active chunks
@@ -477,6 +605,13 @@ export class Game {
             obj.render(this.renderer, this.camera);
         }
         
+        // Render wormholes (prominent foreground layer, after stars)
+        for (const obj of activeObjects.wormholes) {
+            // Get destination preview objects for gravitational lensing
+            const destinationPreview = this.getDestinationPreviewObjects(obj);
+            obj.render(this.renderer, this.camera, destinationPreview);
+        }
+        
         this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars);
@@ -487,10 +622,110 @@ export class Game {
         const discoveredStars = this.chunkManager.getDiscoveredStars();
         const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
         const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae);
+        const discoveredWormholes = this.chunkManager.getDiscoveredWormholes();
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae, discoveredWormholes);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
+        
+        // Render traversal fade effect (on top of everything)
+        if (fadeAlpha > 0) {
+            const ctx = this.renderer.ctx;
+            ctx.fillStyle = `rgba(0, 0, 15, ${fadeAlpha})`; // Very dark blue-black
+            ctx.fillRect(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
+            
+            // Add subtle particle tunnel effect at peak fade
+            if (fadeAlpha > 0.8) {
+                this.renderTraversalTunnel(ctx, fadeAlpha);
+            }
+        }
+    }
+
+    renderTraversalTunnel(ctx: CanvasRenderingContext2D, intensity: number): void {
+        const centerX = this.renderer.canvas.width / 2;
+        const centerY = this.renderer.canvas.height / 2;
+        const time = this.traversalStartTime * 4; // Speed up animation
+        
+        // Draw subtle tunnel particles
+        for (let i = 0; i < 20; i++) {
+            const angle = (i / 20) * Math.PI * 2 + time;
+            const radius = 50 + (i * 15);
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            
+            const particleAlpha = (intensity - 0.8) * 5 * (1 - i / 20); // Fade outer particles
+            ctx.fillStyle = `rgba(100, 150, 255, ${particleAlpha})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    getDestinationPreviewObjects(wormhole: any): any[] {
+        // Get objects near the destination wormhole for gravitational lensing preview
+        if (!wormhole.twinX || !wormhole.twinY) return [];
+        
+        const destinationX = wormhole.twinX;
+        const destinationY = wormhole.twinY;
+        const previewRadius = 300; // 300 pixel radius around destination
+        
+        // Get all objects from chunks near the destination
+        const destinationObjects: any[] = [];
+        
+        // Sample objects from chunks around destination area
+        const chunkSize = 2000; // Should match ChunkManager.CHUNK_SIZE
+        const chunksToCheck = [
+            { x: Math.floor(destinationX / chunkSize), y: Math.floor(destinationY / chunkSize) },
+            { x: Math.floor((destinationX - chunkSize) / chunkSize), y: Math.floor(destinationY / chunkSize) },
+            { x: Math.floor((destinationX + chunkSize) / chunkSize), y: Math.floor(destinationY / chunkSize) },
+            { x: Math.floor(destinationX / chunkSize), y: Math.floor((destinationY - chunkSize) / chunkSize) },
+            { x: Math.floor(destinationX / chunkSize), y: Math.floor((destinationY + chunkSize) / chunkSize) },
+        ];
+        
+        for (const chunkCoord of chunksToCheck) {
+            const chunkKey = `${chunkCoord.x},${chunkCoord.y}`;
+            
+            // Ensure chunk exists for preview
+            this.chunkManager.ensureChunkExists(chunkCoord.x, chunkCoord.y);
+            const chunk = this.chunkManager.getChunk(chunkKey);
+            
+            if (chunk) {
+                // Check all object types within preview radius
+                const allObjects = [
+                    ...chunk.celestialStars,
+                    ...chunk.planets, 
+                    ...chunk.moons,
+                    ...chunk.nebulae,
+                    ...chunk.asteroidGardens,
+                    ...chunk.wormholes.filter((w: any) => w.uniqueId !== wormhole.uniqueId) // Exclude self
+                ];
+                
+                for (const obj of allObjects) {
+                    const distance = Math.sqrt(
+                        Math.pow(obj.x - destinationX, 2) + Math.pow(obj.y - destinationY, 2)
+                    );
+                    
+                    if (distance <= previewRadius) {
+                        // Create preview object with relative positioning
+                        const relativeX = obj.x - destinationX;
+                        const relativeY = obj.y - destinationY;
+                        
+                        destinationObjects.push({
+                            ...obj,
+                            relativeX,
+                            relativeY,
+                            distance,
+                            type: obj.type
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Sort by distance (closest first) and limit to prevent performance issues
+        return destinationObjects
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 8); // Limit to 8 objects for performance
     }
 }
 

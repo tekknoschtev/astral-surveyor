@@ -29,12 +29,13 @@ window.SeededRandom = SeededRandom; // 27 total window exports
 - Manual sync burden when updating production files
 
 **Browser Loading Pattern:**
+
 ```html
 <!-- Dependency order manually managed -->
-<script src="js/utils/random.js"></script>
-<script src="js/naming/naming.js"></script>
+<script src="../js/utils/random.js"></script>
+<script src="../js/naming/naming.js"></script>
 <!-- ... 12 more files ... -->
-<script src="js/game.js"></script>
+<script src="../js/game.js"></script>
 ```
 
 ### Current State Analysis
