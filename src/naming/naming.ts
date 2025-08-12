@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids';
 }
 
 interface Star extends CelestialObject {
@@ -293,6 +293,41 @@ export class NamingService {
     }
 
     /**
+     * Generate asteroid garden name following astronomical field/belt naming conventions
+     * Examples: "ASV-1234 Belt A", "ASV-1234 Field", "ASV-1234 Cluster"
+     */
+    generateAsteroidGardenName(garden: any): string {
+        // Generate base catalog number using star catalog system
+        const catalogNumber = this.generateStarCatalogNumber(garden.x, garden.y);
+        const baseName = `${this.catalogPrefix}-${catalogNumber}`;
+        
+        // Select designation suffix based on garden type
+        let suffix: string;
+        switch (garden.gardenType) {
+            case 'metallic':
+                suffix = 'Belt A'; // Classic asteroid belt designation
+                break;
+            case 'crystalline':
+                suffix = 'Field C'; // Crystalline field
+                break;
+            case 'carbonaceous':
+                suffix = 'Belt B'; // Secondary belt
+                break;
+            case 'icy':
+                suffix = 'Ring'; // Ice ring system
+                break;
+            case 'rare_minerals':
+                suffix = 'Cluster'; // Rare mineral cluster
+                break;
+            default:
+                suffix = 'Field'; // Generic field designation
+                break;
+        }
+        
+        return `${baseName} ${suffix}`;
+    }
+
+    /**
      * Calculate moon's index around its parent planet based on orbital distance
      */
     calculateMoonIndex(moon: Moon): number {
@@ -352,6 +387,8 @@ export class NamingService {
             return this.generateNebulaName(object as Nebula);
         } else if (object.type === 'wormhole') {
             return this.generateWormholeName(object as Wormhole);
+        } else if (object.type === 'asteroids') {
+            return this.generateAsteroidGardenName(object);
         }
         
         return 'Unknown Object';
@@ -402,6 +439,16 @@ export class NamingService {
                 type: 'Stable Traversable Wormhole',
                 classification: `Einstein-Rosen Bridge (Paired with ${wormhole.wormholeId}-${twinDesignation})`
             };
+        } else if (object.type === 'asteroids') {
+            const garden = object;
+            const gardenName = this.generateAsteroidGardenName(garden);
+            const coordName = this.generateCoordinateDesignation(garden.x, garden.y);
+            return {
+                catalog: gardenName,
+                coordinate: coordName,
+                type: garden.gardenTypeData?.name || 'Asteroid Garden',
+                classification: this.getAsteroidGardenClassification(garden.gardenType)
+            };
         }
         
         return null;
@@ -423,6 +470,10 @@ export class NamingService {
         } else if (object.type === 'wormhole') {
             // All wormholes are extremely notable due to ultra-rarity (0.0005% spawn chance)
             return true;
+        } else if (object.type === 'asteroids') {
+            // Rare mineral, crystalline, and icy gardens are notable
+            const rareGardens = ['rare_minerals', 'crystalline', 'icy'];
+            return rareGardens.includes(object.gardenType);
         }
         
         return false;
@@ -440,5 +491,20 @@ export class NamingService {
         };
         
         return nebulaType ? classifications[nebulaType] || null : null;
+    }
+
+    /**
+     * Get asteroid garden classification for scientific designation
+     */
+    private getAsteroidGardenClassification(gardenType?: string): string | null {
+        const classifications: Record<string, string> = {
+            'metallic': 'M-Type Belt',
+            'crystalline': 'C-Type Field',
+            'carbonaceous': 'C-Type Belt',
+            'icy': 'K-Type Ring',
+            'rare_minerals': 'X-Type Cluster'
+        };
+        
+        return gardenType ? classifications[gardenType] || null : null;
     }
 }
