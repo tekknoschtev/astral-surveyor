@@ -64,6 +64,7 @@ interface DiscoveryData {
     starTypeName?: string;
     planetTypeName?: string;
     nebulaType?: string;
+    nebulaTypeData?: any;
     gardenType?: string;
     gardenTypeData?: any;
     objectName?: string;
@@ -653,6 +654,7 @@ export class ChunkManager {
             discoveryData.planetTypeName = object.planetTypeName;
         } else if (object.type === 'nebula' && object.nebulaType) {
             discoveryData.nebulaType = object.nebulaType;
+            discoveryData.nebulaTypeData = object.nebulaTypeData;
         } else if (object.type === 'asteroids' && object.gardenType) {
             discoveryData.gardenType = object.gardenType;
             discoveryData.gardenTypeData = object.gardenTypeData;
@@ -878,19 +880,59 @@ export class ChunkManager {
                 if (parts.length >= 3) {
                     const nebulaX = parseInt(parts[1]);
                     const nebulaY = parseInt(parts[2]);
-                    const nebula = this.findNebulaByPosition(nebulaX, nebulaY);
-                
-                    if (nebula) {
-                    const nebulaData: DiscoveredNebula = {
-                        x: nebula.x,
-                        y: nebula.y,
-                        nebulaType: nebula.nebulaType,
-                        nebulaTypeData: nebula.nebulaTypeData,
-                        objectName: discoveryData.objectName,
-                        timestamp: discoveryData.timestamp
-                    };
                     
-                    discoveredNebulae.push(nebulaData);
+                    // Find the nebula in active chunks or reconstruct minimal data
+                    let nebulaData: DiscoveredNebula | null = null;
+                    
+                    // Check if nebula is in currently active chunks
+                    const nebula = this.findNebulaByPosition(nebulaX, nebulaY);
+                    if (nebula) {
+                        nebulaData = {
+                            x: nebula.x,
+                            y: nebula.y,
+                            nebulaType: nebula.nebulaType,
+                            nebulaTypeData: nebula.nebulaTypeData,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    // If not in active chunks, use stored discovery data
+                    if (!nebulaData) {
+                        // Use stored nebula type from discovery data, fallback to regeneration if not available
+                        let nebulaType = discoveryData.nebulaType;
+                        let nebulaTypeData = discoveryData.nebulaTypeData;
+                        
+                        if (!nebulaType) {
+                            // Fallback: regenerate nebula type deterministically
+                            const chunkX = Math.floor(nebulaX / this.chunkSize);
+                            const chunkY = Math.floor(nebulaY / this.chunkSize);
+                            const nebulaeSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
+                            const nebulaeRng = new SeededRandom(nebulaeSeed);
+                            
+                            // Regenerate nebula type using the same logic as in generateNebulaeForChunk
+                            const nebulaTypes = ['emission', 'reflection', 'planetary', 'dark'];
+                            nebulaType = nebulaTypes[nebulaeRng.nextInt(0, nebulaTypes.length - 1)];
+                            
+                            // Generate basic type data
+                            nebulaTypeData = {
+                                name: `${nebulaType.charAt(0).toUpperCase()}${nebulaType.slice(1)} Nebula`,
+                                colors: this.getBasicNebulaColors(nebulaType)
+                            };
+                        }
+                        
+                        nebulaData = {
+                            x: nebulaX,
+                            y: nebulaY,
+                            nebulaType: nebulaType!,
+                            nebulaTypeData: nebulaTypeData,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    if (nebulaData) {
+                        discoveredNebulae.push(nebulaData);
                     }
                 }
             }
@@ -1510,6 +1552,18 @@ export class ChunkManager {
         this.activeChunks.clear();
         this.discoveredObjects.clear();
         console.log('🌌 All chunks cleared for universe regeneration');
+    }
+    
+    // Helper method to get basic nebula colors for fallback reconstruction
+    private getBasicNebulaColors(nebulaType: string): string[] {
+        const colorSchemes: Record<string, string[]> = {
+            'emission': ['#ff6b6b', '#ff8e53', '#ff6b9d'],
+            'reflection': ['#4ecdc4', '#45b7d1', '#96ceb4'],
+            'planetary': ['#a8e6cf', '#7fcdcd', '#81ecec'],
+            'dark': ['#2c3e50', '#34495e', '#4a6741']
+        };
+        
+        return colorSchemes[nebulaType] || colorSchemes['emission'];
     }
 }
 
