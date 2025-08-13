@@ -56,6 +56,18 @@ interface WormholeLike {
     timestamp?: number;
 }
 
+interface AsteroidGardenLike {
+    x: number;
+    y: number;
+    gardenType: string;
+    gardenTypeData?: {
+        name: string;
+        colors?: string[];
+    };
+    objectName?: string;
+    timestamp?: number;
+}
+
 interface NamingService {
     generateDisplayName(object: any): string;
     generateFullDesignation(object: any): {
@@ -85,6 +97,8 @@ export class StellarMap {
     hoveredNebula: NebulaLike | null;
     selectedWormhole: WormholeLike | null;
     hoveredWormhole: WormholeLike | null;
+    selectedAsteroidGarden: AsteroidGardenLike | null;
+    hoveredAsteroidGarden: AsteroidGardenLike | null;
     namingService: NamingService | null;
     
     // Interactive panning state
@@ -117,6 +131,8 @@ export class StellarMap {
         this.hoveredNebula = null;
         this.selectedWormhole = null;
         this.hoveredWormhole = null;
+        this.selectedAsteroidGarden = null;
+        this.hoveredAsteroidGarden = null;
         this.namingService = null; // Will be injected
         
         // Interactive panning state
@@ -266,7 +282,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -278,6 +294,7 @@ export class StellarMap {
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedAsteroidGarden = null;
             return false;
         }
         
@@ -285,9 +302,11 @@ export class StellarMap {
         let closestStar: StarLike | null = null;
         let closestPlanet: PlanetLike | null = null;
         let closestNebula: NebulaLike | null = null;
+        let closestAsteroidGarden: AsteroidGardenLike | null = null;
         let closestStarDistance = Infinity;
         let closestPlanetDistance = Infinity;
         let closestNebulaDistance = Infinity;
+        let closestAsteroidGardenDistance = Infinity;
         const clickThreshold = 10; // pixels
         
         // Check for planet clicks first (in detail view)
@@ -353,23 +372,53 @@ export class StellarMap {
             }
         }
         
-        // Select the closest object (prioritize order: planets > nebulae > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance)) {
+        // Check for asteroid garden clicks (visible at all zoom levels)
+        if (discoveredAsteroidGardens) {
+            for (const garden of discoveredAsteroidGardens) {
+                const gardenMapX = mapX + mapWidth/2 + (garden.x - this.centerX) * worldToMapScale;
+                const gardenMapY = mapY + mapHeight/2 + (garden.y - this.centerY) * worldToMapScale;
+                
+                // Check if asteroid garden is within map bounds and click threshold
+                // Use moderate threshold for asteroid gardens
+                const gardenClickThreshold = Math.max(12, clickThreshold);
+                if (gardenMapX >= mapX && gardenMapX <= mapX + mapWidth && 
+                    gardenMapY >= mapY && gardenMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - gardenMapX)**2 + (mouseY - gardenMapY)**2);
+                    if (distance <= gardenClickThreshold && distance < closestAsteroidGardenDistance) {
+                        closestAsteroidGarden = garden;
+                        closestAsteroidGardenDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Select the closest object (prioritize order: planets > asteroid gardens > nebulae > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestAsteroidGardenDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
+            this.selectedNebula = null;
+            this.selectedAsteroidGarden = null;
+        } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= Math.min(closestStarDistance, closestNebulaDistance)) {
+            this.selectedAsteroidGarden = closestAsteroidGarden;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
             this.selectedNebula = null;
         } else if (closestNebula && closestNebulaDistance <= closestStarDistance) {
             this.selectedNebula = closestNebula;
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedAsteroidGarden = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedAsteroidGarden = null;
         } else {
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedAsteroidGarden = null;
         }
         
         return true; // Consumed the event
@@ -386,12 +435,13 @@ export class StellarMap {
         this.hoveredPlanet = null;
         this.hoveredNebula = null;
         this.hoveredWormhole = null;
+        this.hoveredAsteroidGarden = null;
         
         // Update cursor based on hover state
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -403,6 +453,7 @@ export class StellarMap {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredAsteroidGarden = null;
             this.updateCursor(canvas);
             return;
         }
@@ -411,9 +462,11 @@ export class StellarMap {
         let closestStar: StarLike | null = null;
         let closestPlanet: PlanetLike | null = null;
         let closestNebula: NebulaLike | null = null;
+        let closestAsteroidGarden: AsteroidGardenLike | null = null;
         let closestStarDistance = Infinity;
         let closestPlanetDistance = Infinity;
         let closestNebulaDistance = Infinity;
+        let closestAsteroidGardenDistance = Infinity;
         const hoverThreshold = 15; // Slightly larger than click threshold for better UX
         
         // Check for planet hover first (in detail view)
@@ -479,23 +532,53 @@ export class StellarMap {
             }
         }
         
-        // Set hover state (prioritize order: planets > nebulae > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance)) {
+        // Check for asteroid garden hover (visible at all zoom levels)
+        if (discoveredAsteroidGardens) {
+            for (const garden of discoveredAsteroidGardens) {
+                const gardenMapX = mapX + mapWidth/2 + (garden.x - this.centerX) * worldToMapScale;
+                const gardenMapY = mapY + mapHeight/2 + (garden.y - this.centerY) * worldToMapScale;
+                
+                // Check if asteroid garden is within map bounds and hover threshold
+                // Use moderate threshold for asteroid gardens (between planets and nebulae)
+                const gardenHoverThreshold = Math.max(18, hoverThreshold);
+                if (gardenMapX >= mapX && gardenMapX <= mapX + mapWidth && 
+                    gardenMapY >= mapY && gardenMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - gardenMapX)**2 + (mouseY - gardenMapY)**2);
+                    if (distance <= gardenHoverThreshold && distance < closestAsteroidGardenDistance) {
+                        closestAsteroidGarden = garden;
+                        closestAsteroidGardenDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Set hover state (prioritize order: planets > asteroid gardens > nebulae > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestAsteroidGardenDistance)) {
             this.hoveredPlanet = closestPlanet;
             this.hoveredStar = null;
+            this.hoveredNebula = null;
+            this.hoveredAsteroidGarden = null;
+        } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= Math.min(closestStarDistance, closestNebulaDistance)) {
+            this.hoveredAsteroidGarden = closestAsteroidGarden;
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
             this.hoveredNebula = null;
         } else if (closestNebula && closestNebulaDistance <= closestStarDistance) {
             this.hoveredNebula = closestNebula;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
+            this.hoveredAsteroidGarden = null;
         } else if (closestStar) {
             this.hoveredStar = closestStar;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredAsteroidGarden = null;
         } else {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredAsteroidGarden = null;
         }
         
         // Update cursor based on hover state
@@ -503,7 +586,7 @@ export class StellarMap {
     }
     
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole) {
+        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden) {
             canvas.style.cursor = 'pointer';
         } else if (this.visible) {
             // Use crosshair for map navigation when visible
@@ -563,7 +646,7 @@ export class StellarMap {
         this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.01);
     }
 
-    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null): void {
+    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -626,6 +709,14 @@ export class StellarMap {
             this.renderDiscoveredWormholes(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredWormholes);
         } else {
             console.log(`[StellarMap] No wormholes to render: ${discoveredWormholes ? discoveredWormholes.length : 'null'}`);
+        }
+
+        // Draw discovered asteroid gardens (scattered fields of glittering rocks)
+        if (discoveredAsteroidGardens && discoveredAsteroidGardens.length > 0) {
+            console.log(`[StellarMap] Rendering ${discoveredAsteroidGardens.length} asteroid gardens on map`);
+            this.renderDiscoveredAsteroidGardens(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredAsteroidGardens);
+        } else {
+            console.log(`[StellarMap] No asteroid gardens to render: ${discoveredAsteroidGardens ? discoveredAsteroidGardens.length : 'null'}`);
         }
         
         // Draw origin (0,0) marker
@@ -1734,6 +1825,148 @@ export class StellarMap {
             console.warn('Failed to generate planet name:', error);
             return `Planet ${planet.planetIndex + 1}`;
         }
+    }
+
+    renderDiscoveredAsteroidGardens(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredAsteroidGardens: AsteroidGardenLike[]): void {
+        if (!discoveredAsteroidGardens) return;
+
+        for (const garden of discoveredAsteroidGardens) {
+            // Convert world coordinates to map coordinates
+            const gardenMapX = mapX + mapWidth/2 + (garden.x - this.centerX) * scale;
+            const gardenMapY = mapY + mapHeight/2 + (garden.y - this.centerY) * scale;
+            
+            // Calculate asteroid garden size (medium-sized objects, smaller than nebulae)
+            const baseSize = 5; // Larger than planets but smaller than nebulae
+            const gardenSize = Math.max(3, baseSize * this.zoomLevel * 0.6);
+            
+            // Check if asteroid garden is within map bounds (with margin for size)
+            const margin = gardenSize + 10;
+            if (gardenMapX >= mapX - margin && gardenMapX <= mapX + mapWidth + margin && 
+                gardenMapY >= mapY - margin && gardenMapY <= mapY + mapHeight + margin) {
+                
+                // Get asteroid garden colors based on type
+                const gardenColors = this.getAsteroidGardenColors(garden);
+                
+                // Draw asteroid garden as scattered glittering rocks
+                ctx.save();
+                
+                // Draw multiple small circles to represent scattered asteroids
+                const rockCount = Math.min(8, Math.max(3, Math.floor(gardenSize / 2)));
+                const fieldRadius = gardenSize * 1.5;
+                
+                for (let i = 0; i < rockCount; i++) {
+                    // Use deterministic positioning based on garden position and index
+                    const angle = (i / rockCount) * Math.PI * 2 + (garden.x + garden.y) * 0.1;
+                    const distance = (Math.sin((garden.x + garden.y + i) * 0.3) * 0.5 + 0.5) * fieldRadius;
+                    
+                    const rockX = gardenMapX + Math.cos(angle) * distance;
+                    const rockY = gardenMapY + Math.sin(angle) * distance;
+                    const rockSize = Math.max(1, gardenSize * 0.3 * (0.7 + 0.3 * Math.sin((garden.x + garden.y + i) * 0.7)));
+                    
+                    // Draw asteroid rock
+                    ctx.fillStyle = gardenColors.primary;
+                    ctx.beginPath();
+                    ctx.arc(rockX, rockY, rockSize, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Add glitter effect for some rocks
+                    if (i % 2 === 0) {
+                        ctx.fillStyle = gardenColors.glitter;
+                        ctx.beginPath();
+                        ctx.arc(rockX + rockSize * 0.3, rockY - rockSize * 0.3, rockSize * 0.4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                // Draw central marker for the garden
+                ctx.fillStyle = gardenColors.center;
+                ctx.beginPath();
+                ctx.arc(gardenMapX, gardenMapY, Math.max(1, gardenSize * 0.2), 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw label if zoomed in enough
+                if (this.zoomLevel > 1.5) {
+                    this.renderAsteroidGardenLabel(ctx, garden, gardenMapX, gardenMapY);
+                }
+                
+                ctx.restore();
+            }
+        }
+    }
+
+    getAsteroidGardenColors(garden: AsteroidGardenLike): {primary: string, glitter: string, center: string} {
+        // Color scheme based on garden type
+        const colors = garden.gardenTypeData?.colors || ['#888888', '#999999', '#777777'];
+        
+        switch (garden.gardenType) {
+            case 'metallic':
+                return {
+                    primary: '#a0a0a0',
+                    glitter: '#e8e8e8',
+                    center: '#c0c0c0'
+                };
+            case 'crystalline':
+                return {
+                    primary: '#d0d0ff',
+                    glitter: '#ffffff',
+                    center: '#e8e8ff'
+                };
+            case 'icy':
+                return {
+                    primary: '#c0e0ff',
+                    glitter: '#ffffff',
+                    center: '#e0f0ff'
+                };
+            case 'rare_minerals':
+                return {
+                    primary: '#ffcc00',
+                    glitter: '#ffffaa',
+                    center: '#ffd700'
+                };
+            case 'volcanic':
+                return {
+                    primary: '#aa3300',
+                    glitter: '#ff6600',
+                    center: '#cc4400'
+                };
+            case 'organic':
+                return {
+                    primary: '#8b5a3c',
+                    glitter: '#d4af37',
+                    center: '#6b4423'
+                };
+            default:
+                // Use first color from gardenTypeData if available
+                const primaryColor = colors[0] || '#888888';
+                return {
+                    primary: primaryColor,
+                    glitter: '#ffffff',
+                    center: primaryColor
+                };
+        }
+    }
+
+    renderAsteroidGardenLabel(ctx: CanvasRenderingContext2D, garden: AsteroidGardenLike, gardenMapX: number, gardenMapY: number): void {
+        if (!this.namingService) return;
+        
+        const gardenName = garden.objectName || this.namingService.generateDisplayName(garden);
+        
+        ctx.save();
+        ctx.fillStyle = '#e8f4fd';
+        ctx.font = '11px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        
+        // Draw text background for readability
+        const textWidth = ctx.measureText(gardenName).width;
+        const bgPadding = 4;
+        ctx.fillStyle = '#000000C0';
+        ctx.fillRect(gardenMapX - textWidth/2 - bgPadding, gardenMapY + 16, textWidth + bgPadding*2, 14);
+        
+        // Draw label text
+        ctx.fillStyle = '#e8f4fd';
+        ctx.fillText(gardenName, gardenMapX, gardenMapY + 27);
+        
+        ctx.restore();
     }
 }
 

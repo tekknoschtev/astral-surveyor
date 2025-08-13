@@ -64,6 +64,8 @@ interface DiscoveryData {
     starTypeName?: string;
     planetTypeName?: string;
     nebulaType?: string;
+    gardenType?: string;
+    gardenTypeData?: any;
     objectName?: string;
 }
 
@@ -91,6 +93,18 @@ interface DiscoveredNebula {
     y: number;
     nebulaType: string;
     nebulaTypeData: {
+        name: string;
+        colors?: string[];
+    };
+    objectName?: string;
+    timestamp: number;
+}
+
+interface DiscoveredAsteroidGarden {
+    x: number;
+    y: number;
+    gardenType: string;
+    gardenTypeData: {
         name: string;
         colors?: string[];
     };
@@ -639,6 +653,9 @@ export class ChunkManager {
             discoveryData.planetTypeName = object.planetTypeName;
         } else if (object.type === 'nebula' && object.nebulaType) {
             discoveryData.nebulaType = object.nebulaType;
+        } else if (object.type === 'asteroids' && object.gardenType) {
+            discoveryData.gardenType = object.gardenType;
+            discoveryData.gardenTypeData = object.gardenTypeData;
         }
         
         // Store the generated name if provided
@@ -925,6 +942,59 @@ export class ChunkManager {
         return discoveredWormholes;
     }
 
+    getDiscoveredAsteroidGardens(): DiscoveredAsteroidGarden[] {
+        const discoveredAsteroidGardens: DiscoveredAsteroidGarden[] = [];
+        
+        // Get all discovered objects that are asteroid gardens  
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('asteroids_') && discoveryData.gardenType) {
+                // Extract coordinates from asteroid garden ID 
+                // Format: asteroids_x_y (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const gardenX = parseInt(parts[1]);
+                    const gardenY = parseInt(parts[2]);
+                    const garden = this.findAsteroidGardenByPosition(gardenX, gardenY);
+                
+                    if (garden) {
+                        const gardenData: DiscoveredAsteroidGarden = {
+                            x: garden.x,
+                            y: garden.y,
+                            gardenType: garden.gardenType,
+                            gardenTypeData: garden.gardenTypeData,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                        
+                        discoveredAsteroidGardens.push(gardenData);
+                    } else {
+                        // Fallback for asteroid gardens in inactive chunks 
+                        // Use stored discovery data with basic color scheme
+                        const fallbackGardenData: DiscoveredAsteroidGarden = {
+                            x: gardenX,
+                            y: gardenY,
+                            gardenType: discoveryData.gardenType!,
+                            gardenTypeData: discoveryData.gardenTypeData || {
+                                name: discoveryData.gardenType! + ' Asteroid Garden',
+                                colors: this.getBasicGardenColors(discoveryData.gardenType!)
+                            },
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                        
+                        discoveredAsteroidGardens.push(fallbackGardenData);
+                        console.log(`[ChunkManager] Using fallback data for asteroid garden at (${gardenX}, ${gardenY}) - chunk not active`);
+                    }
+                }
+            }
+        }
+        
+        // Sort by discovery time (most recent first)
+        discoveredAsteroidGardens.sort((a, b) => b.timestamp - a.timestamp);
+        console.log(`[ChunkManager] getDiscoveredAsteroidGardens returning ${discoveredAsteroidGardens.length} asteroid gardens`);
+        return discoveredAsteroidGardens;
+    }
+
     // Helper method to find a nebula by its position in active chunks  
     private findNebulaByPosition(x: number, y: number): any | null {
         for (const chunk of this.activeChunks.values()) {
@@ -949,6 +1019,32 @@ export class ChunkManager {
             }
         }
         return null;
+    }
+
+    // Helper method to find an asteroid garden by its position in active chunks
+    private findAsteroidGardenByPosition(x: number, y: number): any | null {
+        for (const chunk of this.activeChunks.values()) {
+            for (const garden of chunk.asteroidGardens) {
+                // Check if asteroid garden position matches (using floor to match getObjectId)
+                if (Math.floor(garden.x) === x && Math.floor(garden.y) === y) {
+                    return garden;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Helper method to get basic colors for asteroid garden types (fallback when chunk not active)
+    private getBasicGardenColors(gardenType: string): string[] {
+        const basicColors: Record<string, string[]> = {
+            metallic: ['#8c8c8c', '#a0a0a0', '#7a7a7a'],
+            crystalline: ['#e8e8ff', '#d0d0ff', '#c0c0ff'],
+            icy: ['#e0f0ff', '#c0e0ff', '#a0d0ff'],
+            rare_minerals: ['#ffd700', '#ffcc00', '#ffaa00'],
+            volcanic: ['#cc4400', '#aa3300', '#882200'],
+            organic: ['#6b4423', '#8b5a3c', '#5a3a1a']
+        };
+        return basicColors[gardenType] || ['#888888', '#999999', '#777777'];
     }
     
     // Score a potential star system position based on distance from existing systems
