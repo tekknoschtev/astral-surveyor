@@ -263,7 +263,8 @@ export class Game {
                 const discoveredStars = this.chunkManager.getDiscoveredStars();
                 const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
                 const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discoveredStars, this.renderer.canvas, discoveredPlanets, discoveredNebulae);
+                const discoveredAsteroidGardens = this.chunkManager.getDiscoveredAsteroidGardens();
+                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discoveredStars, this.renderer.canvas, discoveredPlanets, discoveredNebulae, discoveredAsteroidGardens);
             }
         }
         
@@ -278,7 +279,8 @@ export class Game {
             const discoveredStars = this.chunkManager.getDiscoveredStars();
             const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
             const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discoveredStars, discoveredPlanets, discoveredNebulae);
+            const discoveredAsteroidGardens = this.chunkManager.getDiscoveredAsteroidGardens();
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discoveredStars, discoveredPlanets, discoveredNebulae, discoveredAsteroidGardens);
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);
@@ -796,7 +798,8 @@ export class Game {
         const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
         const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
         const discoveredWormholes = this.chunkManager.getDiscoveredWormholes();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae, discoveredWormholes);
+        const discoveredAsteroidGardens = this.chunkManager.getDiscoveredAsteroidGardens();
+        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae, discoveredWormholes, discoveredAsteroidGardens);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
