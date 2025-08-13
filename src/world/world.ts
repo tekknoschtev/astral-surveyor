@@ -940,7 +940,6 @@ export class ChunkManager {
         
         // Sort by discovery time (most recent first)
         discoveredNebulae.sort((a, b) => b.timestamp - a.timestamp);
-        console.log(`[ChunkManager] getDiscoveredNebulae returning ${discoveredNebulae.length} nebulae`);
         return discoveredNebulae;
     }
 
@@ -980,7 +979,6 @@ export class ChunkManager {
         
         // Sort by discovery time (most recent first)
         discoveredWormholes.sort((a, b) => b.timestamp - a.timestamp);
-        console.log(`[ChunkManager] getDiscoveredWormholes returning ${discoveredWormholes.length} wormholes`);
         return discoveredWormholes;
     }
 
@@ -1033,7 +1031,6 @@ export class ChunkManager {
         
         // Sort by discovery time (most recent first)
         discoveredAsteroidGardens.sort((a, b) => b.timestamp - a.timestamp);
-        console.log(`[ChunkManager] getDiscoveredAsteroidGardens returning ${discoveredAsteroidGardens.length} asteroid gardens`);
         return discoveredAsteroidGardens;
     }
 
