@@ -118,6 +118,19 @@ interface DiscoveredWormhole {
     timestamp: number;
 }
 
+interface DiscoveredAsteroidGarden {
+    x: number;
+    y: number;
+    gardenType: string;
+    gardenTypeData?: {
+        name: string;
+        colors?: string[];
+        accentColors?: string[];
+    };
+    objectName?: string;
+    timestamp: number;
+}
+
 interface CompanionWeight {
     type: any;
     weight: number;
@@ -861,19 +874,53 @@ export class ChunkManager {
                 if (parts.length >= 3) {
                     const nebulaX = parseInt(parts[1]);
                     const nebulaY = parseInt(parts[2]);
-                    const nebula = this.findNebulaByPosition(nebulaX, nebulaY);
-                
-                    if (nebula) {
-                    const nebulaData: DiscoveredNebula = {
-                        x: nebula.x,
-                        y: nebula.y,
-                        nebulaType: nebula.nebulaType,
-                        nebulaTypeData: nebula.nebulaTypeData,
-                        objectName: discoveryData.objectName,
-                        timestamp: discoveryData.timestamp
-                    };
                     
-                    discoveredNebulae.push(nebulaData);
+                    // Find the nebula in active chunks or reconstruct minimal data
+                    let nebulaData: DiscoveredNebula | null = null;
+                    
+                    // Check if nebula is in currently active chunks
+                    const nebula = this.findNebulaByPosition(nebulaX, nebulaY);
+                    if (nebula) {
+                        nebulaData = {
+                            x: nebula.x,
+                            y: nebula.y,
+                            nebulaType: nebula.nebulaType,
+                            nebulaTypeData: nebula.nebulaTypeData,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    } else {
+                        // Fallback: use stored nebula type from discovery data
+                        let nebulaType = discoveryData.nebulaType;
+                        
+                        if (!nebulaType) {
+                            // If no stored nebula type, regenerate deterministically as last resort
+                            // This should rarely happen with properly saved data
+                            const chunkX = Math.floor(nebulaX / this.chunkSize);
+                            const chunkY = Math.floor(nebulaY / this.chunkSize);
+                            const nebulaeSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
+                            const nebulaeRng = new SeededRandom(nebulaeSeed);
+                            
+                            // This is a simplified approximation - we can't perfectly recreate the exact RNG state
+                            // without knowing which nebula number this was in the chunk generation sequence
+                            nebulaType = selectNebulaType(nebulaeRng);
+                        }
+                        
+                        nebulaData = {
+                            x: nebulaX,
+                            y: nebulaY,
+                            nebulaType: nebulaType,
+                            nebulaTypeData: {
+                                name: nebulaType,
+                                colors: undefined // Will be looked up by the rendering system
+                            },
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    if (nebulaData) {
+                        discoveredNebulae.push(nebulaData);
                     }
                 }
             }
@@ -881,7 +928,6 @@ export class ChunkManager {
         
         // Sort by discovery time (most recent first)
         discoveredNebulae.sort((a, b) => b.timestamp - a.timestamp);
-        console.log(`[ChunkManager] getDiscoveredNebulae returning ${discoveredNebulae.length} nebulae`);
         return discoveredNebulae;
     }
 
@@ -898,10 +944,14 @@ export class ChunkManager {
                     const wormholeX = parseInt(parts[1]);
                     const wormholeY = parseInt(parts[2]);
                     const designation = parts[3] as 'alpha' | 'beta';
+                    
+                    // Find the wormhole in active chunks or reconstruct minimal data
+                    let wormholeData: DiscoveredWormhole | null = null;
+                    
+                    // Check if wormhole is in currently active chunks
                     const wormhole = this.findWormholeByPosition(wormholeX, wormholeY, designation);
-                
                     if (wormhole) {
-                        const wormholeData: DiscoveredWormhole = {
+                        wormholeData = {
                             x: wormhole.x,
                             y: wormhole.y,
                             wormholeId: wormhole.wormholeId,
@@ -912,7 +962,28 @@ export class ChunkManager {
                             objectName: discoveryData.objectName,
                             timestamp: discoveryData.timestamp
                         };
+                    } else {
+                        // Fallback: reconstruct basic wormhole data (simplified for now)
+                        // TODO: Implement full deterministic wormhole reconstruction including pair location
+                        // For now, provide minimal data to keep wormhole visible on map
+                        const chunkX = Math.floor(wormholeX / this.chunkSize);
+                        const chunkY = Math.floor(wormholeY / this.chunkSize);
+                        const fallbackWormholeId = `wh-${chunkX}-${chunkY}`;
                         
+                        wormholeData = {
+                            x: wormholeX,
+                            y: wormholeY,
+                            wormholeId: fallbackWormholeId,
+                            designation: designation,
+                            pairId: `${fallbackWormholeId}-${designation === 'alpha' ? 'α' : 'β'}`,
+                            twinX: 0, // TODO: Calculate deterministically
+                            twinY: 0, // TODO: Calculate deterministically
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    if (wormholeData) {
                         discoveredWormholes.push(wormholeData);
                     }
                 }
@@ -921,8 +992,63 @@ export class ChunkManager {
         
         // Sort by discovery time (most recent first)
         discoveredWormholes.sort((a, b) => b.timestamp - a.timestamp);
-        console.log(`[ChunkManager] getDiscoveredWormholes returning ${discoveredWormholes.length} wormholes`);
         return discoveredWormholes;
+    }
+
+    getDiscoveredAsteroidGardens(): DiscoveredAsteroidGarden[] {
+        const discoveredAsteroidGardens: DiscoveredAsteroidGarden[] = [];
+        
+        // Get all discovered objects that are asteroid gardens
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('asteroids_')) {
+                // Extract coordinates from asteroid garden ID
+                // Format: asteroids_x_y (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const asteroidX = parseInt(parts[1]);
+                    const asteroidY = parseInt(parts[2]);
+                    
+                    // Find the asteroid garden in active chunks or reconstruct minimal data
+                    let asteroidData: DiscoveredAsteroidGarden | null = null;
+                    
+                    // Check if asteroid garden is in currently active chunks
+                    const asteroidGarden = this.findAsteroidGardenByPosition(asteroidX, asteroidY);
+                    if (asteroidGarden) {
+                        asteroidData = {
+                            x: asteroidGarden.x,
+                            y: asteroidGarden.y,
+                            gardenType: asteroidGarden.gardenType,
+                            gardenTypeData: asteroidGarden.gardenTypeData,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    } else {
+                        // Fallback: provide basic asteroid garden data to keep it visible on map
+                        // We could store gardenType in discoveryData in the future for full reconstruction
+                        asteroidData = {
+                            x: asteroidX,
+                            y: asteroidY,
+                            gardenType: 'metallic', // Default fallback type
+                            gardenTypeData: {
+                                name: 'Asteroid Garden',
+                                colors: ['#8c8c8c', '#a0a0a0'],
+                                accentColors: ['#ffffff', '#e6e6e6']
+                            },
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                    }
+                    
+                    if (asteroidData) {
+                        discoveredAsteroidGardens.push(asteroidData);
+                    }
+                }
+            }
+        }
+        
+        // Sort by discovery time (most recent first)
+        discoveredAsteroidGardens.sort((a, b) => b.timestamp - a.timestamp);
+        return discoveredAsteroidGardens;
     }
 
     // Helper method to find a nebula by its position in active chunks  
@@ -945,6 +1071,19 @@ export class ChunkManager {
                 // Check if wormhole position and designation match (using floor to match getObjectId)
                 if (Math.floor(wormhole.x) === x && Math.floor(wormhole.y) === y && wormhole.designation === designation) {
                     return wormhole;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Helper method to find an asteroid garden by its position in active chunks  
+    private findAsteroidGardenByPosition(x: number, y: number): any | null {
+        for (const chunk of this.activeChunks.values()) {
+            for (const asteroidGarden of chunk.asteroidGardens) {
+                // Check if asteroid garden position matches (using floor to match getObjectId)
+                if (Math.floor(asteroidGarden.x) === x && Math.floor(asteroidGarden.y) === y) {
+                    return asteroidGarden;
                 }
             }
         }
