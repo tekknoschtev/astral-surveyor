@@ -64,6 +64,9 @@ interface DiscoveryData {
     starTypeName?: string;
     planetTypeName?: string;
     nebulaType?: string;
+    nebulaTypeData?: any;
+    gardenType?: string;
+    gardenTypeData?: any;
     objectName?: string;
 }
 
@@ -98,6 +101,18 @@ interface DiscoveredNebula {
     timestamp: number;
 }
 
+interface DiscoveredAsteroidGarden {
+    x: number;
+    y: number;
+    gardenType: string;
+    gardenTypeData: {
+        name: string;
+        colors?: string[];
+    };
+    objectName?: string;
+    timestamp: number;
+}
+
 interface DiscoveredMoon {
     x: number;
     y: number;
@@ -114,19 +129,6 @@ interface DiscoveredWormhole {
     pairId: string;
     twinX: number;
     twinY: number;
-    objectName?: string;
-    timestamp: number;
-}
-
-interface DiscoveredAsteroidGarden {
-    x: number;
-    y: number;
-    gardenType: string;
-    gardenTypeData?: {
-        name: string;
-        colors?: string[];
-        accentColors?: string[];
-    };
     objectName?: string;
     timestamp: number;
 }
@@ -652,6 +654,10 @@ export class ChunkManager {
             discoveryData.planetTypeName = object.planetTypeName;
         } else if (object.type === 'nebula' && object.nebulaType) {
             discoveryData.nebulaType = object.nebulaType;
+            discoveryData.nebulaTypeData = object.nebulaTypeData;
+        } else if (object.type === 'asteroids' && object.gardenType) {
+            discoveryData.gardenType = object.gardenType;
+            discoveryData.gardenTypeData = object.gardenTypeData;
         }
         
         // Store the generated name if provided
@@ -889,31 +895,37 @@ export class ChunkManager {
                             objectName: discoveryData.objectName,
                             timestamp: discoveryData.timestamp
                         };
-                    } else {
-                        // Fallback: use stored nebula type from discovery data
+                    }
+                    
+                    // If not in active chunks, use stored discovery data
+                    if (!nebulaData) {
+                        // Use stored nebula type from discovery data, fallback to regeneration if not available
                         let nebulaType = discoveryData.nebulaType;
+                        let nebulaTypeData = discoveryData.nebulaTypeData;
                         
                         if (!nebulaType) {
-                            // If no stored nebula type, regenerate deterministically as last resort
-                            // This should rarely happen with properly saved data
+                            // Fallback: regenerate nebula type deterministically
                             const chunkX = Math.floor(nebulaX / this.chunkSize);
                             const chunkY = Math.floor(nebulaY / this.chunkSize);
                             const nebulaeSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
                             const nebulaeRng = new SeededRandom(nebulaeSeed);
                             
-                            // This is a simplified approximation - we can't perfectly recreate the exact RNG state
-                            // without knowing which nebula number this was in the chunk generation sequence
-                            nebulaType = selectNebulaType(nebulaeRng);
+                            // Regenerate nebula type using the same logic as in generateNebulaeForChunk
+                            const nebulaTypes = ['emission', 'reflection', 'planetary', 'dark'];
+                            nebulaType = nebulaTypes[nebulaeRng.nextInt(0, nebulaTypes.length - 1)];
+                            
+                            // Generate basic type data
+                            nebulaTypeData = {
+                                name: `${nebulaType.charAt(0).toUpperCase()}${nebulaType.slice(1)} Nebula`,
+                                colors: this.getBasicNebulaColors(nebulaType)
+                            };
                         }
                         
                         nebulaData = {
                             x: nebulaX,
                             y: nebulaY,
-                            nebulaType: nebulaType,
-                            nebulaTypeData: {
-                                name: nebulaType,
-                                colors: undefined // Will be looked up by the rendering system
-                            },
+                            nebulaType: nebulaType!,
+                            nebulaTypeData: nebulaTypeData,
                             objectName: discoveryData.objectName,
                             timestamp: discoveryData.timestamp
                         };
@@ -944,14 +956,10 @@ export class ChunkManager {
                     const wormholeX = parseInt(parts[1]);
                     const wormholeY = parseInt(parts[2]);
                     const designation = parts[3] as 'alpha' | 'beta';
-                    
-                    // Find the wormhole in active chunks or reconstruct minimal data
-                    let wormholeData: DiscoveredWormhole | null = null;
-                    
-                    // Check if wormhole is in currently active chunks
                     const wormhole = this.findWormholeByPosition(wormholeX, wormholeY, designation);
+                
                     if (wormhole) {
-                        wormholeData = {
+                        const wormholeData: DiscoveredWormhole = {
                             x: wormhole.x,
                             y: wormhole.y,
                             wormholeId: wormhole.wormholeId,
@@ -962,28 +970,7 @@ export class ChunkManager {
                             objectName: discoveryData.objectName,
                             timestamp: discoveryData.timestamp
                         };
-                    } else {
-                        // Fallback: reconstruct basic wormhole data (simplified for now)
-                        // TODO: Implement full deterministic wormhole reconstruction including pair location
-                        // For now, provide minimal data to keep wormhole visible on map
-                        const chunkX = Math.floor(wormholeX / this.chunkSize);
-                        const chunkY = Math.floor(wormholeY / this.chunkSize);
-                        const fallbackWormholeId = `wh-${chunkX}-${chunkY}`;
                         
-                        wormholeData = {
-                            x: wormholeX,
-                            y: wormholeY,
-                            wormholeId: fallbackWormholeId,
-                            designation: designation,
-                            pairId: `${fallbackWormholeId}-${designation === 'alpha' ? 'α' : 'β'}`,
-                            twinX: 0, // TODO: Calculate deterministically
-                            twinY: 0, // TODO: Calculate deterministically
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-                    }
-                    
-                    if (wormholeData) {
                         discoveredWormholes.push(wormholeData);
                     }
                 }
@@ -998,49 +985,45 @@ export class ChunkManager {
     getDiscoveredAsteroidGardens(): DiscoveredAsteroidGarden[] {
         const discoveredAsteroidGardens: DiscoveredAsteroidGarden[] = [];
         
-        // Get all discovered objects that are asteroid gardens
+        // Get all discovered objects that are asteroid gardens  
         for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('asteroids_')) {
-                // Extract coordinates from asteroid garden ID
+            if (objId.startsWith('asteroids_') && discoveryData.gardenType) {
+                // Extract coordinates from asteroid garden ID 
                 // Format: asteroids_x_y (from getObjectId)
                 const parts = objId.split('_');
                 if (parts.length >= 3) {
-                    const asteroidX = parseInt(parts[1]);
-                    const asteroidY = parseInt(parts[2]);
-                    
-                    // Find the asteroid garden in active chunks or reconstruct minimal data
-                    let asteroidData: DiscoveredAsteroidGarden | null = null;
-                    
-                    // Check if asteroid garden is in currently active chunks
-                    const asteroidGarden = this.findAsteroidGardenByPosition(asteroidX, asteroidY);
-                    if (asteroidGarden) {
-                        asteroidData = {
-                            x: asteroidGarden.x,
-                            y: asteroidGarden.y,
-                            gardenType: asteroidGarden.gardenType,
-                            gardenTypeData: asteroidGarden.gardenTypeData,
+                    const gardenX = parseInt(parts[1]);
+                    const gardenY = parseInt(parts[2]);
+                    const garden = this.findAsteroidGardenByPosition(gardenX, gardenY);
+                
+                    if (garden) {
+                        const gardenData: DiscoveredAsteroidGarden = {
+                            x: garden.x,
+                            y: garden.y,
+                            gardenType: garden.gardenType,
+                            gardenTypeData: garden.gardenTypeData,
                             objectName: discoveryData.objectName,
                             timestamp: discoveryData.timestamp
                         };
+                        
+                        discoveredAsteroidGardens.push(gardenData);
                     } else {
-                        // Fallback: provide basic asteroid garden data to keep it visible on map
-                        // We could store gardenType in discoveryData in the future for full reconstruction
-                        asteroidData = {
-                            x: asteroidX,
-                            y: asteroidY,
-                            gardenType: 'metallic', // Default fallback type
-                            gardenTypeData: {
-                                name: 'Asteroid Garden',
-                                colors: ['#8c8c8c', '#a0a0a0'],
-                                accentColors: ['#ffffff', '#e6e6e6']
+                        // Fallback for asteroid gardens in inactive chunks 
+                        // Use stored discovery data with basic color scheme
+                        const fallbackGardenData: DiscoveredAsteroidGarden = {
+                            x: gardenX,
+                            y: gardenY,
+                            gardenType: discoveryData.gardenType!,
+                            gardenTypeData: discoveryData.gardenTypeData || {
+                                name: discoveryData.gardenType! + ' Asteroid Garden',
+                                colors: this.getBasicGardenColors(discoveryData.gardenType!)
                             },
                             objectName: discoveryData.objectName,
                             timestamp: discoveryData.timestamp
                         };
-                    }
-                    
-                    if (asteroidData) {
-                        discoveredAsteroidGardens.push(asteroidData);
+                        
+                        discoveredAsteroidGardens.push(fallbackGardenData);
+                        console.log(`[ChunkManager] Using fallback data for asteroid garden at (${gardenX}, ${gardenY}) - chunk not active`);
                     }
                 }
             }
@@ -1077,17 +1060,30 @@ export class ChunkManager {
         return null;
     }
 
-    // Helper method to find an asteroid garden by its position in active chunks  
+    // Helper method to find an asteroid garden by its position in active chunks
     private findAsteroidGardenByPosition(x: number, y: number): any | null {
         for (const chunk of this.activeChunks.values()) {
-            for (const asteroidGarden of chunk.asteroidGardens) {
+            for (const garden of chunk.asteroidGardens) {
                 // Check if asteroid garden position matches (using floor to match getObjectId)
-                if (Math.floor(asteroidGarden.x) === x && Math.floor(asteroidGarden.y) === y) {
-                    return asteroidGarden;
+                if (Math.floor(garden.x) === x && Math.floor(garden.y) === y) {
+                    return garden;
                 }
             }
         }
         return null;
+    }
+
+    // Helper method to get basic colors for asteroid garden types (fallback when chunk not active)
+    private getBasicGardenColors(gardenType: string): string[] {
+        const basicColors: Record<string, string[]> = {
+            metallic: ['#8c8c8c', '#a0a0a0', '#7a7a7a'],
+            crystalline: ['#e8e8ff', '#d0d0ff', '#c0c0ff'],
+            icy: ['#e0f0ff', '#c0e0ff', '#a0d0ff'],
+            rare_minerals: ['#ffd700', '#ffcc00', '#ffaa00'],
+            volcanic: ['#cc4400', '#aa3300', '#882200'],
+            organic: ['#6b4423', '#8b5a3c', '#5a3a1a']
+        };
+        return basicColors[gardenType] || ['#888888', '#999999', '#777777'];
     }
     
     // Score a potential star system position based on distance from existing systems
@@ -1553,6 +1549,18 @@ export class ChunkManager {
         this.activeChunks.clear();
         this.discoveredObjects.clear();
         console.log('🌌 All chunks cleared for universe regeneration');
+    }
+    
+    // Helper method to get basic nebula colors for fallback reconstruction
+    private getBasicNebulaColors(nebulaType: string): string[] {
+        const colorSchemes: Record<string, string[]> = {
+            'emission': ['#ff6b6b', '#ff8e53', '#ff6b9d'],
+            'reflection': ['#4ecdc4', '#45b7d1', '#96ceb4'],
+            'planetary': ['#a8e6cf', '#7fcdcd', '#81ecec'],
+            'dark': ['#2c3e50', '#34495e', '#4a6741']
+        };
+        
+        return colorSchemes[nebulaType] || colorSchemes['emission'];
     }
 }
 
