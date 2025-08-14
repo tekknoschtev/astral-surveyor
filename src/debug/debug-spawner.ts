@@ -4,6 +4,7 @@
 import { SeededRandom } from '../utils/random.js';
 import { generateWormholePair, Wormhole } from '../celestial/wormholes.js';
 import { generateBlackHole, BlackHole } from '../celestial/blackholes.js';
+import { NamingService } from '../naming/naming.js';
 import type { Camera } from '../camera/camera.js';
 import type { ChunkManager } from '../world/world.js';
 
@@ -68,7 +69,12 @@ export class DebugSpawner {
             y: betaY
         });
         
-        // Save discovery state
+        // Generate proper names for the wormholes
+        const namingService = new NamingService();
+        const alphaName = namingService.generateWormholeName(alphaWormhole as any);
+        const betaName = namingService.generateWormholeName(betaWormhole as any);
+        
+        // Save discovery state with proper naming
         const alphaId = chunkManager.getObjectId(alphaX, alphaY, 'wormhole', alphaWormhole);
         const betaId = chunkManager.getObjectId(betaX, betaY, 'wormhole', betaWormhole);
         
@@ -76,14 +82,16 @@ export class DebugSpawner {
             discovered: true,
             timestamp: Date.now(),
             wormholeId: debugId,
-            designation: 'alpha'
+            designation: 'alpha',
+            objectName: alphaName
         });
         
         chunkManager.discoveredObjects.set(betaId, {
             discovered: true,
             timestamp: Date.now(),
             wormholeId: debugId,
-            designation: 'beta'
+            designation: 'beta',
+            objectName: betaName
         });
         
         // Ensure wormholes are added to their respective chunks

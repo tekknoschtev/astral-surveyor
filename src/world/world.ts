@@ -183,6 +183,11 @@ export class ChunkManager {
             return `${type}_${planetX}_${planetY}_moon_${object.moonIndex}`;
         }
         
+        // For wormholes, include designation for proper stellar map discovery parsing
+        if (type === 'wormhole' && object && object.designation) {
+            return `${type}_${Math.floor(x)}_${Math.floor(y)}_${object.designation}`;
+        }
+        
         // For regular objects, use their position
         return `${type}_${Math.floor(x)}_${Math.floor(y)}`;
     }
@@ -661,6 +666,11 @@ export class ChunkManager {
         } else if (object.type === 'nebula' && object.nebulaType) {
             discoveryData.nebulaType = object.nebulaType;
             discoveryData.nebulaTypeData = object.nebulaTypeData;
+        } else if (object.type === 'wormhole' && object.wormholeId && object.designation) {
+            discoveryData.wormholeId = object.wormholeId;
+            discoveryData.designation = object.designation;
+        } else if (object.type === 'blackhole' && object.blackHoleTypeName) {
+            discoveryData.blackHoleTypeName = object.blackHoleTypeName;
         } else if (object.type === 'asteroids' && object.gardenType) {
             discoveryData.gardenType = object.gardenType;
             discoveryData.gardenTypeData = object.gardenTypeData;
