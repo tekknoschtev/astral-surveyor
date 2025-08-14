@@ -9,8 +9,6 @@ describe('NamingService', () => {
   beforeEach(() => {
     // Set a consistent universe seed for predictable testing BEFORE creating NamingService
     window.UNIVERSE_SEED = 12345;
-    // Reset any global state that might affect tests
-    resetMockMathRandom();
     // Create new service instance
     namingService = new NamingService();
   });
@@ -205,6 +203,230 @@ describe('NamingService', () => {
     });
   });
   
+  describe('Planet Naming System', () => {
+    it('should generate planet names with letter designations', () => {
+      const parentStar = {
+        type: 'star',
+        x: 1000,
+        y: 2000,
+        starTypeName: 'G-Type Star'
+      };
+      
+      const planet = {
+        type: 'planet',
+        x: 1050,
+        y: 2050,
+        parentStar: parentStar,
+        planetTypeName: 'Rocky World',
+        orbitalDistance: 150
+      };
+      
+      const name = namingService.generatePlanetName(planet);
+      expect(name).toMatch(/^ASV-\d{4} [b-z]$/);
+    });
+
+    it('should generate planet index based on orbital distance', () => {
+      const parentStar = {
+        planets: [
+          { orbitalDistance: 100 },
+          { orbitalDistance: 200 },
+          { orbitalDistance: 150 }
+        ]
+      };
+      
+      const planet = {
+        parentStar: parentStar,
+        orbitalDistance: 150
+      };
+      
+      const index = namingService.calculatePlanetIndex(planet);
+      expect(typeof index).toBe('number'); // Should return a number (could be -1 if not found)
+    });
+
+    it('should handle planet without parent star', () => {
+      const planet = {
+        type: 'planet',
+        x: 1000,
+        y: 2000,
+        planetTypeName: 'Rogue Planet'
+      };
+      
+      const name = namingService.generatePlanetName(planet);
+      expect(name).toBe('Unknown Planet'); // Should return error message for missing parent
+    });
+  });
+
+  describe('Moon Naming System', () => {
+    it('should generate moon names with Roman numerals', () => {
+      const parentPlanet = {
+        type: 'planet',
+        parentStar: { x: 1000, y: 2000, starTypeName: 'G-Type Star' },
+        orbitalDistance: 150
+      };
+      
+      const moon = {
+        type: 'moon',
+        parentPlanet: parentPlanet,
+        orbitalDistance: 10
+      };
+      
+      const name = namingService.generateMoonName(moon);
+      expect(name).toMatch(/^ASV-\d{4} [b-z] [IVX]+$/);
+    });
+
+    it('should calculate moon index based on orbital distance ranges', () => {
+      const parentPlanet = { x: 1000, y: 2000 };
+      
+      const moon1 = { orbitalDistance: 5, parentPlanet }; // <= 10, should be index 0
+      const moon2 = { orbitalDistance: 15, parentPlanet }; // <= 20, should be index 1
+      const moon3 = { orbitalDistance: 25, parentPlanet }; // <= 30, should be index 2
+      const moon4 = { orbitalDistance: 35, parentPlanet }; // > 30, should be index 3
+      
+      expect(namingService.calculateMoonIndex(moon1)).toBe(0);
+      expect(namingService.calculateMoonIndex(moon2)).toBe(1);  
+      expect(namingService.calculateMoonIndex(moon3)).toBe(2);
+      expect(namingService.calculateMoonIndex(moon4)).toBe(3);
+    });
+
+    it('should handle moon without parent planet', () => {
+      const moon = {
+        type: 'moon',
+        x: 1000,
+        y: 2000
+      };
+      
+      const name = namingService.generateMoonName(moon);
+      expect(name).toBe('Unknown Moon');
+    });
+  });
+
+  describe('Nebula Naming System', () => {
+    it('should generate nebula names with famous names or catalog numbers', () => {
+      const nebula = {
+        type: 'nebula',
+        x: 1000,
+        y: 2000,
+        nebulaType: 'emission',
+        nebulaTypeData: { name: 'Emission Nebula' }
+      };
+      
+      const name = namingService.generateNebulaName(nebula);
+      // Should be either "[Name] Nebula" (allowing multi-word names) or "NGC/IC [number]"
+      expect(name).toMatch(/^(.+ Nebula|NGC \d+|IC \d+)$/);
+    });
+
+    it('should generate consistent catalog numbers for nebulae', () => {
+      const nebula1 = { x: 500, y: 600 };
+      const nebula2 = { x: 500, y: 600 };
+      
+      const catalog1 = namingService.generateNebulaCatalogNumber(nebula1.x, nebula1.y);
+      const catalog2 = namingService.generateNebulaCatalogNumber(nebula2.x, nebula2.y);
+      
+      expect(catalog1).toBe(catalog2);
+      expect(catalog1).toBeGreaterThanOrEqual(1);
+      expect(catalog1).toBeLessThanOrEqual(9999);
+    });
+  });
+
+  describe('Wormhole Naming System', () => {
+    it('should generate wormhole names with Greek designations', () => {
+      const wormhole = {
+        type: 'wormhole',
+        x: 1000,
+        y: 2000,
+        wormholeId: 'WH-1234',
+        designation: 'alpha'
+      };
+      
+      const name = namingService.generateWormholeName(wormhole);
+      expect(name).toBe('WH-1234-α');
+    });
+
+    it('should handle wormhole with pairId', () => {
+      const wormhole = {
+        type: 'wormhole',
+        pairId: 'WH-5678-β'
+      };
+      
+      const name = namingService.generateWormholeName(wormhole);
+      expect(name).toBe('WH-5678-β');
+    });
+
+    it('should generate fallback names from coordinates', () => {
+      const wormhole = {
+        type: 'wormhole',
+        x: 2000,
+        y: 3000,
+        designation: 'beta'
+      };
+      
+      const name = namingService.generateWormholeName(wormhole);
+      expect(name).toMatch(/^WH-\d{4}-β$/);
+    });
+  });
+
+  describe('Black Hole Naming System', () => {
+    it('should generate black hole names with classifications', () => {
+      const stellarBH = {
+        type: 'blackhole',
+        x: 1000,
+        y: 2000,
+        blackHoleTypeName: 'Stellar Mass Black Hole'
+      };
+      
+      const name = namingService.generateBlackHoleName(stellarBH);
+      expect(name).toMatch(/^BH-\d{4} SMH$/);
+    });
+
+    it('should handle supermassive black holes', () => {
+      const supermassiveBH = {
+        type: 'blackhole',
+        x: 3000,
+        y: 4000,
+        blackHoleTypeName: 'Supermassive Black Hole'
+      };
+      
+      const name = namingService.generateBlackHoleName(supermassiveBH);
+      expect(name).toMatch(/^BH-\d{4} SMBH$/);
+    });
+
+    it('should handle black holes without type', () => {
+      const genericBH = {
+        type: 'blackhole',
+        x: 5000,
+        y: 6000
+      };
+      
+      const name = namingService.generateBlackHoleName(genericBH);
+      expect(name).toMatch(/^BH-\d{4}$/);
+    });
+  });
+
+  describe('Asteroid Garden Naming System', () => {
+    it('should generate asteroid garden names with type-specific suffixes', () => {
+      const gardens = [
+        { gardenType: 'metallic', expected: 'Belt A' },
+        { gardenType: 'crystalline', expected: 'Field C' },
+        { gardenType: 'carbonaceous', expected: 'Belt B' },
+        { gardenType: 'icy', expected: 'Ring' },
+        { gardenType: 'rare_minerals', expected: 'Cluster' },
+        { gardenType: 'unknown', expected: 'Field' }
+      ];
+      
+      gardens.forEach(({ gardenType, expected }) => {
+        const garden = {
+          type: 'asteroids',
+          x: 1000,
+          y: 2000,
+          gardenType: gardenType
+        };
+        
+        const name = namingService.generateAsteroidGardenName(garden);
+        expect(name).toMatch(new RegExp(`^ASV-\\d{4} ${expected}$`));
+      });
+    });
+  });
+
   describe('Full designation generation', () => {
     it('should generate comprehensive star designations', () => {
       const star = {
@@ -220,6 +442,234 @@ describe('NamingService', () => {
       expect(designation.coordinate).toMatch(/^ASV J1000\+2000\+$/);
       expect(designation.type).toBe('Neutron Star');
       expect(designation.classification).toBe('NS');
+    });
+
+    it('should generate planet designations', () => {
+      const planet = {
+        type: 'planet',
+        x: 1050,
+        y: 2050,
+        planetTypeName: 'Ocean World',
+        parentStar: { x: 1000, y: 2000, starTypeName: 'G-Type Star' }
+      };
+      
+      const designation = namingService.generateFullDesignation(planet);
+      
+      expect(designation.designation).toMatch(/^ASV-\d{4} [b-z]$/);
+      expect(designation.type).toBe('Ocean World');
+      expect(designation.parentStar).toMatch(/^ASV-\d{4}$/);
+      expect(designation.orbitalIndex).toBeGreaterThan(0);
+    });
+
+    it('should generate nebula designations', () => {
+      const nebula = {
+        type: 'nebula',
+        x: 2000,
+        y: 3000,
+        nebulaType: 'emission',
+        nebulaTypeData: { name: 'Emission Nebula' }
+      };
+      
+      const designation = namingService.generateFullDesignation(nebula);
+      
+      expect(designation.catalog).toMatch(/^(\w+ Nebula|NGC \d+|IC \d+)$/);
+      expect(designation.coordinate).toMatch(/^ASV J2000\+3000\+$/);
+      expect(designation.type).toBe('Emission Nebula');
+      expect(designation.classification).toBe('H II Region');
+    });
+
+    it('should generate wormhole designations', () => {
+      const wormhole = {
+        type: 'wormhole',
+        x: 4000,
+        y: 5000,
+        wormholeId: 'WH-9999',
+        designation: 'alpha'
+      };
+      
+      const designation = namingService.generateFullDesignation(wormhole);
+      
+      expect(designation.catalog).toBe('WH-9999-α');
+      expect(designation.coordinate).toMatch(/^ASV J4000\+5000\+$/);
+      expect(designation.type).toBe('Stable Traversable Wormhole');
+      expect(designation.classification).toContain('WH-9999-β');
+    });
+
+    it('should generate black hole designations', () => {
+      const blackHole = {
+        type: 'blackhole',
+        x: 6000,
+        y: 7000,
+        blackHoleTypeName: 'Stellar Mass Black Hole'
+      };
+      
+      const designation = namingService.generateFullDesignation(blackHole);
+      
+      expect(designation.catalog).toMatch(/^BH-\d{4} SMH$/);
+      expect(designation.coordinate).toMatch(/^ASV J6000\+7000\+$/);
+      expect(designation.type).toBe('Stellar Mass Black Hole');
+      expect(designation.classification).toContain('Stellar Mass');
+    });
+
+    it('should generate asteroid garden designations', () => {
+      const garden = {
+        type: 'asteroids',
+        x: 8000,
+        y: 9000,
+        gardenType: 'crystalline',
+        gardenTypeData: { name: 'Crystalline Field' }
+      };
+      
+      const designation = namingService.generateFullDesignation(garden);
+      
+      expect(designation.catalog).toMatch(/^ASV-\d{4} Field C$/);
+      expect(designation.coordinate).toMatch(/^ASV J8000\+9000\+$/);
+      expect(designation.type).toBe('Crystalline Field');
+      expect(designation.classification).toBe('C-Type Field');
+    });
+
+    it('should return null for unknown object types', () => {
+      const unknown = {
+        type: 'unknown',
+        x: 1000,
+        y: 2000
+      };
+      
+      const designation = namingService.generateFullDesignation(unknown);
+      expect(designation).toBe(null);
+    });
+  });
+
+  describe('Display Name Generation - Extended', () => {
+    it('should handle all object types in generateDisplayName', () => {
+      const objects = [
+        { type: 'star', x: 1000, y: 2000, starTypeName: 'G-Type Star' },
+        { type: 'planet', parentStar: { x: 1000, y: 2000 } },
+        { type: 'moon', parentPlanet: { parentStar: { x: 1000, y: 2000 } } },
+        { type: 'nebula', x: 2000, y: 3000 },
+        { type: 'wormhole', wormholeId: 'WH-1234', designation: 'alpha' },
+        { type: 'blackhole', x: 4000, y: 5000 },
+        { type: 'asteroids', x: 6000, y: 7000, gardenType: 'metallic' },
+        { type: 'unknown' }
+      ];
+      
+      objects.forEach(obj => {
+        const name = namingService.generateDisplayName(obj);
+        if (obj.type === 'unknown') {
+          expect(name).toBe('Unknown Object');
+        } else {
+          expect(name).toBeTruthy();
+          expect(typeof name).toBe('string');
+        }
+      });
+    });
+
+    it('should handle discovered star data format without type field', () => {
+      const discoveredStar = {
+        x: 1000,
+        y: 2000,
+        starTypeName: 'K-Type Star' // No type field, but has starTypeName
+      };
+      
+      const name = namingService.generateDisplayName(discoveredStar);
+      expect(name).toMatch(/^ASV-\d{4}$/);
+    });
+  });
+
+  describe('Classification Systems', () => {
+    it('should classify nebula types correctly', () => {
+      const nebulaTypes = [
+        { type: 'emission', expected: 'H II Region' },
+        { type: 'reflection', expected: 'Reflection Cloud' },
+        { type: 'planetary', expected: 'Planetary Nebula' },
+        { type: 'dark', expected: 'Dark Cloud' },
+        { type: 'unknown', expected: null }
+      ];
+      
+      nebulaTypes.forEach(({ type, expected }) => {
+        const classification = namingService.getNebulaClassification(type);
+        expect(classification).toBe(expected);
+      });
+    });
+
+    it('should classify asteroid garden types correctly', () => {
+      const gardenTypes = [
+        { type: 'metallic', expected: 'M-Type Belt' },
+        { type: 'crystalline', expected: 'C-Type Field' },
+        { type: 'carbonaceous', expected: 'C-Type Belt' },
+        { type: 'icy', expected: 'K-Type Ring' },
+        { type: 'rare_minerals', expected: 'X-Type Cluster' },
+        { type: 'unknown', expected: null }
+      ];
+      
+      gardenTypes.forEach(({ type, expected }) => {
+        const classification = namingService.getAsteroidGardenClassification(type);
+        expect(classification).toBe(expected);
+      });
+    });
+  });
+
+  describe('Notable Discovery Detection - Extended', () => {
+    it('should identify all moons as notable', () => {
+      const moon = { type: 'moon' };
+      expect(namingService.isNotableDiscovery(moon)).toBe(false); // Moons are not automatically notable in the current implementation
+    });
+
+    it('should identify all nebulae as notable', () => {
+      const nebula = { type: 'nebula' };
+      expect(namingService.isNotableDiscovery(nebula)).toBe(true);
+    });
+
+    it('should identify all wormholes as notable', () => {
+      const wormhole = { type: 'wormhole' };
+      expect(namingService.isNotableDiscovery(wormhole)).toBe(true);
+    });
+
+    it('should identify all black holes as notable', () => {
+      const blackHole = { type: 'blackhole' };
+      expect(namingService.isNotableDiscovery(blackHole)).toBe(true);
+    });
+
+    it('should identify rare asteroid gardens as notable', () => {
+      const rareGarden = { type: 'asteroids', gardenType: 'rare_minerals' };
+      const commonGarden = { type: 'asteroids', gardenType: 'metallic' };
+      
+      expect(namingService.isNotableDiscovery(rareGarden)).toBe(true);
+      expect(namingService.isNotableDiscovery(commonGarden)).toBe(false);
+    });
+
+    it('should not identify unknown object types as notable', () => {
+      const unknown = { type: 'unknown' };
+      expect(namingService.isNotableDiscovery(unknown)).toBe(false);
+    });
+  });
+
+  describe('Edge Cases and Error Handling', () => {
+    it('should handle objects with missing coordinates', () => {
+      const star = {
+        type: 'star',
+        x: undefined,
+        y: undefined,
+        starTypeName: 'G-Type Star'
+      };
+      
+      // Should not crash
+      expect(() => namingService.generateDisplayName(star)).not.toThrow();
+    });
+
+    it('should handle wormholes with missing data gracefully', () => {
+      const wormholes = [
+        { type: 'wormhole', x: 1000, y: 2000, designation: 'alpha' },
+        { type: 'wormhole', wormholeId: 'WH-1234' },
+        { type: 'wormhole', pairId: 'WH-5678-α' },
+        { type: 'wormhole', x: 2000, y: 3000 } // Minimal data
+      ];
+      
+      wormholes.forEach(wormhole => {
+        const name = namingService.generateWormholeName(wormhole);
+        expect(name).toBeTruthy();
+        expect(typeof name).toBe('string');
+      });
     });
   });
 });

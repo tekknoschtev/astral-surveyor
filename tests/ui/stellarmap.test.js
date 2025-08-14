@@ -1301,6 +1301,94 @@ describe('StellarMap System', () => {
     });
   });
 
+  describe('Nebula and Asteroid Garden Selection', () => {
+    let mockNebulae;
+    let mockAsteroidGardens;
+    let mockStars;
+
+    beforeEach(() => {
+      stellarMap.visible = true;
+      stellarMap.centerX = 1000;
+      stellarMap.centerY = 2000;
+      stellarMap.zoomLevel = 2.0;
+
+      mockNebulae = [
+        {
+          x: 1100,
+          y: 2100,
+          nebulaType: 'emission',
+          nebulaTypeData: { name: 'Eagle Nebula', colors: ['#FF6B6B'] },
+          objectName: 'Test Nebula',
+          timestamp: Date.now()
+        }
+      ];
+
+      mockAsteroidGardens = [
+        {
+          x: 1200,
+          y: 2200,
+          gardenType: 'metallic',
+          gardenTypeData: { name: 'Iron Asteroid Field', colors: ['#C0C0C0'] },
+          objectName: 'Test Garden',
+          timestamp: Date.now()
+        }
+      ];
+
+      mockStars = [
+        {
+          x: 1000,
+          y: 2000,
+          starTypeName: 'G-Type Star',
+          starType: { sizeMultiplier: 1.0 },
+          timestamp: Date.now()
+        }
+      ];
+    });
+
+    it('should select nebula when clicked within threshold', () => {
+      const result = stellarMap.handleStarSelection(400, 300, mockStars, mockCanvas, null, mockNebulae);
+      
+      expect(result).toBe(true);
+      // Should prioritize nebula if it's closer than star
+    });
+
+    it('should select asteroid garden when clicked within threshold', () => {
+      const result = stellarMap.handleStarSelection(400, 300, mockStars, mockCanvas, null, null, null, mockAsteroidGardens);
+      
+      expect(result).toBe(true);
+      // Should prioritize asteroid garden based on distance
+    });
+
+    it('should handle hover detection for nebulae', () => {
+      stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, null, mockNebulae);
+      
+      // Should not crash and should work correctly
+      expect(() => stellarMap.updateCursor(mockCanvas)).not.toThrow();
+    });
+
+    it('should handle hover detection for asteroid gardens', () => {
+      stellarMap.detectHoverTarget(400, 300, mockCanvas, mockStars, null, null, mockAsteroidGardens);
+      
+      // Should not crash and should work correctly
+      expect(() => stellarMap.updateCursor(mockCanvas)).not.toThrow();
+    });
+
+    it('should clear all selection types when clicking empty space', () => {
+      // Set initial selections
+      stellarMap.selectedStar = mockStars[0];
+      stellarMap.selectedNebula = mockNebulae[0];
+      stellarMap.selectedAsteroidGarden = mockAsteroidGardens[0];
+      
+      // Click far from any objects
+      const result = stellarMap.handleStarSelection(100, 100, mockStars, mockCanvas, null, mockNebulae, null, mockAsteroidGardens);
+      
+      expect(result).toBe(true);
+      expect(stellarMap.selectedStar).toBe(null);
+      expect(stellarMap.selectedNebula).toBe(null);
+      expect(stellarMap.selectedAsteroidGarden).toBe(null);
+    });
+  });
+
   describe('Player Following and Utility Methods', () => {
     it('should enable follow player and center on camera', () => {
       stellarMap.followPlayer = false;
