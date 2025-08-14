@@ -375,6 +375,31 @@ export class Input {
         return this.wasJustPressed('KeyQ');
     }
 
+    // Debug input methods (development builds only)
+    isShiftPressed(): boolean {
+        return this.isPressed('ShiftLeft') || this.isPressed('ShiftRight');
+    }
+
+    isDebugWormholeSpawn(): boolean {
+        // Always available in development builds (this code won't exist in production)
+        return this.isShiftPressed() && this.wasJustPressed('KeyW');
+    }
+
+    isDebugBlackHoleSpawn(): boolean {
+        // Always available in development builds (this code won't exist in production)
+        return this.isShiftPressed() && this.wasJustPressed('KeyB');
+    }
+
+    isDebugHelpRequested(): boolean {
+        // Always available in development builds (this code won't exist in production)
+        return this.isShiftPressed() && this.wasJustPressed('KeyH');
+    }
+
+    isDebugInspectRequested(): boolean {
+        // Always available in development builds (this code won't exist in production)
+        return this.isShiftPressed() && this.wasJustPressed('KeyI');
+    }
+
     // Mouse/touch input for movement
     isMousePressed(): boolean {
         return this.mousePressed;

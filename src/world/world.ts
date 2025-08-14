@@ -68,6 +68,11 @@ interface DiscoveryData {
     gardenType?: string;
     gardenTypeData?: any;
     objectName?: string;
+    // Wormhole properties
+    wormholeId?: string;
+    designation?: 'alpha' | 'beta';
+    // Black hole properties
+    blackHoleTypeName?: string;
 }
 
 interface DiscoveredStar {
@@ -143,6 +148,7 @@ export class ChunkManager {
     loadRadius: number;
     activeChunks: Map<string, Chunk>;
     discoveredObjects: Map<string, DiscoveryData>;
+    debugObjects?: Array<{type: string, object: any, x: number, y: number}>;
 
     constructor() {
         this.chunkSize = 1000; // 1000x1000 pixel chunks
@@ -1344,6 +1350,20 @@ export class ChunkManager {
 
     // Generate wormholes for a chunk - extremely rare spacetime anomalies
     generateWormholesForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // First, check for debug wormholes in this chunk
+        if (this.debugObjects) {
+            for (const debugObj of this.debugObjects) {
+                if (debugObj.type === 'wormhole') {
+                    const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
+                    if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
+                        chunk.wormholes.push(debugObj.object);
+                        // Continue to check for natural wormholes too
+                    }
+                }
+            }
+        }
+        
+        // Continue with normal wormhole generation
         // Use separate seed for wormhole generation to avoid correlation with other objects
         const wormholeSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x789ABCDE;
         const wormholeRng = new SeededRandom(wormholeSeed);
@@ -1461,6 +1481,19 @@ export class ChunkManager {
 
     // Generate black holes for a chunk - ultra-rare cosmic phenomena
     generateBlackHolesForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // First, check for debug black holes in this chunk
+        if (this.debugObjects) {
+            for (const debugObj of this.debugObjects) {
+                if (debugObj.type === 'blackhole') {
+                    const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
+                    if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
+                        chunk.blackholes.push(debugObj.object);
+                        // Continue to check for natural black holes too
+                    }
+                }
+            }
+        }
+        
         // Use separate seed for black hole generation to avoid correlation with other objects
         const blackHoleSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
         const blackHoleRng = new SeededRandom(blackHoleSeed);

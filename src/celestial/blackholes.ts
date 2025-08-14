@@ -385,9 +385,15 @@ export class BlackHole extends CelestialObject {
         
         // Pulsing bright point
         const pulse = Math.sin(Date.now() * 0.005) * 0.5 + 1.0;
-        const alpha = Math.floor(pulse * 255).toString(16).padStart(2, '0');
+        const alphaValue = pulse; // Keep as 0.0-1.0 for rgba
         
-        ctx.fillStyle = singularityColor + alpha;
+        // Convert hex color to rgba format
+        const hex = singularityColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alphaValue})`;
         ctx.beginPath();
         ctx.arc(centerX, centerY, this.singularityRadius, 0, Math.PI * 2);
         ctx.fill();
@@ -397,8 +403,8 @@ export class BlackHole extends CelestialObject {
             centerX, centerY, 0,
             centerX, centerY, this.singularityRadius * 3
         );
-        glowGradient.addColorStop(0, singularityColor + alpha);
-        glowGradient.addColorStop(1, singularityColor + '00');
+        glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alphaValue})`);
+        glowGradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         
         ctx.fillStyle = glowGradient;
         ctx.beginPath();

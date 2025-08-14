@@ -22,6 +22,9 @@ import {
     getUniverseResetCount
 } from './utils/random.js';
 
+// Debug spawner import (development builds only)
+let DebugSpawner: any = null;
+
 // Interface definitions
 interface GameStartingPosition {
     x: number;
@@ -95,6 +98,9 @@ export class Game {
     isResettingUniverse: boolean;
     resetStartTime: number;
     resetDuration: number;
+    
+    // Debug mode state
+    debugModeEnabled: boolean;
 
     constructor(canvas: HTMLCanvasElement) {
         this.renderer = new Renderer(canvas);
@@ -133,6 +139,9 @@ export class Game {
         this.isResettingUniverse = false;
         this.resetStartTime = 0;
         this.resetDuration = 3.0; // 3 seconds for cosmic transition
+        
+        // Debug mode system - URL parameter controlled
+        this.debugModeEnabled = this.checkDebugMode();
         
         // Connect naming service to stellar map
         this.stellarMap.setNamingService(this.namingService as any);
@@ -179,17 +188,17 @@ export class Game {
         this.gameLoop(0);
     }
 
-    gameLoop = (currentTime: number): void => {
+    gameLoop = async (currentTime: number): Promise<void> => {
         const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
 
-        this.update(deltaTime);
+        await this.update(deltaTime);
         this.render();
 
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
-    update(deltaTime: number): void {
+    async update(deltaTime: number): Promise<void> {
         this.input.update(deltaTime);
         
         // Handle wormhole traversal transition
@@ -235,6 +244,9 @@ export class Game {
             const isMuted = this.soundManager.toggleMute();
             this.discoveryDisplay.addNotification(isMuted ? 'Audio muted' : 'Audio unmuted');
         }
+        
+        // Handle debug commands (development builds only)
+        await this.handleDebugInput();
         
         // Handle map/logbook close (Escape key)
         if (this.input.wasJustPressed('Escape')) {
@@ -553,6 +565,61 @@ export class Game {
                 time: currentTime,
                 level: warningLevel
             });
+        }
+    }
+
+    checkDebugMode(): boolean {
+        // Check URL parameters for debug mode
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugEnabled = urlParams.has('debug') || urlParams.get('debug') === 'true';
+        
+        if (debugEnabled) {
+            console.log('🛠️  DEBUG MODE ENABLED via URL parameter');
+            console.log('Available commands:');
+            console.log('  Shift + H: Show debug help');
+            console.log('  Shift + W: Spawn wormhole pair');
+            console.log('  Shift + B: Spawn black hole');
+        }
+        
+        return debugEnabled;
+    }
+
+    async handleDebugInput(): Promise<void> {
+        // Only process debug input if debug mode is enabled
+        if (!this.debugModeEnabled) {
+            return;
+        }
+
+        // Lazy load debug spawner only when needed
+        if (!DebugSpawner) {
+            try {
+                DebugSpawner = (await import('./debug/debug-spawner.js')).DebugSpawner;
+            } catch (error) {
+                console.warn('Failed to load debug spawner:', error);
+                return;
+            }
+        }
+
+        // Handle debug help (Shift + H)
+        if (this.input.isDebugHelpRequested()) {
+            DebugSpawner.showDebugHelp();
+        }
+
+        // Handle wormhole spawning (Shift + W)
+        if (this.input.isDebugWormholeSpawn()) {
+            DebugSpawner.spawnWormholePair(this.camera, this.chunkManager, this.debugModeEnabled);
+            this.discoveryDisplay.addNotification('🌀 DEBUG: Wormhole pair spawned nearby');
+        }
+
+        // Handle black hole spawning (Shift + B)
+        if (this.input.isDebugBlackHoleSpawn()) {
+            DebugSpawner.spawnBlackHole(this.camera, this.chunkManager, this.debugModeEnabled);
+            this.discoveryDisplay.addNotification('🕳️ DEBUG: Black hole spawned nearby - use caution!');
+        }
+
+        // Handle chunk inspection (Shift + I)
+        if (this.input.isDebugInspectRequested()) {
+            DebugSpawner.inspectCurrentChunk(this.camera, this.chunkManager);
         }
     }
 
