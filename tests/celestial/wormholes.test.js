@@ -189,10 +189,10 @@ describe('Wormhole System', () => {
       expect(destination1.x).not.toBe(1500);
       expect(destination1.y).not.toBe(800);
 
-      // Should be within reasonable distance of twin (50px + some angle offset)
+      // Should be within reasonable distance of twin (80px + some angle offset)
       const distance = Math.sqrt(Math.pow(destination1.x - 1500, 2) + Math.pow(destination1.y - 800, 2));
-      expect(distance).toBeGreaterThan(40); // At least some offset
-      expect(distance).toBeLessThan(70); // Not too far
+      expect(distance).toBeGreaterThan(70); // At least some offset (updated for 80px safety margin)
+      expect(distance).toBeLessThan(90); // Not too far (updated for 80px safety margin)
     });
   });
 

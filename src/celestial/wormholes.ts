@@ -163,16 +163,49 @@ export class Wormhole extends CelestialObject {
     }
 
     // Get traversal destination coordinates (with offset to avoid immediate re-entry)
-    getDestinationCoordinates(): { x: number, y: number } {
-        // Position ship 50 pixels away from destination wormhole
-        // Use a consistent offset based on wormhole ID for deterministic positioning
-        const offsetAngle = parseInt(this.wormholeId.split('-')[1] || '0', 16) % (Math.PI * 2);
-        const offsetDistance = 50;
+    getDestinationCoordinates(shipVelocityX?: number, shipVelocityY?: number): { x: number, y: number } {
+        let offsetAngle: number;
+        const offsetDistance = 80; // Increased distance for better safety margin
+        
+        if (shipVelocityX !== undefined && shipVelocityY !== undefined) {
+            // Calculate ship's velocity vector
+            const velocityMagnitude = Math.sqrt(shipVelocityX * shipVelocityX + shipVelocityY * shipVelocityY);
+            
+            if (velocityMagnitude > 0.1) { // Only consider velocity if ship is moving
+                // Get the angle of ship's movement
+                const velocityAngle = Math.atan2(shipVelocityY, shipVelocityX);
+                
+                // Position ship so it exits in the same direction it was traveling
+                // This prevents the ship from moving back toward the wormhole
+                offsetAngle = velocityAngle;
+            } else {
+                // Ship has minimal velocity, use deterministic offset based on wormhole ID
+                offsetAngle = this.getDeterministicAngle();
+            }
+        } else {
+            // Fallback: use deterministic offset based on wormhole ID
+            offsetAngle = this.getDeterministicAngle();
+        }
         
         return {
             x: this.twinX + Math.cos(offsetAngle) * offsetDistance,
             y: this.twinY + Math.sin(offsetAngle) * offsetDistance
         };
+    }
+
+    // Get a deterministic angle based on wormhole properties
+    private getDeterministicAngle(): number {
+        // Create a simple hash from wormhole ID and position
+        let hash = 0;
+        const str = this.wormholeId + this.designation;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash + str.charCodeAt(i)) & 0xffffffff;
+        }
+        // Add position to make it more unique
+        hash = (hash + Math.floor(this.x) + Math.floor(this.y)) & 0xffffffff;
+        
+        // Convert to angle between 0 and 2π
+        return (Math.abs(hash) % 360) * (Math.PI / 180);
     }
 
     // Update wormhole animations and effects
