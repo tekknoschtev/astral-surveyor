@@ -36,6 +36,9 @@ export class Input {
     private twoFingerDragActive = false;
     private twoFingerStartCenter = { x: 0, y: 0 };
     private twoFingerCurrentCenter = { x: 0, y: 0 };
+    
+    // Debug input safety - track modifier key states
+    private shiftPressedFirst = false;
 
     constructor() {
         this.setupEventListeners();
@@ -48,6 +51,16 @@ export class Input {
                 this.keys.add(e.code);
                 this.keyHoldTimes.set(e.code, 0); // Start tracking hold time
                 this.keyPressed.set(e.code, true); // Mark as just pressed
+                
+                // Track debug key sequence safety - Shift must be pressed first
+                if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                    this.shiftPressedFirst = true;
+                } else if (this.shiftPressedFirst && (e.code === 'KeyW' || e.code === 'KeyB' || e.code === 'KeyH' || e.code === 'KeyI')) {
+                    // Valid debug sequence - Shift was pressed first, then debug key
+                } else if (e.code === 'KeyW' || e.code === 'KeyB' || e.code === 'KeyH' || e.code === 'KeyI') {
+                    // Invalid sequence - debug key pressed without Shift first
+                    this.shiftPressedFirst = false;
+                }
             }
         });
 
@@ -55,6 +68,11 @@ export class Input {
             this.keys.delete(e.code);
             this.keyHoldTimes.delete(e.code);
             this.keyPressed.delete(e.code);
+            
+            // Reset debug sequence tracking when Shift is released
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                this.shiftPressedFirst = false;
+            }
         });
 
         window.addEventListener('mousemove', (e: MouseEvent) => {
@@ -382,22 +400,26 @@ export class Input {
 
     isDebugWormholeSpawn(): boolean {
         // Always available in development builds (this code won't exist in production)
-        return this.isShiftPressed() && this.wasJustPressed('KeyW');
+        // Require Shift to be pressed BEFORE W to prevent accidental spawning during movement
+        return this.shiftPressedFirst && this.isShiftPressed() && this.wasJustPressed('KeyW');
     }
 
     isDebugBlackHoleSpawn(): boolean {
         // Always available in development builds (this code won't exist in production)
-        return this.isShiftPressed() && this.wasJustPressed('KeyB');
+        // Require Shift to be pressed BEFORE B to prevent accidental spawning
+        return this.shiftPressedFirst && this.isShiftPressed() && this.wasJustPressed('KeyB');
     }
 
     isDebugHelpRequested(): boolean {
         // Always available in development builds (this code won't exist in production)
-        return this.isShiftPressed() && this.wasJustPressed('KeyH');
+        // Require Shift to be pressed BEFORE H to prevent accidental activation
+        return this.shiftPressedFirst && this.isShiftPressed() && this.wasJustPressed('KeyH');
     }
 
     isDebugInspectRequested(): boolean {
         // Always available in development builds (this code won't exist in production)
-        return this.isShiftPressed() && this.wasJustPressed('KeyI');
+        // Require Shift to be pressed BEFORE I to prevent accidental activation
+        return this.shiftPressedFirst && this.isShiftPressed() && this.wasJustPressed('KeyI');
     }
 
     // Mouse/touch input for movement
