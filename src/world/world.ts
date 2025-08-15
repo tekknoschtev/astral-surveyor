@@ -1486,9 +1486,9 @@ export class ChunkManager {
     
     private generateWormholePairLocation(chunkX: number, chunkY: number, rng: SeededRandom): { x: number, y: number } {
         // Generate distant but deterministic pair location
-        // Ensure pairs are separated by significant distance (multiple chunks)
-        const minDistance = this.chunkSize * 5; // At least 5 chunks away
-        const maxDistance = this.chunkSize * 20; // At most 20 chunks away
+        // Ensure pairs are separated by truly cosmic distances for meaningful travel shortcuts
+        const minDistance = this.chunkSize * 100; // At least 100 chunks away (100,000px = 2+ minutes travel)
+        const maxDistance = this.chunkSize * 500; // At most 500 chunks away (500,000px = 10+ minutes travel)
         
         const angle = rng.nextFloat(0, Math.PI * 2);
         const distance = rng.nextFloat(minDistance, maxDistance);
