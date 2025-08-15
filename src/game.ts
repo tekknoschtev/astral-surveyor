@@ -80,7 +80,7 @@ export class Game {
     isTraversing: boolean;
     traversalStartTime: number;
     traversalDuration: number;
-    traversalDestination?: { x: number; y: number; velocityX: number; velocityY: number; wormhole: any };
+    traversalDestination?: { x: number; y: number; velocityX: number; velocityY: number; wormhole: any; stellarMapWasVisible: boolean };
     
     // Distance saving timer (save every 5 seconds)
     distanceSaveTimer: number;
@@ -662,8 +662,8 @@ export class Game {
     }
 
     checkWormholeTraversal(wormholes: any[]): void {
-        // Skip if already traversing or if stellar map is open
-        if (this.isTraversing || this.stellarMap.isVisible()) {
+        // Skip if already traversing
+        if (this.isTraversing) {
             return;
         }
 
@@ -688,7 +688,8 @@ export class Game {
             y: destination.y,
             velocityX: this.camera.velocityX,
             velocityY: this.camera.velocityY,
-            wormhole: wormhole
+            wormhole: wormhole,
+            stellarMapWasVisible: this.stellarMap.isVisible()
         };
         
         // Stop ship movement during traversal
@@ -715,6 +716,11 @@ export class Game {
             
             // Update chunks for new location
             this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+            
+            // If stellar map was visible before traversal, center it on new position
+            if (this.traversalDestination.stellarMapWasVisible) {
+                this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
+            }
             
             // Show traversal notification
             const destinationDesignation = this.traversalDestination.wormhole.designation === 'alpha' ? 'β' : 'α';
