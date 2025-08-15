@@ -681,8 +681,8 @@ export class Game {
         this.isTraversing = true;
         this.traversalStartTime = 0;
         
-        // Store destination and momentum
-        const destination = wormhole.getDestinationCoordinates();
+        // Store destination and momentum (pass velocity for smart exit positioning)
+        const destination = wormhole.getDestinationCoordinates(this.camera.velocityX, this.camera.velocityY);
         this.traversalDestination = {
             x: destination.x,
             y: destination.y,
