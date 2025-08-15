@@ -1697,6 +1697,11 @@ export class InfiniteStarField {
         // Then render the original chunk-based stars (these are "foreground" stars)
         this.renderChunkStars(renderer, camera);
         
+        // Render debug chunk boundaries if enabled
+        if (GameConfig.debug.enabled && GameConfig.debug.chunkBoundaries.enabled) {
+            this.renderChunkBoundaries(renderer, camera);
+        }
+        
         // Update camera tracking
         this.lastCameraX = camera.x;
         this.lastCameraY = camera.y;
@@ -1767,6 +1772,118 @@ export class InfiniteStarField {
                     renderer.drawCircle(screenX, screenY, star.size, colorWithAlpha);
                 } else {
                     renderer.drawPixel(screenX, screenY, colorWithAlpha);
+                }
+            }
+        }
+    }
+    
+    renderChunkBoundaries(renderer: Renderer, camera: Camera): void {
+        const { canvas } = renderer;
+        const config = GameConfig.debug.chunkBoundaries;
+        
+        // Calculate which chunks are visible on screen
+        const margin = 100; // Add margin to ensure we draw boundaries just off-screen
+        const topLeftX = camera.x - (canvas.width / 2) - margin;
+        const topLeftY = camera.y - (canvas.height / 2) - margin;
+        const bottomRightX = camera.x + (canvas.width / 2) + margin;
+        const bottomRightY = camera.y + (canvas.height / 2) + margin;
+        
+        // Calculate chunk coordinate ranges
+        const startChunkX = Math.floor(topLeftX / this.chunkManager.chunkSize);
+        const endChunkX = Math.floor(bottomRightX / this.chunkManager.chunkSize);
+        const startChunkY = Math.floor(topLeftY / this.chunkManager.chunkSize);
+        const endChunkY = Math.floor(bottomRightY / this.chunkManager.chunkSize);
+        
+        // Draw crosshairs at each chunk boundary intersection
+        for (let chunkX = startChunkX; chunkX <= endChunkX + 1; chunkX++) {
+            for (let chunkY = startChunkY; chunkY <= endChunkY + 1; chunkY++) {
+                // Calculate world position of this chunk boundary intersection
+                const worldX = chunkX * this.chunkManager.chunkSize;
+                const worldY = chunkY * this.chunkManager.chunkSize;
+                
+                // Convert to screen coordinates
+                const [screenX, screenY] = camera.worldToScreen(worldX, worldY, canvas.width, canvas.height);
+                
+                // Only draw if the crosshair would be visible on screen
+                if (screenX >= -config.crosshairSize && screenX <= canvas.width + config.crosshairSize &&
+                    screenY >= -config.crosshairSize && screenY <= canvas.height + config.crosshairSize) {
+                    
+                    renderer.drawCrosshair(
+                        screenX, 
+                        screenY, 
+                        config.crosshairSize, 
+                        config.color, 
+                        config.lineWidth, 
+                        config.opacity
+                    );
+                }
+            }
+        }
+        
+        // Render subdivision markers if enabled
+        if (config.subdivisions.enabled) {
+            this.renderChunkSubdivisions(renderer, camera, startChunkX, endChunkX, startChunkY, endChunkY);
+        }
+    }
+    
+    renderChunkSubdivisions(renderer: Renderer, camera: Camera, startChunkX: number, endChunkX: number, startChunkY: number, endChunkY: number): void {
+        const { canvas } = renderer;
+        const config = GameConfig.debug.chunkBoundaries.subdivisions;
+        const chunkSize = this.chunkManager.chunkSize;
+        const subdivisionDistance = chunkSize * config.interval; // Distance between subdivision marks
+        
+        // Render vertical subdivision lines (along chunk X boundaries)
+        for (let chunkX = startChunkX; chunkX <= endChunkX + 1; chunkX++) {
+            const worldX = chunkX * chunkSize;
+            
+            // For each Y chunk span, add subdivision markers along the vertical line
+            for (let chunkY = startChunkY; chunkY <= endChunkY; chunkY++) {
+                for (let i = 1; i < (1 / config.interval); i++) { // Skip 0% and 100% (those have crosshairs)
+                    const worldY = chunkY * chunkSize + (i * subdivisionDistance);
+                    const [screenX, screenY] = camera.worldToScreen(worldX, worldY, canvas.width, canvas.height);
+                    
+                    // Only draw if visible on screen
+                    if (screenX >= -config.dashLength && screenX <= canvas.width + config.dashLength &&
+                        screenY >= -config.dashLength && screenY <= canvas.height + config.dashLength) {
+                        
+                        renderer.drawDash(
+                            screenX,
+                            screenY,
+                            config.dashLength,
+                            config.color,
+                            Math.PI / 2, // Horizontal dash on vertical line
+                            config.lineWidth,
+                            config.opacity
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Render horizontal subdivision lines (along chunk Y boundaries)
+        for (let chunkY = startChunkY; chunkY <= endChunkY + 1; chunkY++) {
+            const worldY = chunkY * chunkSize;
+            
+            // For each X chunk span, add subdivision markers along the horizontal line
+            for (let chunkX = startChunkX; chunkX <= endChunkX; chunkX++) {
+                for (let i = 1; i < (1 / config.interval); i++) { // Skip 0% and 100% (those have crosshairs)
+                    const worldX = chunkX * chunkSize + (i * subdivisionDistance);
+                    const [screenX, screenY] = camera.worldToScreen(worldX, worldY, canvas.width, canvas.height);
+                    
+                    // Only draw if visible on screen
+                    if (screenX >= -config.dashLength && screenX <= canvas.width + config.dashLength &&
+                        screenY >= -config.dashLength && screenY <= canvas.height + config.dashLength) {
+                        
+                        renderer.drawDash(
+                            screenX,
+                            screenY,
+                            config.dashLength,
+                            config.color,
+                            0, // Vertical dash on horizontal line
+                            config.lineWidth,
+                            config.opacity
+                        );
+                    }
                 }
             }
         }

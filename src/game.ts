@@ -13,6 +13,7 @@ import { StellarMap } from './ui/stellarmap.js';
 import { NamingService } from './naming/naming.js';
 import { TouchUI } from './ui/touchui.js';
 import { SoundManager } from './audio/soundmanager.js';
+import { GameConfig } from './config/gameConfig.js';
 import { 
     initializeUniverseSeed, 
     getStartingCoordinates, 
@@ -578,11 +579,15 @@ export class Game {
         const debugEnabled = urlParams.has('debug') || urlParams.get('debug') === 'true';
         
         if (debugEnabled) {
+            // Enable the debug configuration when URL debug mode is active
+            GameConfig.debug.enabled = true;
+            
             console.log('🛠️  DEBUG MODE ENABLED via URL parameter');
             console.log('Available commands:');
             console.log('  Shift + H: Show debug help');
             console.log('  Shift + W: Spawn wormhole pair');
             console.log('  Shift + B: Spawn black hole');
+            console.log('  Debug features: Chunk boundaries, coordinates, etc.');
         }
         
         return debugEnabled;

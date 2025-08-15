@@ -73,4 +73,50 @@ export class Renderer {
             this.ctx.restore();
         }
     }
+
+    drawCrosshair(x: number, y: number, size: number, color: string, lineWidth: number = 2, opacity: number = 1.0): void {
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.globalAlpha = opacity;
+        this.ctx.lineCap = 'round';
+        
+        const halfSize = size / 2;
+        
+        this.ctx.beginPath();
+        // Horizontal line
+        this.ctx.moveTo(Math.floor(x - halfSize), Math.floor(y));
+        this.ctx.lineTo(Math.floor(x + halfSize), Math.floor(y));
+        // Vertical line
+        this.ctx.moveTo(Math.floor(x), Math.floor(y - halfSize));
+        this.ctx.lineTo(Math.floor(x), Math.floor(y + halfSize));
+        this.ctx.stroke();
+        
+        this.ctx.restore();
+    }
+
+    drawDash(x: number, y: number, length: number, color: string, angle: number = 0, lineWidth: number = 1, opacity: number = 1.0): void {
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.globalAlpha = opacity;
+        this.ctx.lineCap = 'round';
+        
+        const halfLength = length / 2;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(
+            Math.floor(x - halfLength * cos), 
+            Math.floor(y - halfLength * sin)
+        );
+        this.ctx.lineTo(
+            Math.floor(x + halfLength * cos), 
+            Math.floor(y + halfLength * sin)
+        );
+        this.ctx.stroke();
+        
+        this.ctx.restore();
+    }
 }

@@ -293,6 +293,35 @@ export const AudioConfig = {
     }
 };
 
+// Debug Configuration  
+export const DebugConfig = {
+    // Enable/disable debug features
+    enabled: false,                    // Master debug toggle - set to true to enable debug features
+    
+    // Chunk boundary visualization
+    chunkBoundaries: {
+        enabled: true,                 // Show chunk boundaries when debug mode is on
+        crosshairSize: 20,             // Size of crosshair markers in pixels
+        color: '#FF00FF',              // Magenta color for high contrast
+        lineWidth: 2,                  // Thickness of crosshair lines
+        opacity: 0.8,                  // Semi-transparent for less visual noise
+        
+        // Subdivision markers (10% intervals along chunk edges)
+        subdivisions: {
+            enabled: true,             // Show subdivision markers
+            dashLength: 10,            // Length of subdivision dash marks
+            color: '#FFAAFF',          // Lighter magenta for subdivisions
+            lineWidth: 1,              // Thinner lines for subdivisions
+            opacity: 0.6,              // More transparent than main crosshairs
+            interval: 0.1,             // 10% intervals (0.1 = 10%)
+        }
+    },
+    
+    // Other debug features can be added here
+    showCoordinates: true,             // Show current coordinates
+    showFPS: true,                     // Show frame rate counter
+};
+
 // Export combined configuration for easy importing
 export const GameConfig = {
     world: WorldConfig,
@@ -302,6 +331,7 @@ export const GameConfig = {
     particles: ParticleConfig,
     visual: VisualConfig,
     audio: AudioConfig,
-} as const;
+    debug: DebugConfig,
+};
 
 export default GameConfig;

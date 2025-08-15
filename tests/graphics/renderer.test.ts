@@ -7,10 +7,17 @@ function createMockCanvas() {
   const ctx = {
     imageSmoothingEnabled: true,
     fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    globalAlpha: 1,
+    lineCap: 'butt',
     fillRect: vi.fn(),
     beginPath: vi.fn(),
     arc: vi.fn(),
     fill: vi.fn(),
+    stroke: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
     translate: vi.fn(),
@@ -100,5 +107,46 @@ describe('Renderer', () => {
     expect(mockCtx.rotate).toHaveBeenCalledWith(Math.PI / 4);
     expect(mockCtx.fillRect).toHaveBeenCalled();
     expect(mockCtx.restore).toHaveBeenCalled();
+  });
+
+  it('drawCrosshair() should draw crosshair lines with proper styling', () => {
+    renderer.drawCrosshair(50, 100, 20, '#ff00ff', 3, 0.8);
+    
+    expect(mockCtx.save).toHaveBeenCalled();
+    expect(mockCtx.strokeStyle).toBe('#ff00ff');
+    expect(mockCtx.lineWidth).toBe(3);
+    expect(mockCtx.globalAlpha).toBe(0.8);
+    expect(mockCtx.lineCap).toBe('round');
+    expect(mockCtx.beginPath).toHaveBeenCalled();
+    expect(mockCtx.moveTo).toHaveBeenCalledWith(40, 100); // x - halfSize
+    expect(mockCtx.lineTo).toHaveBeenCalledWith(60, 100); // x + halfSize
+    expect(mockCtx.moveTo).toHaveBeenCalledWith(50, 90);  // y - halfSize
+    expect(mockCtx.lineTo).toHaveBeenCalledWith(50, 110); // y + halfSize
+    expect(mockCtx.stroke).toHaveBeenCalled();
+    expect(mockCtx.restore).toHaveBeenCalled();
+  });
+
+  it('drawDash() should draw angled dash lines with proper styling', () => {
+    // Test horizontal dash (angle = 0)
+    renderer.drawDash(100, 200, 20, '#ffaaff', 0, 2, 0.7);
+    
+    expect(mockCtx.save).toHaveBeenCalled();
+    expect(mockCtx.strokeStyle).toBe('#ffaaff');
+    expect(mockCtx.lineWidth).toBe(2);
+    expect(mockCtx.globalAlpha).toBe(0.7);
+    expect(mockCtx.lineCap).toBe('round');
+    expect(mockCtx.beginPath).toHaveBeenCalled();
+    expect(mockCtx.moveTo).toHaveBeenCalledWith(90, 200);  // x - halfLength
+    expect(mockCtx.lineTo).toHaveBeenCalledWith(110, 200); // x + halfLength
+    expect(mockCtx.stroke).toHaveBeenCalled();
+    expect(mockCtx.restore).toHaveBeenCalled();
+  });
+
+  it('drawDash() should handle vertical dashes correctly', () => {
+    // Test vertical dash (angle = π/2)
+    renderer.drawDash(50, 50, 10, '#ff0000', Math.PI / 2);
+    
+    expect(mockCtx.moveTo).toHaveBeenCalledWith(50, 45);  // y - halfLength (vertical)
+    expect(mockCtx.lineTo).toHaveBeenCalledWith(50, 55);  // y + halfLength (vertical)
   });
 });
