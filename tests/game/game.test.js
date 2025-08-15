@@ -1057,12 +1057,16 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       expect(game.soundManager.playWormholeTraversal).toHaveBeenCalled();
     });
 
-    it('should skip traversal when stellar map is visible', async () => {
+    it('should allow traversal when stellar map is visible and preserve map state', async () => {
       game.stellarMap.isVisible.mockReturnValue(true);
+      game.stellarMap.centerOnPosition = vi.fn();
       const mockWormhole = {
         canTraverse: vi.fn().mockReturnValue(true),
         distanceToShip: vi.fn().mockReturnValue(1000),
-        checkDiscovery: vi.fn().mockReturnValue(false)
+        checkDiscovery: vi.fn().mockReturnValue(false),
+        getDestinationCoordinates: vi.fn().mockReturnValue({ x: 2000, y: 3000 }),
+        designation: 'alpha',
+        pairId: 'WH-TEST'
       };
 
       game.chunkManager.getAllActiveObjects.mockReturnValue({
@@ -1078,8 +1082,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
 
       await game.update(0.016);
 
-      expect(game.isTraversing).toBe(false);
-      expect(mockWormhole.canTraverse).not.toHaveBeenCalled();
+      expect(game.isTraversing).toBe(true);
+      expect(mockWormhole.canTraverse).toHaveBeenCalled();
+      expect(game.traversalDestination.stellarMapWasVisible).toBe(true);
     });
 
     it('should complete traversal correctly', async () => {
@@ -1091,7 +1096,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         y: 6000,
         velocityX: 100,
         velocityY: 200,
-        wormhole: { designation: 'alpha', wormholeId: 'WH-001' }
+        wormhole: { designation: 'alpha', wormholeId: 'WH-001' },
+        stellarMapWasVisible: false
       };
 
       await game.update(0.2); // Push over midpoint
@@ -1103,6 +1109,28 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('Traversed to WH-001-β');
     });
 
+    it('should center stellar map on new position when it was visible during traversal', async () => {
+      // Setup traversal state with stellar map visible
+      game.isTraversing = true;
+      game.traversalStartTime = 0.9; // Near midpoint
+      game.stellarMap.centerOnPosition = vi.fn();
+      game.traversalDestination = {
+        x: 5000,
+        y: 6000,
+        velocityX: 100,
+        velocityY: 200,
+        wormhole: { designation: 'alpha', wormholeId: 'WH-001' },
+        stellarMapWasVisible: true
+      };
+
+      await game.update(0.2); // Push over midpoint
+
+      // Should complete at midpoint and center stellar map
+      expect(game.camera.x).toBe(5000);
+      expect(game.camera.y).toBe(6000);
+      expect(game.stellarMap.centerOnPosition).toHaveBeenCalledWith(5000, 6000);
+    });
+
     it('should end traversal and restore momentum', async () => {
       // Setup traversal near end
       game.isTraversing = true;
@@ -1112,7 +1140,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         y: 6000,
         velocityX: 100,
         velocityY: 200,
-        wormhole: { designation: 'alpha', wormholeId: 'WH-001' }
+        wormhole: { designation: 'alpha', wormholeId: 'WH-001' },
+        stellarMapWasVisible: false
       };
 
       await game.update(0.2); // Push past end
