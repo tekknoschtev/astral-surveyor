@@ -204,12 +204,16 @@ export class Game {
         // Handle wormhole traversal transition
         if (this.isTraversing) {
             this.updateTraversal(deltaTime);
+            // Still clear frame state to prevent input corruption during traversal
+            this.input.clearFrameState();
             return; // Skip normal updates during traversal
         }
         
         // Handle universe reset transition
         if (this.isResettingUniverse) {
             this.updateUniverseReset(deltaTime);
+            // Still clear frame state to prevent input corruption during cosmic transition
+            this.input.clearFrameState();
             return; // Skip normal updates during cosmic transition
         }
         
