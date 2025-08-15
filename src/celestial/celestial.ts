@@ -3,6 +3,7 @@
 
 // Import dependencies
 import { SeededRandom } from '../utils/random.js';
+import { GameConfig } from '../config/gameConfig.js';
 
 // Interface definitions for renderer and camera
 interface Renderer {
@@ -197,7 +198,8 @@ export class Planet extends CelestialObject {
     
     initializePlanetProperties(): void {
         // Set size based on planet type
-        const baseRadius = 8 + Math.random() * 12; // 8-20 pixels base
+        const config = GameConfig.celestial.planets.baseRadius;
+        const baseRadius = config.min + Math.random() * (config.max - config.min);
         this.radius = baseRadius * this.planetType.sizeMultiplier;
         this.discoveryDistance = this.radius + 30;
         
@@ -510,7 +512,7 @@ export class Planet extends CelestialObject {
             // More generous crater scaling - larger planets get significantly more craters
             const baseCraterCount = Math.floor(this.radius / 6); // Increased from /8 to /6
             const bonusCraters = Math.floor((this.radius - 10) / 4); // Extra craters for larger planets
-            const craterCount = Math.max(2, baseCraterCount + bonusCraters); // Minimum 2 craters
+            const craterCount = Math.max(GameConfig.celestial.planets.craters.minCraters, baseCraterCount + bonusCraters);
             
             for (let i = 0; i < craterCount; i++) {
                 // Use unique planet ID for consistent but varied crater patterns
@@ -522,14 +524,15 @@ export class Planet extends CelestialObject {
                 
                 // Generate random but consistent distance from center
                 const distanceSeed = (baseHash + i * 100 + 12345) % 1000 / 1000;
-                const distance = this.radius * 0.7 * distanceSeed;
+                const distance = this.radius * GameConfig.celestial.planets.craters.distanceFromCenter * distanceSeed;
                 
                 const craterX = screenX + Math.cos(angle) * distance;
                 const craterY = screenY + Math.sin(angle) * distance;
                 
                 // Generate consistent crater size
                 const sizeSeed = (baseHash + i * 200 + 67890) % 1000 / 1000;
-                const craterSize = 1 + sizeSeed * 2;
+                const config = GameConfig.celestial.planets.craters.sizeRange;
+                const craterSize = config.min + sizeSeed * (config.max - config.min);
                 
                 ctx.beginPath();
                 ctx.arc(craterX, craterY, craterSize, 0, Math.PI * 2);
@@ -787,10 +790,11 @@ export class Star extends CelestialObject {
     
     initializeStarProperties(): void {
         // Set size based on star type
-        const baseRadius = 80 + Math.random() * 60; // 80-140 pixels base
+        const config = GameConfig.celestial.stars.baseRadius;
+        const baseRadius = config.min + Math.random() * (config.max - config.min);
         this.radius = baseRadius * this.starType.sizeMultiplier;
         this.discoveryDistance = this.radius + 400;
-        this.brakingDistance = this.radius + 100; // Separate braking distance for stars
+        this.brakingDistance = this.radius + GameConfig.celestial.stars.brakingDistance;
         
         // Set color from star type's color palette
         this.color = this.starType.colors[Math.floor(Math.random() * this.starType.colors.length)];
@@ -817,7 +821,7 @@ export class Star extends CelestialObject {
         const baseRadius = rng.nextFloat(80, 140); // 80-140 pixels base
         this.radius = baseRadius * this.starType.sizeMultiplier;
         this.discoveryDistance = this.radius + 400;
-        this.brakingDistance = this.radius + 100; // Separate braking distance for stars
+        this.brakingDistance = this.radius + GameConfig.celestial.stars.brakingDistance;
         
         // Set color from star type's color palette using seeded random
         this.color = rng.choice(this.starType.colors);
@@ -856,10 +860,18 @@ export class Star extends CelestialObject {
         // Determine number of sunspots (0-6) with realistic probability distribution
         const rand = rng.next();
         let sunspotCount: number;
-        if (rand < 0.2) sunspotCount = 0;        // 20% - solar minimum
-        else if (rand < 0.4) sunspotCount = rng.nextInt(1, 2);  // 20% - low activity
-        else if (rand < 0.7) sunspotCount = rng.nextInt(3, 4);  // 30% - moderate activity  
-        else sunspotCount = rng.nextInt(5, 6);  // 30% - high activity
+        const config = GameConfig.celestial.stars.sunspots;
+        if (rand < config.lowActivityChance) {
+            sunspotCount = 0;        // Solar minimum
+        } else if (rand < config.lowActivityChance * 2) {
+            sunspotCount = rng.nextInt(1, 2);  // Low activity
+        } else if (rand < config.lowActivityChance * 2 + config.moderateActivityChance) {
+            const range = config.moderateRange;
+            sunspotCount = rng.nextInt(range.min, range.max);  // Moderate activity  
+        } else {
+            const range = config.countRange;
+            sunspotCount = rng.nextInt(range.min, range.max);  // High activity
+        }
         
         // Generate individual sunspots
         for (let i = 0; i < sunspotCount; i++) {
@@ -1301,7 +1313,8 @@ export class Moon extends CelestialObject {
         
         // Set size based on parent planet using seeded random
         if (this.parentPlanet) {
-            const sizeVariation = rng.nextFloat(0.1, 0.2); // 10-20% of parent size
+            const config = GameConfig.celestial.moons.sizeVariation;
+            const sizeVariation = rng.nextFloat(config.min, config.max);
             this.radius = Math.max(2, Math.floor(this.parentPlanet.radius * sizeVariation));
         } else {
             this.radius = rng.nextInt(2, 4); // 2-4 pixels fallback
@@ -1335,7 +1348,7 @@ export class Moon extends CelestialObject {
         
         if (rng) {
             // Use seeded random for deterministic color selection
-            const useParentColor = rng.next() < 0.3; // 30% chance to use parent color
+            const useParentColor = rng.next() < GameConfig.celestial.moons.parentColorChance;
             if (useParentColor && this.parentPlanet) {
                 return this.darkenColor(this.parentPlanet.color, 0.4);
             } else {
@@ -1418,7 +1431,8 @@ export const PlanetTypes: Record<string, PlanetType> = {
         visualEffects: {
             hasAtmosphere: false,
             hasCraters: true,
-            hasStripes: false
+            hasStripes: false,
+            hasRings: GameConfig.celestial.planets.rings.rockyChance
         }
     },
     OCEAN: {
@@ -1431,6 +1445,7 @@ export const PlanetTypes: Record<string, PlanetType> = {
             hasAtmosphere: true,
             hasCraters: false,
             hasStripes: true, // Represents currents/weather patterns
+            hasRings: GameConfig.celestial.planets.rings.oceanChance,
             atmosphereConfig: {
                 layers: 3,
                 thickness: 12,
@@ -1454,7 +1469,7 @@ export const PlanetTypes: Record<string, PlanetType> = {
             hasCraters: false,
             hasStripes: true, // Atmospheric bands
             hasSwirls: true,
-            hasRings: 0.4, // 40% of gas giants have ring systems
+            hasRings: GameConfig.celestial.planets.rings.gasGiantChance,
             ringConfig: {
                 innerRadius: 1.4, // Multiple of planet radius
                 outerRadius: 2.2,
@@ -1483,7 +1498,8 @@ export const PlanetTypes: Record<string, PlanetType> = {
             hasAtmosphere: false,
             hasCraters: true,
             hasStripes: false,
-            hasDunePatterns: true
+            hasDunePatterns: true,
+            hasRings: GameConfig.celestial.planets.rings.desertChance
         }
     },
     FROZEN: {
@@ -1498,7 +1514,7 @@ export const PlanetTypes: Record<string, PlanetType> = {
             hasStripes: false,
             hasCrystalline: true,
             hasGlow: true, // Subtle ice glow
-            hasRings: 0.3, // 30% chance of icy ring systems
+            hasRings: GameConfig.celestial.planets.rings.frozenChance,
             ringConfig: {
                 innerRadius: 1.3,
                 outerRadius: 1.8,
@@ -1519,7 +1535,8 @@ export const PlanetTypes: Record<string, PlanetType> = {
             hasCraters: false,
             hasStripes: false,
             hasGlow: true, // Volcanic glow
-            hasLavaFlow: true
+            hasLavaFlow: true,
+            hasRings: GameConfig.celestial.planets.rings.volcanicChance
         }
     },
     EXOTIC: {
@@ -1534,7 +1551,7 @@ export const PlanetTypes: Record<string, PlanetType> = {
             hasStripes: false,
             hasGlow: true, // Mysterious glow
             hasShimmer: true, // Special effect
-            hasRings: 0.5, // 50% chance of exotic ring systems
+            hasRings: GameConfig.celestial.planets.rings.exoticChance,
             ringConfig: {
                 innerRadius: 1.5,
                 outerRadius: 2.5,

@@ -35,7 +35,7 @@ describe('World Generation and Management', () => {
   
   describe('ChunkManager', () => {
     it('should initialize with correct default values', () => {
-      expect(chunkManager.chunkSize).toBe(1000);
+      expect(chunkManager.chunkSize).toBe(2000);
       expect(chunkManager.loadRadius).toBe(1);
       expect(chunkManager.activeChunks).toBeInstanceOf(Map);
       expect(chunkManager.discoveredObjects).toBeInstanceOf(Map);
@@ -43,7 +43,7 @@ describe('World Generation and Management', () => {
     
     it('should calculate chunk coordinates from world position', () => {
       const coords1 = chunkManager.getChunkCoords(500, 750);
-      const coords2 = chunkManager.getChunkCoords(1500, 2250);
+      const coords2 = chunkManager.getChunkCoords(2500, 4500);
       const coords3 = chunkManager.getChunkCoords(-500, -750);
       
       expect(coords1.x).toBe(0);
