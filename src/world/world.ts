@@ -1106,10 +1106,12 @@ export class ChunkManager {
     scoreStarSystemPosition(x: number, y: number, currentChunkX: number, currentChunkY: number): number {
         const minDistance = 1200; // Minimum distance between star systems
         const preferredDistance = 1800; // Preferred distance for optimal spacing
+        const nebulaMinDistance = 800; // Minimum distance from nebulae to prevent overlap
+        const nebulaPreferredDistance = 1200; // Preferred distance from nebulae
         
         let score = 1.0; // Start with perfect score
         
-        // Check neighboring chunks for existing star systems
+        // Check neighboring chunks for existing star systems and nebulae
         for (let dx = -2; dx <= 2; dx++) {
             for (let dy = -2; dy <= 2; dy++) {
                 const neighborChunkX = currentChunkX + dx;
@@ -1117,20 +1119,39 @@ export class ChunkManager {
                 const chunkKey = this.getChunkKey(neighborChunkX, neighborChunkY);
                 const chunk = this.activeChunks.get(chunkKey);
                 
-                // If chunk exists, check distances to its star systems
-                if (chunk && chunk.celestialStars) {
-                    for (const star of chunk.celestialStars) {
-                        const distance = Math.sqrt(Math.pow(x - star.x, 2) + Math.pow(y - star.y, 2));
-                        
-                        // Penalize positions too close to existing systems
-                        if (distance < minDistance) {
-                            score *= 0.1; // Heavy penalty for violating minimum distance
-                        } else if (distance < preferredDistance) {
-                            // Gradual penalty for being closer than preferred
-                            const penalty = (distance - minDistance) / (preferredDistance - minDistance);
-                            score *= (0.3 + 0.7 * penalty);
+                if (chunk) {
+                    // Check distances to existing star systems
+                    if (chunk.celestialStars) {
+                        for (const star of chunk.celestialStars) {
+                            const distance = Math.sqrt(Math.pow(x - star.x, 2) + Math.pow(y - star.y, 2));
+                            
+                            // Penalize positions too close to existing systems
+                            if (distance < minDistance) {
+                                score *= 0.1; // Heavy penalty for violating minimum distance
+                            } else if (distance < preferredDistance) {
+                                // Gradual penalty for being closer than preferred
+                                const penalty = (distance - minDistance) / (preferredDistance - minDistance);
+                                score *= (0.3 + 0.7 * penalty);
+                            }
+                            // Positions at preferred distance or farther get no penalty
                         }
-                        // Positions at preferred distance or farther get no penalty
+                    }
+                    
+                    // Check distances to existing nebulae to prevent overlap
+                    if (chunk.nebulae) {
+                        for (const nebula of chunk.nebulae) {
+                            const distance = Math.sqrt(Math.pow(x - nebula.x, 2) + Math.pow(y - nebula.y, 2));
+                            
+                            // Penalize positions too close to nebulae
+                            if (distance < nebulaMinDistance) {
+                                score *= 0.05; // Very heavy penalty for overlapping with nebulae
+                            } else if (distance < nebulaPreferredDistance) {
+                                // Gradual penalty for being closer than preferred
+                                const penalty = (distance - nebulaMinDistance) / (nebulaPreferredDistance - nebulaMinDistance);
+                                score *= (0.2 + 0.8 * penalty);
+                            }
+                            // Positions at preferred distance or farther get minimal penalty
+                        }
                     }
                 }
             }
