@@ -2,6 +2,7 @@
 // TypeScript conversion with comprehensive type definitions
 
 // Import dependencies
+import { GameConfig } from '../config/gameConfig.js';
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
@@ -216,9 +217,9 @@ export class ThrusterParticles {
             this.particles.push({
                 x: thrusterX,
                 y: thrusterY,
-                velocityX: -thrustDirection.x * 80 + (Math.random() - 0.5) * 40,
-                velocityY: -thrustDirection.y * 80 + (Math.random() - 0.5) * 40,
-                life: 0.5 + Math.random() * 0.3,
+                velocityX: -thrustDirection.x * GameConfig.particles.thrust.baseVelocity + (Math.random() - 0.5) * GameConfig.particles.thrust.velocitySpread,
+                velocityY: -thrustDirection.y * GameConfig.particles.thrust.baseVelocity + (Math.random() - 0.5) * GameConfig.particles.thrust.velocitySpread,
+                life: GameConfig.particles.thrust.lifeRange.min + Math.random() * (GameConfig.particles.thrust.lifeRange.max - GameConfig.particles.thrust.lifeRange.min),
                 maxLife: 0.8,
                 alpha: 1.0,
                 color: particleColor
@@ -294,35 +295,40 @@ export class StarParticles {
         for (let i = 0; i < particlesToSpawn; i++) {
             // Random position around star surface
             const angle = Math.random() * Math.PI * 2;
-            const spawnRadius = star.radius * (0.8 + Math.random() * 0.3); // Spawn mostly on surface
+            const radiusConfig = GameConfig.particles.stellarCorona.radiusMultiplier;
+            const spawnRadius = star.radius * (radiusConfig.min + Math.random() * (radiusConfig.max - radiusConfig.min));
             const spawnX = star.x + Math.cos(angle) * spawnRadius;
             const spawnY = star.y + Math.sin(angle) * spawnRadius;
 
             // Very slow particle velocity for majestic corona effect
-            const speed = 3 + Math.random() * 6; // Much slower speed (3-9 vs 8-20)
-            const velocityAngle = angle + (Math.random() - 0.5) * 0.4; // Slightly more random direction
+            const speedConfig = GameConfig.particles.stellarCorona.speedRange;
+            const speed = speedConfig.min + Math.random() * (speedConfig.max - speedConfig.min);
+            const velocityAngle = angle + (Math.random() - 0.5) * GameConfig.particles.stellarCorona.directionRandomness;
             const velocityX = Math.cos(velocityAngle) * speed;
             const velocityY = Math.sin(velocityAngle) * speed;
 
             // Make particles brighter/lighter than the star itself
-            const particleColor = this.lightenColor(star.color, 0.4 + Math.random() * 0.3); // 40-70% lighter
+            const brightnessConfig = GameConfig.particles.stellarCorona.brightnessRange;
+            const particleColor = this.lightenColor(star.color, brightnessConfig.min + Math.random() * (brightnessConfig.max - brightnessConfig.min));
 
-            // Add size variance - mostly 1px with some larger particles
+            // Add size variance based on configuration
             let particleSize = 1;
             const sizeRand = Math.random();
-            if (sizeRand > 0.85) {
-                particleSize = 3; // 15% chance of larger particles
-            } else if (sizeRand > 0.7) {
-                particleSize = 2; // 15% chance of medium particles
+            const config = GameConfig.particles.stellarCorona.sizes;
+            if (sizeRand > (1 - config.large.chance)) {
+                particleSize = config.large.size;
+            } else if (sizeRand > (1 - config.large.chance - config.medium.chance)) {
+                particleSize = config.medium.size;
+            } else {
+                particleSize = config.small.size;
             }
-            // 70% remain size 1
 
             this.particles.push({
                 x: spawnX,
                 y: spawnY,
                 velocityX: velocityX,
                 velocityY: velocityY,
-                life: 1.0 + Math.random() * 0.8, // Shorter life = stay closer
+                life: GameConfig.particles.stellarCorona.lifeRange.min + Math.random() * (GameConfig.particles.stellarCorona.lifeRange.max - GameConfig.particles.stellarCorona.lifeRange.min),
                 maxLife: 1.8,
                 alpha: 1.0,
                 color: particleColor,

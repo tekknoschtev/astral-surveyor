@@ -8,6 +8,7 @@ import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
+import { GameConfig } from '../config/gameConfig.js';
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
@@ -151,7 +152,7 @@ export class ChunkManager {
     debugObjects?: Array<{type: string, object: any, x: number, y: number}>;
 
     constructor() {
-        this.chunkSize = 1000; // 1000x1000 pixel chunks
+        this.chunkSize = GameConfig.world.chunkSize;
         this.loadRadius = 1; // Load chunks in 3x3 grid around player
         this.activeChunks = new Map(); // Key: "x,y", Value: chunk data
         this.discoveredObjects = new Map(); // Key: "objId", Value: discovery state
@@ -236,15 +237,16 @@ export class ChunkManager {
         const starSystemRoll = starSystemRng.nextFloat(0, 1);
         let starSystemCount: number;
         
-        if (starSystemRoll < 0.92) {
-            starSystemCount = 0; // 92% chance of empty chunk (even more space to explore with larger orbits)
+        const spawnThreshold = 1 - GameConfig.world.starSystem.spawnChance;
+        if (starSystemRoll < spawnThreshold) {
+            starSystemCount = 0; // Most chunks will be empty space
         } else {
-            starSystemCount = 1; // 8% chance of having a star system
+            starSystemCount = 1; // Configured chance of having a star system
         }
 
         for (let i = 0; i < starSystemCount; i++) {
             // Improved star system placement to eliminate vertical line patterns
-            const margin = 250; // Margin for larger star systems with epic outer planet orbits
+            const margin = GameConfig.world.starSystem.margin;
             
             // Use separate RNG instances for X and Y to break correlation
             const positionSeed = starSystemSeed + i * 1000000; // Unique seed per star system
@@ -280,9 +282,9 @@ export class ChunkManager {
             // Determine star type based on rarity distribution
             const starType = this.selectStarType(starSystemRng);
             
-            // Check for binary system generation (10% chance)
+            // Check for binary system generation
             const binaryChance = starSystemRng.nextFloat(0, 1);
-            const isBinary = binaryChance < 0.10; // 10% chance for binary systems
+            const isBinary = binaryChance < GameConfig.world.starSystem.binaryChance;
             
             // Create the primary star with the selected type
             const star = new Star(starX, starY, starType);
@@ -291,7 +293,10 @@ export class ChunkManager {
             // Add binary companion if this is a binary system
             if (isBinary) {
                 // Generate companion star properties
-                const companionDistance = starSystemRng.nextFloat(150, 300); // Distance between stars
+                const companionDistance = starSystemRng.nextFloat(
+                    GameConfig.world.binaryStars.distanceRange.min, 
+                    GameConfig.world.binaryStars.distanceRange.max
+                );
                 const companionAngle = starSystemRng.nextFloat(0, Math.PI * 2); // Random angle
                 const companionX = starX + Math.cos(companionAngle) * companionDistance;
                 const companionY = starY + Math.sin(companionAngle) * companionDistance;
@@ -314,21 +319,25 @@ export class ChunkManager {
             const planetRoll = starSystemRng.nextFloat(0, 1);
             let planetCount: number;
             
-            if (planetRoll < 0.10) {
-                planetCount = 0; // 10% chance - empty system
-            } else if (planetRoll < 0.25) {
-                planetCount = 1; // 15% chance - single planet
-            } else if (planetRoll < 0.85) {
-                planetCount = starSystemRng.nextInt(2, 5); // 60% chance - 2-5 planets (most common)
-            } else if (planetRoll < 0.97) {
-                planetCount = starSystemRng.nextInt(6, 8); // 12% chance - 6-8 planets (solar system-like)
+            const config = GameConfig.world.planetCounts;
+            if (planetRoll < config.empty) {
+                planetCount = 0; // Empty system
+            } else if (planetRoll < config.empty + config.single) {
+                planetCount = 1; // Single planet
+            } else if (planetRoll < config.empty + config.single + config.small) {
+                const range = GameConfig.world.planetCountRanges.small;
+                planetCount = starSystemRng.nextInt(range.min, range.max); // Small system - most common
+            } else if (planetRoll < config.empty + config.single + config.small + config.medium) {
+                const range = GameConfig.world.planetCountRanges.medium;
+                planetCount = starSystemRng.nextInt(range.min, range.max); // Medium system - solar system-like
             } else {
-                planetCount = starSystemRng.nextInt(9, 12); // 3% chance - 9-12 planets (massive system)
+                const range = GameConfig.world.planetCountRanges.large;
+                planetCount = starSystemRng.nextInt(range.min, range.max); // Large system - massive system
             }
             
             for (let j = 0; j < planetCount; j++) {
                 // Calculate orbital distance based on planet index and star size
-                const minDistance = star.radius + 60; // Minimum safe distance from star
+                const minDistance = star.radius + GameConfig.celestial.planets.minDistanceFromStar;
                 
                 // Scale orbital distance with much more dramatic variation for speed differences
                 // Inner planets much closer, outer planets can have truly massive orbits
@@ -358,14 +367,20 @@ export class ChunkManager {
                 const planetSeed = starSystemSeed ^ (j * 0xA5A5A5A5) ^ 0xDEADBEEF; // Unique seed for each planet
                 const planetRng = new SeededRandom(planetSeed);
                 
-                const baseSpeed = 0.08; // radians per second (more perceptible motion)
+                const baseSpeed = GameConfig.celestial.planets.orbitalSpeed.base;
                 
                 // Stronger inverse relationship with distance for more dramatic speed differences
                 // Using a more pronounced power relationship to make speed differences very visible
-                const distanceSpeedFactor = Math.pow(120 / orbitalDistance, 2.0); // More dramatic Kepler's law
+                const distanceSpeedFactor = Math.pow(
+                    GameConfig.celestial.planets.orbitalSpeed.keplerReference / orbitalDistance, 
+                    GameConfig.celestial.planets.orbitalSpeed.keplerExponent
+                );
                 
-                // Individual randomness for each planet (±30% variation, less random more physics-based)
-                const randomSpeedFactor = planetRng.nextFloat(0.7, 1.3);
+                // Individual randomness for each planet
+                const randomSpeedFactor = planetRng.nextFloat(
+                    GameConfig.celestial.planets.orbitalSpeed.randomFactor.min,
+                    GameConfig.celestial.planets.orbitalSpeed.randomFactor.max
+                );
                 
                 const orbitalSpeed = baseSpeed * distanceSpeedFactor * randomSpeedFactor;
                 
@@ -415,48 +430,16 @@ export class ChunkManager {
         
         if (relativeDistance < 0.2) {
             // Very close to star - hot planets more likely
-            probabilities = {
-                ROCKY: 0.5,
-                VOLCANIC: 0.25,
-                DESERT: 0.2,
-                OCEAN: 0.03,
-                FROZEN: 0.01,
-                GAS_GIANT: 0.01,
-                EXOTIC: 0.001
-            };
+            probabilities = GameConfig.planetTypes.inner;
         } else if (relativeDistance < 0.4) {
             // Close to star - temperate zone
-            probabilities = {
-                ROCKY: 0.35,
-                OCEAN: 0.25,
-                DESERT: 0.2,
-                VOLCANIC: 0.1,
-                GAS_GIANT: 0.05,
-                FROZEN: 0.03,
-                EXOTIC: 0.02
-            };
+            probabilities = GameConfig.planetTypes.habitable;
         } else if (relativeDistance < 0.7) {
             // Medium distance - gas giants more common
-            probabilities = {
-                GAS_GIANT: 0.3,
-                ROCKY: 0.25,
-                OCEAN: 0.15,
-                FROZEN: 0.15,
-                DESERT: 0.1,
-                VOLCANIC: 0.03,
-                EXOTIC: 0.02
-            };
+            probabilities = GameConfig.planetTypes.outer;
         } else {
             // Far from star - frozen worlds dominate
-            probabilities = {
-                FROZEN: 0.4,
-                GAS_GIANT: 0.25,
-                ROCKY: 0.2,
-                OCEAN: 0.1,
-                DESERT: 0.02,
-                VOLCANIC: 0.01,
-                EXOTIC: 0.02
-            };
+            probabilities = GameConfig.planetTypes.far;
         }
         
         // Apply star type modifiers to create realistic stellar systems
@@ -1104,10 +1087,10 @@ export class ChunkManager {
     
     // Score a potential star system position based on distance from existing systems
     scoreStarSystemPosition(x: number, y: number, currentChunkX: number, currentChunkY: number): number {
-        const minDistance = 1200; // Minimum distance between star systems
-        const preferredDistance = 1800; // Preferred distance for optimal spacing
-        const nebulaMinDistance = 800; // Minimum distance from nebulae to prevent overlap
-        const nebulaPreferredDistance = 1200; // Preferred distance from nebulae
+        const minDistance = GameConfig.world.starSystem.minDistance;
+        const preferredDistance = GameConfig.world.starSystem.preferredDistance;
+        const nebulaMinDistance = GameConfig.world.specialObjects.nebulae.minDistance;
+        const nebulaPreferredDistance = GameConfig.world.specialObjects.nebulae.preferredDistance;
         
         let score = 1.0; // Start with perfect score
         
@@ -1168,17 +1151,17 @@ export class ChunkManager {
         
         // Gas giants have the highest chance of moons
         if (planet.planetType === PlanetTypes.GAS_GIANT) {
-            moonChance = 0.6; // 60% chance
+            moonChance = GameConfig.world.moons.gasGiantChance;
             maxMoons = 4;
         }
         // Large rocky/ocean planets can have moons
         else if ((planet.planetType === PlanetTypes.ROCKY || planet.planetType === PlanetTypes.OCEAN) && planet.radius > 15) {
-            moonChance = 0.25; // 25% chance for large planets
+            moonChance = GameConfig.world.moons.largePlanetChance;
             maxMoons = 2;
         }
         // Other planet types have low chance of moons
         else {
-            moonChance = 0.10; // 10% chance
+            moonChance = GameConfig.world.moons.otherPlanetChance;
             maxMoons = 1;
         }
         
@@ -1192,8 +1175,8 @@ export class ChunkManager {
         
         for (let i = 0; i < moonCount; i++) {
             // Calculate moon orbital parameters
-            const minDistance = planet.radius + 15; // Minimum safe distance from planet
-            const maxDistance = planet.radius + 50; // Maximum distance (closer than planets)
+            const minDistance = planet.radius + GameConfig.world.moons.minDistance;
+            const maxDistance = planet.radius + GameConfig.world.moons.maxDistance;
             const orbitalDistance = rng.nextFloat(minDistance, maxDistance);
             
             // Random starting angle
@@ -1282,12 +1265,15 @@ export class ChunkManager {
         const nebulaeRoll = nebulaeRng.nextFloat(0, 1);
         let nebulaeCount: number;
         
-        if (nebulaeRoll < 0.95) {
-            nebulaeCount = 0; // 95% chance of no nebulae
-        } else if (nebulaeRoll < 0.98) {
-            nebulaeCount = 1; // 3% chance of 1 nebula
+        const spawnThreshold = GameConfig.world.specialObjects.nebulae.spawnChance;
+        const multipleThreshold = spawnThreshold + GameConfig.world.specialObjects.nebulae.multipleChance;
+        
+        if (nebulaeRoll < (1 - spawnThreshold)) {
+            nebulaeCount = 0; // Most chunks have no nebulae
+        } else if (nebulaeRoll < (1 - multipleThreshold)) {
+            nebulaeCount = 1; // Single nebula
         } else {
-            nebulaeCount = nebulaeRng.nextInt(1, 2); // 2% chance of 1-2 nebulae (rare clusters)
+            nebulaeCount = nebulaeRng.nextInt(1, 2); // Rare clusters of multiple nebulae
         }
         
         for (let i = 0; i < nebulaeCount; i++) {
@@ -1318,12 +1304,15 @@ export class ChunkManager {
         const asteroidRoll = asteroidRng.nextFloat(0, 1);
         let asteroidCount: number;
         
-        if (asteroidRoll < 0.85) {
-            asteroidCount = 0; // 85% chance of no asteroid gardens
-        } else if (asteroidRoll < 0.95) {
-            asteroidCount = 1; // 10% chance of 1 asteroid garden
+        const asteroidSpawnThreshold = GameConfig.world.specialObjects.asteroidGardens.spawnChance;
+        const asteroidMultipleThreshold = asteroidSpawnThreshold + GameConfig.world.specialObjects.asteroidGardens.multipleChance;
+        
+        if (asteroidRoll < (1 - asteroidSpawnThreshold)) {
+            asteroidCount = 0; // Most chunks have no asteroid gardens
+        } else if (asteroidRoll < (1 - asteroidMultipleThreshold)) {
+            asteroidCount = 1; // Single asteroid garden
         } else {
-            asteroidCount = asteroidRng.nextInt(1, 2); // 5% chance of 1-2 asteroid gardens (rare multiple fields)
+            asteroidCount = asteroidRng.nextInt(1, 2); // Rare multiple asteroid gardens
         }
         
         for (let i = 0; i < asteroidCount; i++) {
@@ -1403,8 +1392,8 @@ export class ChunkManager {
         // 99.95% of chunks will have no wormholes (approximately 1 every 2000 chunks)
         const wormholeRoll = wormholeRng.nextFloat(0, 1);
         
-        if (wormholeRoll >= 0.0005) {
-            return; // No wormhole in this chunk (99.95% of the time)
+        if (wormholeRoll >= GameConfig.world.specialObjects.wormholes.spawnChance) {
+            return; // No wormhole in this chunk (most of the time)
         }
         
         // This chunk gets a wormhole! Generate its pair location
@@ -1529,9 +1518,8 @@ export class ChunkManager {
         const blackHoleSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
         const blackHoleRng = new SeededRandom(blackHoleSeed);
         
-        // Ultra-rare chance: 0.0001% (1 in 1,000,000 chance)  
-        // This means roughly 1 black hole every 1,000,000 chunks
-        const blackHoleChance = 0.000001;
+        // Ultra-rare chance for black holes
+        const blackHoleChance = GameConfig.world.specialObjects.blackHoles.spawnChance;
         
         if (blackHoleRng.next() > blackHoleChance) {
             return; // No black hole in this chunk
@@ -1546,7 +1534,7 @@ export class ChunkManager {
         
         // Check for conflicts with existing celestial objects
         let hasConflict = false;
-        const minDistance = 2000; // 2000px minimum distance from any major object
+        const minDistance = GameConfig.world.specialObjects.blackHoles.minDistance;
         
         // Check celestial stars in this chunk
         for (const star of chunk.celestialStars) {
@@ -1709,6 +1697,11 @@ export class InfiniteStarField {
         // Then render the original chunk-based stars (these are "foreground" stars)
         this.renderChunkStars(renderer, camera);
         
+        // Render debug chunk boundaries if enabled
+        if (GameConfig.debug.enabled && GameConfig.debug.chunkBoundaries.enabled) {
+            this.renderChunkBoundaries(renderer, camera);
+        }
+        
         // Update camera tracking
         this.lastCameraX = camera.x;
         this.lastCameraY = camera.y;
@@ -1716,7 +1709,7 @@ export class InfiniteStarField {
     
     renderParallaxLayers(renderer: Renderer, camera: Camera): void {
         const { canvas } = renderer;
-        const regionSize = 2000; // Size of each parallax region
+        const regionSize = GameConfig.visual.parallax.regionSize;
         
         // Calculate which regions we need to cover the screen for each parallax layer
         for (const layer of this.parallaxLayers) {
@@ -1779,6 +1772,118 @@ export class InfiniteStarField {
                     renderer.drawCircle(screenX, screenY, star.size, colorWithAlpha);
                 } else {
                     renderer.drawPixel(screenX, screenY, colorWithAlpha);
+                }
+            }
+        }
+    }
+    
+    renderChunkBoundaries(renderer: Renderer, camera: Camera): void {
+        const { canvas } = renderer;
+        const config = GameConfig.debug.chunkBoundaries;
+        
+        // Calculate which chunks are visible on screen
+        const margin = 100; // Add margin to ensure we draw boundaries just off-screen
+        const topLeftX = camera.x - (canvas.width / 2) - margin;
+        const topLeftY = camera.y - (canvas.height / 2) - margin;
+        const bottomRightX = camera.x + (canvas.width / 2) + margin;
+        const bottomRightY = camera.y + (canvas.height / 2) + margin;
+        
+        // Calculate chunk coordinate ranges
+        const startChunkX = Math.floor(topLeftX / this.chunkManager.chunkSize);
+        const endChunkX = Math.floor(bottomRightX / this.chunkManager.chunkSize);
+        const startChunkY = Math.floor(topLeftY / this.chunkManager.chunkSize);
+        const endChunkY = Math.floor(bottomRightY / this.chunkManager.chunkSize);
+        
+        // Draw crosshairs at each chunk boundary intersection
+        for (let chunkX = startChunkX; chunkX <= endChunkX + 1; chunkX++) {
+            for (let chunkY = startChunkY; chunkY <= endChunkY + 1; chunkY++) {
+                // Calculate world position of this chunk boundary intersection
+                const worldX = chunkX * this.chunkManager.chunkSize;
+                const worldY = chunkY * this.chunkManager.chunkSize;
+                
+                // Convert to screen coordinates
+                const [screenX, screenY] = camera.worldToScreen(worldX, worldY, canvas.width, canvas.height);
+                
+                // Only draw if the crosshair would be visible on screen
+                if (screenX >= -config.crosshairSize && screenX <= canvas.width + config.crosshairSize &&
+                    screenY >= -config.crosshairSize && screenY <= canvas.height + config.crosshairSize) {
+                    
+                    renderer.drawCrosshair(
+                        screenX, 
+                        screenY, 
+                        config.crosshairSize, 
+                        config.color, 
+                        config.lineWidth, 
+                        config.opacity
+                    );
+                }
+            }
+        }
+        
+        // Render subdivision markers if enabled
+        if (config.subdivisions.enabled) {
+            this.renderChunkSubdivisions(renderer, camera, startChunkX, endChunkX, startChunkY, endChunkY);
+        }
+    }
+    
+    renderChunkSubdivisions(renderer: Renderer, camera: Camera, startChunkX: number, endChunkX: number, startChunkY: number, endChunkY: number): void {
+        const { canvas } = renderer;
+        const config = GameConfig.debug.chunkBoundaries.subdivisions;
+        const chunkSize = this.chunkManager.chunkSize;
+        const subdivisionDistance = chunkSize * config.interval; // Distance between subdivision marks
+        
+        // Render vertical subdivision lines (along chunk X boundaries)
+        for (let chunkX = startChunkX; chunkX <= endChunkX + 1; chunkX++) {
+            const worldX = chunkX * chunkSize;
+            
+            // For each Y chunk span, add subdivision markers along the vertical line
+            for (let chunkY = startChunkY; chunkY <= endChunkY; chunkY++) {
+                for (let i = 1; i < (1 / config.interval); i++) { // Skip 0% and 100% (those have crosshairs)
+                    const worldY = chunkY * chunkSize + (i * subdivisionDistance);
+                    const [screenX, screenY] = camera.worldToScreen(worldX, worldY, canvas.width, canvas.height);
+                    
+                    // Only draw if visible on screen
+                    if (screenX >= -config.dashLength && screenX <= canvas.width + config.dashLength &&
+                        screenY >= -config.dashLength && screenY <= canvas.height + config.dashLength) {
+                        
+                        renderer.drawDash(
+                            screenX,
+                            screenY,
+                            config.dashLength,
+                            config.color,
+                            Math.PI / 2, // Horizontal dash on vertical line
+                            config.lineWidth,
+                            config.opacity
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Render horizontal subdivision lines (along chunk Y boundaries)
+        for (let chunkY = startChunkY; chunkY <= endChunkY + 1; chunkY++) {
+            const worldY = chunkY * chunkSize;
+            
+            // For each X chunk span, add subdivision markers along the horizontal line
+            for (let chunkX = startChunkX; chunkX <= endChunkX; chunkX++) {
+                for (let i = 1; i < (1 / config.interval); i++) { // Skip 0% and 100% (those have crosshairs)
+                    const worldX = chunkX * chunkSize + (i * subdivisionDistance);
+                    const [screenX, screenY] = camera.worldToScreen(worldX, worldY, canvas.width, canvas.height);
+                    
+                    // Only draw if visible on screen
+                    if (screenX >= -config.dashLength && screenX <= canvas.width + config.dashLength &&
+                        screenY >= -config.dashLength && screenY <= canvas.height + config.dashLength) {
+                        
+                        renderer.drawDash(
+                            screenX,
+                            screenY,
+                            config.dashLength,
+                            config.color,
+                            0, // Vertical dash on horizontal line
+                            config.lineWidth,
+                            config.opacity
+                        );
+                    }
                 }
             }
         }
