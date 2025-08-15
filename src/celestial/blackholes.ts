@@ -210,23 +210,37 @@ export class BlackHole extends CelestialObject {
         const normalizedDx = dx / pullDirection;
         const normalizedDy = dy / pullDirection;
         
-        // Calculate pull strength based on inverse square law (simplified)
-        const influenceRatio = 1 - (distance / this.gravitationalInfluence);
-        const pullStrength = this.gravitationalStrength * influenceRatio * influenceRatio;
+        // NEW: Greatly reduced gravitational pull until crossing event horizon
+        let pullForceX = 0;
+        let pullForceY = 0;
         
-        // Apply gravitational acceleration
-        const pullForceX = normalizedDx * pullStrength;
-        const pullForceY = normalizedDy * pullStrength;
-        
-        // Determine warning levels and danger states
+        // Determine warning levels and danger states first
         if (distance <= this.eventHorizonRadius) {
             this.isPlayerPastEventHorizon = true;
             this.warningLevel = 3; // Maximum danger
+            
+            // STRONG pull only after crossing event horizon - point of no return
+            const eventHorizonPenetration = 1 - (distance / this.eventHorizonRadius);
+            const pullStrength = this.gravitationalStrength * eventHorizonPenetration * eventHorizonPenetration;
+            pullForceX = normalizedDx * pullStrength;
+            pullForceY = normalizedDy * pullStrength;
+            
         } else if (distance <= this.eventHorizonRadius * 2) {
             this.isPlayerInDangerZone = true;
             this.warningLevel = 2; // High danger
+            
+            // Very light pull in danger zone - gives player time to read warning and react
+            const pullStrength = this.gravitationalStrength * 0.05; // 5% of normal strength
+            pullForceX = normalizedDx * pullStrength;
+            pullForceY = normalizedDy * pullStrength;
+            
         } else if (distance <= this.eventHorizonRadius * 4) {
             this.warningLevel = 1; // Caution
+            
+            // Minimal gravitational effect in caution zone - mostly for atmosphere
+            const pullStrength = this.gravitationalStrength * 0.01; // 1% of normal strength  
+            pullForceX = normalizedDx * pullStrength;
+            pullForceY = normalizedDy * pullStrength;
         }
         
         return {
