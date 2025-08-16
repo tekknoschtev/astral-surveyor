@@ -17,6 +17,9 @@ interface SoundConfig {
     waveform?: OscillatorType;
     filterFreq?: number;
     filterQ?: number;
+    reverbTime?: number;
+    reverbDecay?: number;
+    reverbWetness?: number;
 }
 
 // Sound generation options
@@ -124,90 +127,111 @@ export class SoundManager {
         const configs: Record<string, SoundConfig> = {
             'star_discovery': {
                 type: 'oscillator',
-                frequency: 110,
-                frequency2: 165,
-                duration: 1.2,
-                attack: 0.1,
-                decay: 0.2,
+                frequency: 98,    // Slightly lower for warmer tone
+                frequency2: 147,  // Slightly lower for warmer harmony
+                duration: 2.0,    // Extended duration for reverb tail
+                attack: 0.3,      // Soft, gentle onset
+                decay: 0.4,       // Gradual decay
                 sustain: 0.3,
-                release: 0.3,
-                volume: 0.6,
-                waveform: 'sine'
+                release: 0.8,     // Long, soft release
+                volume: 0.5,      // Slightly quieter
+                waveform: 'sine', // Pure, soft sine wave
+                reverbTime: 2.0,  // 2-second reverb tail
+                reverbDecay: 2.5, // Moderate decay rate
+                reverbWetness: 0.4 // 40% reverb mix
             },
             'planet_discovery': {
                 type: 'oscillator', 
-                frequency: 220,
-                frequency2: 330,
-                duration: 0.6,
-                attack: 0.05,
-                decay: 0.15,
+                frequency: 196,   // Lower for warmer tone
+                frequency2: 294,  // Lower harmony
+                duration: 1.5,    // Extended duration
+                attack: 0.2,      // Soft onset
+                decay: 0.3,       // Gentle decay
                 sustain: 0.4,
-                release: 0.25,
-                volume: 0.5,
-                waveform: 'triangle'
+                release: 0.6,     // Longer release
+                volume: 0.45,     // Slightly quieter
+                waveform: 'sine', // Softer sine instead of triangle
+                reverbTime: 1.5,  // 1.5-second reverb
+                reverbDecay: 2.0,
+                reverbWetness: 0.35
             },
             'moon_discovery': {
                 type: 'oscillator',
-                frequency: 440,
-                duration: 0.3,
-                attack: 0.02,
-                decay: 0.08,
-                sustain: 0.1,
-                release: 0.15,
-                volume: 0.4,
-                waveform: 'sine'
+                frequency: 392,   // Lower, softer
+                duration: 0.8,    // Extended duration
+                attack: 0.1,      // Softer onset
+                decay: 0.2,       // Gentle decay
+                sustain: 0.2,
+                release: 0.4,     // Longer, gentle release
+                volume: 0.35,     // Quieter
+                waveform: 'sine',
+                reverbTime: 1.0,  // 1-second reverb
+                reverbDecay: 1.8,
+                reverbWetness: 0.3
             },
             'nebula_discovery': {
                 type: 'oscillator',
-                frequency: 880,
-                frequency2: 1320,  // Perfect fifth for harmonic sparkle
-                duration: 1.0,
-                attack: 0.15,      // Slow attack for ethereal build-up
-                decay: 0.3,        // Gentle decay
+                frequency: 784,    // Slightly lower for softer sparkle
+                frequency2: 1176,  // Maintain harmonic ratio but lower
+                duration: 1.8,     // Extended for reverb tail
+                attack: 0.25,      // Even slower ethereal build-up
+                decay: 0.4,        // Gentle decay
                 sustain: 0.2,      // Lower sustain for twinkly effect
-                release: 0.4,      // Long release for ethereal fade
-                volume: 0.45,
-                waveform: 'triangle'  // Triangle wave for softer, warmer sparkle
+                release: 0.7,      // Longer ethereal fade
+                volume: 0.4,       // Slightly quieter
+                waveform: 'sine',  // Pure sine for softest sparkle
+                reverbTime: 2.5,   // Long cosmic reverb
+                reverbDecay: 3.0,  // Very ethereal decay
+                reverbWetness: 0.5 // High reverb mix for cosmic effect
             },
             'rare_discovery': {
                 type: 'oscillator',
-                frequency: 65,
-                frequency2: 97,
-                duration: 1.2,
-                attack: 0.15,
-                decay: 0.3,
+                frequency: 58,     // Deeper, more mysterious
+                frequency2: 87,    // Maintain ratio but deeper
+                duration: 2.5,     // Extended for epic feel
+                attack: 0.4,       // Slow, majestic onset
+                decay: 0.5,        // Gradual decay
                 sustain: 0.4,
-                release: 0.5,
-                volume: 0.6,
-                waveform: 'sine'
+                release: 1.2,      // Very long, majestic release
+                volume: 0.5,       // Slightly quieter
+                waveform: 'sine',
+                reverbTime: 3.0,   // Long, majestic reverb
+                reverbDecay: 3.5,  // Very slow decay for rarity
+                reverbWetness: 0.6 // High reverb for cosmic grandeur
             },
             'wormhole_discovery': {
                 type: 'oscillator',
-                frequency: 55,        // Deep, resonant fundamental frequency
-                frequency2: 110,      // Perfect octave for harmonic depth
-                duration: 2.0,        // Long duration for cosmic significance
-                attack: 0.3,          // Slow build for mysterious emergence
-                decay: 0.4,           // Extended decay for ethereal quality
+                frequency: 49,        // Even deeper, more mysterious
+                frequency2: 98,       // Maintain octave relationship
+                duration: 3.0,        // Extended for reverb tail
+                attack: 0.5,          // Very slow, mysterious emergence
+                decay: 0.6,           // Extended decay for ethereal quality
                 sustain: 0.3,         // Sustained presence
-                release: 0.8,         // Very long release for haunting fade
-                volume: 0.7,          // Prominent but not overwhelming
-                waveform: 'sawtooth', // Rich harmonics for otherworldly character
-                filterFreq: 200,      // Low-pass filter for deep space ambiance
-                filterQ: 1.2          // Moderate resonance for character
+                release: 1.5,         // Extremely long haunting fade
+                volume: 0.6,          // Slightly quieter but present
+                waveform: 'sine',     // Softer sine instead of harsh sawtooth
+                filterFreq: 150,      // Lower filter for even softer tone
+                filterQ: 1.0,         // Gentler filtering
+                reverbTime: 4.0,      // Very long cosmic reverb
+                reverbDecay: 4.0,     // Ultra-slow decay for cosmic mystery
+                reverbWetness: 0.7    // High reverb for otherworldly effect
             },
             'wormhole_traversal': {
                 type: 'oscillator',
-                frequency: 80,        // Mid-low frequency for dimensional shift
-                frequency2: 120,      // Perfect fifth for stability in chaos
-                duration: 1.5,        // Duration matches traversal time
-                attack: 0.1,          // Quick onset for sudden shift
-                decay: 0.2,           // Brief decay
-                sustain: 0.6,         // Strong sustain during transition
-                release: 0.4,         // Moderate release for soft landing
-                volume: 0.65,
-                waveform: 'triangle', // Softer than sawtooth but richer than sine
-                filterFreq: 400,      // Slightly higher filter for movement sense
-                filterQ: 1.5          // More resonance for dramatic effect
+                frequency: 72,        // Lower for softer dimensional shift
+                frequency2: 108,      // Maintain perfect fifth relationship
+                duration: 2.0,        // Extended duration for reverb
+                attack: 0.2,          // Softer onset for gentler shift
+                decay: 0.3,           // Longer decay
+                sustain: 0.5,         // Sustained transition
+                release: 0.8,         // Longer, softer landing
+                volume: 0.55,         // Quieter
+                waveform: 'sine',     // Softer sine wave
+                filterFreq: 300,      // Lower filter for softer tone
+                filterQ: 1.2,         // Gentler resonance
+                reverbTime: 2.0,      // Reverb for spatial sense
+                reverbDecay: 2.5,
+                reverbWetness: 0.4
             },
             'map_toggle': {
                 type: 'oscillator',
@@ -258,6 +282,36 @@ export class SoundManager {
         return configs[name];
     }
 
+    private createReverbEffect(reverbTime: number, reverbDecay: number): AudioNode | null {
+        if (!this.context) return null;
+
+        try {
+            // Create a simple algorithmic reverb using multiple delay lines
+            const convolver = this.context.createConvolver();
+            
+            // Create impulse response buffer for reverb
+            const sampleRate = this.context.sampleRate;
+            const length = sampleRate * reverbTime;
+            const impulse = this.context.createBuffer(2, length, sampleRate);
+            
+            // Generate reverb impulse response
+            for (let channel = 0; channel < 2; channel++) {
+                const channelData = impulse.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    // Create exponentially decaying noise for reverb tail
+                    const decay = Math.pow(1 - (i / length), reverbDecay);
+                    channelData[i] = (Math.random() * 2 - 1) * decay;
+                }
+            }
+            
+            convolver.buffer = impulse;
+            return convolver;
+        } catch (error) {
+            console.warn('Failed to create reverb effect:', error);
+            return null;
+        }
+    }
+
     private playOscillatorSound(config: SoundConfig, options: SoundOptions = {}): void {
         if (!this.context || !this.effectsGain || this.muted) return;
 
@@ -301,6 +355,36 @@ export class SoundManager {
                     }
                     gainNode.connect(filter);
                     outputNode = filter;
+                }
+                
+                // Apply reverb if specified
+                if (config.reverbTime && config.reverbTime > 0) {
+                    const reverbEffect = this.createReverbEffect(
+                        config.reverbTime, 
+                        config.reverbDecay || 2.0
+                    );
+                    const dryGain = this.context.createGain();
+                    const wetGain = this.context.createGain();
+                    const mixGain = this.context.createGain();
+                    
+                    if (reverbEffect) {
+                        const wetness = config.reverbWetness || 0.3;
+                        
+                        // Set dry/wet mix levels
+                        dryGain.gain.setValueAtTime(1 - wetness, now);
+                        wetGain.gain.setValueAtTime(wetness, now);
+                        
+                        // Connect dry signal
+                        outputNode.connect(dryGain);
+                        dryGain.connect(mixGain);
+                        
+                        // Connect wet signal through reverb
+                        outputNode.connect(reverbEffect);
+                        reverbEffect.connect(wetGain);
+                        wetGain.connect(mixGain);
+                        
+                        outputNode = mixGain;
+                    }
                 }
                 
                 // Connect and play
