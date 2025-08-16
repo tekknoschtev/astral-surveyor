@@ -8,7 +8,7 @@ With no combat or time pressure, your mission is one of peaceful curiosity: cata
 Whether you discover a pulsing neutron star, encounter a binary system with swirling energy patterns, or find a gas giant with four orbiting moons, every discovery is a moment of wonder that's yours to catalog and share.
 
 ## Demo
-You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/game.html>
+You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/>
 
 ## ✨ Key Features
 
