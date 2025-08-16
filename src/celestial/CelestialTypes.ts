@@ -3,6 +3,7 @@
 
 // Import dependencies
 import type { SeededRandom } from '../utils/random.js';
+import { DiscoveryService } from '../services/DiscoveryService.js';
 
 // Interface definitions for renderer and camera
 export interface Renderer {
@@ -129,25 +130,15 @@ export abstract class CelestialObject {
     checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
         if (this.discovered) return false;
         
-        // For stars, discovery happens when they're visible on screen (since stars are so bright)
-        if (this.type === 'star') {
-            const [screenX, screenY] = camera.worldToScreen(this.x, this.y, canvasWidth, canvasHeight);
-            const margin = Math.max('radius' in this && typeof this.radius === 'number' ? this.radius : 50, 50); // Use star radius or minimum 50px margin
-            
-            const isVisible = screenX >= -margin && screenX <= canvasWidth + margin && 
-                             screenY >= -margin && screenY <= canvasHeight + margin;
-            
-            if (isVisible) {
-                this.discovered = true;
-                return true; // Newly discovered
-            }
-        } else {
-            // For planets and moons, use the traditional distance-based discovery
-            if (this.distanceToShip(camera) <= this.discoveryDistance) {
-                this.discovered = true;
-                return true; // Newly discovered
-            }
+        // Use the centralized DiscoveryService for consistent discovery logic
+        const discoveryService = new DiscoveryService();
+        const shouldDiscover = discoveryService.checkDiscovery(this, camera, canvasWidth, canvasHeight);
+        
+        if (shouldDiscover) {
+            this.discovered = true;
+            return true; // Newly discovered
         }
+        
         return false;
     }
 
