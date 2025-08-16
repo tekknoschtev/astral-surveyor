@@ -152,6 +152,7 @@ export class Game {
         this.discoveryLogbook = new DiscoveryLogbook();
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
+        this.stellarMap.setNamingService(this.namingService);
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
         this.discoveryManager = new DiscoveryManager(
@@ -220,6 +221,12 @@ export class Game {
 
     async update(deltaTime: number): Promise<void> {
         this.input.update(deltaTime);
+        
+        // Debug: Check initial state
+        if (!this.stateManager) {
+            console.error('❌ StateManager not initialized!');
+            return;
+        }
         
         // Handle wormhole traversal transition
         if (this.stateManager.isTraversing) {
@@ -304,7 +311,7 @@ export class Game {
             } else if (this.stellarMap.isVisible() && !this.input.isTouchConsumed()) {
                 // Handle stellar map interactions (simplified) - only if not panning
                 const discovered = this.getDiscoveredObjects();
-                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.asteroidGardens, discovered.blackHoles);
+                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
             }
         }
         

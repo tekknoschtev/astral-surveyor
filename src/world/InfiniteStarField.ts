@@ -33,7 +33,7 @@ export class InfiniteStarField {
             {
                 stars: new Map(),
                 depth: 0.1,
-                density: 8,
+                density: 4, // Reduced from 8
                 brightnesRange: [0.1, 0.3],
                 sizeRange: [1, 1],
                 colors: ['#ffffff', '#ffffcc', '#ccccff']
@@ -41,7 +41,7 @@ export class InfiniteStarField {
             {
                 stars: new Map(),
                 depth: 0.3,
-                density: 12,
+                density: 6, // Reduced from 12
                 brightnesRange: [0.2, 0.5],
                 sizeRange: [1, 2],
                 colors: ['#ffffff', '#ffddaa', '#aaddff']
@@ -49,7 +49,7 @@ export class InfiniteStarField {
             {
                 stars: new Map(),
                 depth: 0.6,
-                density: 6,
+                density: 3, // Reduced from 6
                 brightnesRange: [0.4, 0.8],
                 sizeRange: [1, 2],
                 colors: ['#ffffff', '#ffaa88', '#88aaff', '#ffddaa']

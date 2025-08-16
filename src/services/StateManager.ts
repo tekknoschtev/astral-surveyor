@@ -54,6 +54,9 @@ export class StateManager {
     constructor(gameStartingPosition: GameStartingPosition) {
         this.gameStartingPosition = gameStartingPosition;
         this.debugModeEnabled = this.checkDebugMode();
+        
+        // Ensure clean initial state
+        this.reset();
     }
 
     /**
@@ -114,6 +117,14 @@ export class StateManager {
         
         this.traversalStartTime += deltaTime;
         
+        // Safety check to prevent infinite traversal
+        if (this.traversalStartTime > this.traversalDuration * 2) {
+            console.warn('🌀 Traversal timeout - forcing completion');
+            this.isTraversing = false;
+            this.traversalDestination = undefined;
+            return;
+        }
+        
         // Complete traversal at midpoint (1 second in)
         if (this.traversalStartTime >= this.traversalDuration / 2 && 
             this.traversalStartTime - deltaTime < this.traversalDuration / 2) {
@@ -164,7 +175,7 @@ export class StateManager {
      * Calculate fade alpha for visual effects during transitions
      */
     calculateFadeAlpha(): number {
-        let fadeAlpha = 1.0;
+        let fadeAlpha = 0.0; // No fade by default
         
         // Universe reset fade
         if (this.isResettingUniverse) {

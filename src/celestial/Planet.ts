@@ -2,7 +2,7 @@
 // Manages planet rendering, orbital mechanics, and visual effects
 
 // Import dependencies
-import { SeededRandom } from '../utils/random.js';
+import { SeededRandom, hashPosition } from '../utils/random.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { CelestialObject } from './CelestialTypes.js';
 import type { 
@@ -38,6 +38,9 @@ export class Planet extends CelestialObject {
     // Identification
     uniqueId?: string;
     planetIndex?: number;
+    
+    // Pre-calculated crater positions (to avoid recalculating each frame)
+    craterPositions: Array<{x: number, y: number, size: number}> = [];
 
     constructor(x: number, y: number, parentStar?: Star, orbitalDistance: number = 0, orbitalAngle: number = 0, orbitalSpeed: number = 0, planetType?: PlanetType) {
         super(x, y, 'planet');
@@ -130,6 +133,11 @@ export class Planet extends CelestialObject {
         
         // Initialize ring system if planet has rings
         this.hasRings = this.determineRingSystem(rng);
+        
+        // Pre-calculate crater positions if planet has craters
+        if (this.visualEffects.hasCraters) {
+            this.initializeCraterPositions();
+        }
     }
 
     generateUniqueId(): string {
@@ -152,6 +160,32 @@ export class Planet extends CelestialObject {
             hash = hash & hash; // Convert to 32-bit integer
         }
         return Math.abs(hash) % 1000000; // Return positive number
+    }
+
+    // Pre-calculate crater positions based on planet position
+    initializeCraterPositions(): void {
+        // Use planet's world position to create deterministic crater pattern
+        const craterSeed = hashPosition(this.x, this.y) + 12345; // Add offset for crater-specific variation
+        const rng = new SeededRandom(craterSeed);
+        
+        // Clear any existing crater positions
+        this.craterPositions = [];
+        
+        // Generate 2-4 small craters (deterministic count)
+        const craterCount = 2 + Math.floor(rng.next() * 3);
+        for (let i = 0; i < craterCount; i++) {
+            const angle = (i / craterCount) * Math.PI * 2 + rng.next() * 0.5;
+            const distance = rng.next() * this.radius * 0.6;
+            const craterX = Math.cos(angle) * distance; // Relative to planet center
+            const craterY = Math.sin(angle) * distance; // Relative to planet center
+            const craterSize = 1 + rng.next() * 3;
+            
+            this.craterPositions.push({
+                x: craterX,
+                y: craterY,
+                size: craterSize
+            });
+        }
     }
 
     // Determine if this planet should have rings based on type and probability
@@ -256,21 +290,17 @@ export class Planet extends CelestialObject {
     }
 
     drawCraters(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
-        // Simple crater representation with darker circles
+        // Use pre-calculated crater positions
         const craterColor = this.darkenColor(this.color, 0.5);
+        ctx.fillStyle = craterColor;
         
-        // Draw 2-4 small craters
-        const craterCount = 2 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < craterCount; i++) {
-            const angle = (i / craterCount) * Math.PI * 2 + Math.random() * 0.5;
-            const distance = Math.random() * this.radius * 0.6;
-            const craterX = centerX + Math.cos(angle) * distance;
-            const craterY = centerY + Math.sin(angle) * distance;
-            const craterSize = 1 + Math.random() * 3;
+        for (const crater of this.craterPositions) {
+            // Convert relative crater position to screen position
+            const craterX = centerX + crater.x;
+            const craterY = centerY + crater.y;
             
-            ctx.fillStyle = craterColor;
             ctx.beginPath();
-            ctx.arc(craterX, craterY, craterSize, 0, Math.PI * 2);
+            ctx.arc(craterX, craterY, crater.size, 0, Math.PI * 2);
             ctx.fill();
         }
     }

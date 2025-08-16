@@ -83,11 +83,14 @@ type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | As
 interface NamingService {
     generateDisplayName(object: DiscoverableObject): string;
     generateFullDesignation(object: DiscoverableObject): {
-        catalog: string;
-        coordinate: string;
+        catalog?: string;
+        coordinate?: string;
+        designation?: string;
         type: string;
-        classification?: string;
-    };
+        classification?: string | null;
+        parentStar?: string;
+        orbitalIndex?: number;
+    } | null;
 }
 
 interface GameStartingPosition {
@@ -298,7 +301,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -408,6 +411,29 @@ export class StellarMap {
             }
         }
         
+        // Check for wormhole clicks
+        let closestWormhole: WormholeLike | null = null;
+        let closestWormholeDistance = Infinity;
+        
+        if (discoveredWormholes) {
+            for (const wormhole of discoveredWormholes) {
+                const wormholeMapX = mapX + mapWidth/2 + (wormhole.x - this.centerX) * worldToMapScale;
+                const wormholeMapY = mapY + mapHeight/2 + (wormhole.y - this.centerY) * worldToMapScale;
+                
+                // Use larger click threshold for wormholes due to their vortex effect
+                const wormholeClickThreshold = Math.max(20, clickThreshold);
+                if (wormholeMapX >= mapX && wormholeMapX <= mapX + mapWidth && 
+                    wormholeMapY >= mapY && wormholeMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - wormholeMapX)**2 + (mouseY - wormholeMapY)**2);
+                    if (distance <= wormholeClickThreshold && distance < closestWormholeDistance) {
+                        closestWormhole = wormhole;
+                        closestWormholeDistance = distance;
+                    }
+                }
+            }
+        }
+        
         // Check for black hole clicks
         let closestBlackHole: BlackHoleLike | null = null;
         let closestBlackHoleDistance = Infinity;
@@ -431,10 +457,18 @@ export class StellarMap {
             }
         }
         
-        // Select the closest object (prioritize order: planets > nebulae > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+        // Select the closest object (prioritize order: planets > wormholes > nebulae > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
+            this.selectedNebula = null;
+            this.selectedWormhole = null;
+            this.selectedBlackHole = null;
+            this.selectedAsteroidGarden = null;
+        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.selectedWormhole = closestWormhole;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
             this.selectedNebula = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
@@ -442,6 +476,7 @@ export class StellarMap {
             this.selectedNebula = closestNebula;
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedWormhole = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
         } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
@@ -449,22 +484,26 @@ export class StellarMap {
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedWormhole = null;
             this.selectedAsteroidGarden = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.selectedAsteroidGarden = closestAsteroidGarden;
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedWormhole = null;
             this.selectedBlackHole = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedWormhole = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
         } else {
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedWormhole = null;
             this.selectedNebula = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
@@ -1884,11 +1923,11 @@ export class StellarMap {
         const lineHeight = 14;
         
         // Star designation
-        ctx.fillText(`Designation: ${fullDesignation.catalog}`, panelX + 10, lineY);
+        ctx.fillText(`Designation: ${fullDesignation.catalog || 'Unknown'}`, panelX + 10, lineY);
         lineY += lineHeight;
         
         // Coordinate designation
-        ctx.fillText(`Coordinates: ${fullDesignation.coordinate}`, panelX + 10, lineY);
+        ctx.fillText(`Coordinates: ${fullDesignation.coordinate || 'Unknown'}`, panelX + 10, lineY);
         lineY += lineHeight;
         
         // Star type
