@@ -30,9 +30,9 @@ export class DebugSpawner {
         const alphaX = playerX + Math.cos(alphaAngle) * alphaDistance;
         const alphaY = playerY + Math.sin(alphaAngle) * alphaDistance;
         
-        // Beta wormhole: 800-1200 pixels away in different direction
+        // Beta wormhole: 10,000-50,000 pixels away in different direction (cosmic scale for testing)
         const betaAngle = alphaAngle + Math.PI + (Math.random() - 0.5) * Math.PI; // Opposite side with variation
-        const betaDistance = 800 + Math.random() * 400; // 800-1200 pixels
+        const betaDistance = 10000 + Math.random() * 40000; // 10,000-50,000 pixels (cosmic scale)
         const betaX = playerX + Math.cos(betaAngle) * betaDistance;
         const betaY = playerY + Math.sin(betaAngle) * betaDistance;
         
@@ -169,9 +169,16 @@ export class DebugSpawner {
                 blackHoleTypeName: blackHole.blackHoleTypeName
             });
             
-            // Force generation of the chunk containing the black hole
+            // Ensure black hole is added to its chunk (handle existing chunks)
             const chunkCoords = chunkManager.getChunkCoords(blackHoleX, blackHoleY);
-            chunkManager.generateChunk(chunkCoords.x, chunkCoords.y);
+            const chunkKey = chunkManager.getChunkKey(chunkCoords.x, chunkCoords.y);
+            
+            let chunk = chunkManager.activeChunks.get(chunkKey);
+            if (!chunk) {
+                chunk = chunkManager.generateChunk(chunkCoords.x, chunkCoords.y);
+            } else {
+                chunk.blackholes.push(blackHole);
+            }
             
             console.log(`🕳️ DEBUG: Spawned ${blackHole.blackHoleTypeName} at (${Math.round(blackHoleX)}, ${Math.round(blackHoleY)})`);
             console.log(`  Distance from player: ${Math.round(distance)} pixels - Safe to approach`);

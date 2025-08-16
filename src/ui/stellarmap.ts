@@ -69,6 +69,14 @@ interface AsteroidGardenLike {
     timestamp?: number;
 }
 
+interface BlackHoleLike {
+    x: number;
+    y: number;
+    blackHoleTypeName: string;
+    objectName?: string;
+    timestamp?: number;
+}
+
 interface NamingService {
     generateDisplayName(object: any): string;
     generateFullDesignation(object: any): {
@@ -100,6 +108,8 @@ export class StellarMap {
     hoveredWormhole: WormholeLike | null;
     selectedAsteroidGarden: AsteroidGardenLike | null;
     hoveredAsteroidGarden: AsteroidGardenLike | null;
+    selectedBlackHole: BlackHoleLike | null;
+    hoveredBlackHole: BlackHoleLike | null;
     namingService: NamingService | null;
     
     // Interactive panning state
@@ -134,6 +144,8 @@ export class StellarMap {
         this.hoveredWormhole = null;
         this.selectedAsteroidGarden = null;
         this.hoveredAsteroidGarden = null;
+        this.selectedBlackHole = null;
+        this.hoveredBlackHole = null;
         this.namingService = null; // Will be injected
         
         // Interactive panning state
@@ -283,7 +295,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -393,31 +405,65 @@ export class StellarMap {
             }
         }
         
-        // Select the closest object (prioritize order: planets > nebulae > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestAsteroidGardenDistance)) {
+        // Check for black hole clicks
+        let closestBlackHole: BlackHoleLike | null = null;
+        let closestBlackHoleDistance = Infinity;
+        
+        if (discoveredBlackHoles) {
+            for (const blackHole of discoveredBlackHoles) {
+                const blackHoleMapX = mapX + mapWidth/2 + (blackHole.x - this.centerX) * worldToMapScale;
+                const blackHoleMapY = mapY + mapHeight/2 + (blackHole.y - this.centerY) * worldToMapScale;
+                
+                // Use larger click threshold for black holes due to their accretion disc
+                const blackHoleClickThreshold = Math.max(25, clickThreshold);
+                if (blackHoleMapX >= mapX && blackHoleMapX <= mapX + mapWidth && 
+                    blackHoleMapY >= mapY && blackHoleMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - blackHoleMapX)**2 + (mouseY - blackHoleMapY)**2);
+                    if (distance <= blackHoleClickThreshold && distance < closestBlackHoleDistance) {
+                        closestBlackHole = blackHole;
+                        closestBlackHoleDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Select the closest object (prioritize order: planets > nebulae > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
             this.selectedNebula = null;
+            this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
+        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.selectedNebula = closestNebula;
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedBlackHole = null;
+            this.selectedAsteroidGarden = null;
+        } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
+            this.selectedBlackHole = closestBlackHole;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
+            this.selectedNebula = null;
             this.selectedAsteroidGarden = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.selectedAsteroidGarden = closestAsteroidGarden;
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedBlackHole = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
         } else {
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
         }
         
@@ -440,7 +486,7 @@ export class StellarMap {
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -454,6 +500,7 @@ export class StellarMap {
             this.hoveredNebula = null;
             this.hoveredWormhole = null;
             this.hoveredAsteroidGarden = null;
+            this.hoveredBlackHole = null;
             this.updateCursor(canvas);
             return;
         }
@@ -463,10 +510,12 @@ export class StellarMap {
         let closestPlanet: PlanetLike | null = null;
         let closestNebula: NebulaLike | null = null;
         let closestAsteroidGarden: AsteroidGardenLike | null = null;
+        let closestBlackHole: BlackHoleLike | null = null;
         let closestStarDistance = Infinity;
         let closestPlanetDistance = Infinity;
         let closestNebulaDistance = Infinity;
         let closestAsteroidGardenDistance = Infinity;
+        let closestBlackHoleDistance = Infinity;
         const hoverThreshold = 15; // Slightly larger than click threshold for better UX
         
         // Check for planet hover first (in detail view)
@@ -552,31 +601,62 @@ export class StellarMap {
             }
         }
         
-        // Set hover state (prioritize order: planets > nebulae > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestAsteroidGardenDistance)) {
+        // Check for black hole hover
+        if (discoveredBlackHoles) {
+            for (const blackHole of discoveredBlackHoles) {
+                const blackHoleMapX = mapX + mapWidth/2 + (blackHole.x - this.centerX) * worldToMapScale;
+                const blackHoleMapY = mapY + mapHeight/2 + (blackHole.y - this.centerY) * worldToMapScale;
+                
+                // Use larger hover threshold for black holes due to their accretion disc
+                const blackHoleHoverThreshold = Math.max(30, hoverThreshold);
+                if (blackHoleMapX >= mapX && blackHoleMapX <= mapX + mapWidth && 
+                    blackHoleMapY >= mapY && blackHoleMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - blackHoleMapX)**2 + (mouseY - blackHoleMapY)**2);
+                    if (distance <= blackHoleHoverThreshold && distance < closestBlackHoleDistance) {
+                        closestBlackHole = blackHole;
+                        closestBlackHoleDistance = distance;
+                    }
+                }
+            }
+        }
+        
+        // Set hover state (prioritize order: planets > nebulae > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.hoveredPlanet = closestPlanet;
             this.hoveredStar = null;
             this.hoveredNebula = null;
+            this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
+        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.hoveredNebula = closestNebula;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
+            this.hoveredBlackHole = null;
+            this.hoveredAsteroidGarden = null;
+        } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
+            this.hoveredBlackHole = closestBlackHole;
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
+            this.hoveredNebula = null;
             this.hoveredAsteroidGarden = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.hoveredAsteroidGarden = closestAsteroidGarden;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredBlackHole = null;
         } else if (closestStar) {
             this.hoveredStar = closestStar;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
         } else {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
         }
         
@@ -585,7 +665,7 @@ export class StellarMap {
     }
     
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden) {
+        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole) {
             canvas.style.cursor = 'pointer';
         } else if (this.visible) {
             // Use crosshair for map navigation when visible
@@ -645,7 +725,7 @@ export class StellarMap {
         this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.01);
     }
 
-    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null): void {
+    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -707,6 +787,11 @@ export class StellarMap {
         // Draw discovered asteroid gardens (scattered rock fields, visible at most zoom levels)
         if (discoveredAsteroidGardens && discoveredAsteroidGardens.length > 0) {
             this.renderDiscoveredAsteroidGardens(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredAsteroidGardens);
+        }
+
+        // Draw discovered black holes (gravitational anomalies with accretion discs)
+        if (discoveredBlackHoles && discoveredBlackHoles.length > 0) {
+            this.renderDiscoveredBlackHoles(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredBlackHoles);
         }
         
         // Draw origin (0,0) marker
@@ -1751,13 +1836,15 @@ export class StellarMap {
         const coordWidth = ctx.measureText(coordText).width;
         ctx.fillText(coordText, canvas.width - coordWidth - 20, canvas.height - 50);
         
-        // Information panel for selected star, planet, or nebula
+        // Information panel for selected star, planet, nebula, black hole, or asteroid garden
         if (this.selectedStar && this.namingService) {
             this.renderStarInfoPanel(ctx, canvas);
         } else if (this.selectedPlanet && this.namingService) {
             this.renderPlanetInfoPanel(ctx, canvas);
         } else if (this.selectedNebula && this.namingService) {
             this.renderNebulaInfoPanel(ctx, canvas);
+        } else if (this.selectedBlackHole && this.namingService) {
+            this.renderBlackHoleInfoPanel(ctx, canvas);
         } else if (this.selectedAsteroidGarden && this.namingService) {
             this.renderAsteroidGardenInfoPanel(ctx, canvas);
         }
@@ -1919,6 +2006,62 @@ export class StellarMap {
         }
     }
 
+    renderBlackHoleInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        if (!this.selectedBlackHole || !this.namingService) return;
+        
+        // Panel dimensions and position (consistent with other panels)
+        const panelWidth = 300;
+        const panelHeight = 140;
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background (consistent with other panels)
+        ctx.save();
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Setup text
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#FFFFFF';
+        let lineY = panelY + 20;
+        const lineHeight = 18;
+        
+        // Black hole designation
+        const blackHoleName = this.generateBlackHoleDisplayName(this.selectedBlackHole);
+        ctx.fillText(`Designation: ${blackHoleName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Black hole type with scientific description
+        let typeDescription = this.selectedBlackHole.blackHoleTypeName;
+        if (this.selectedBlackHole.blackHoleTypeName === 'supermassive') {
+            typeDescription = 'Supermassive (10⁶-10¹⁰ M☉)';
+        } else if (this.selectedBlackHole.blackHoleTypeName === 'stellar') {
+            typeDescription = 'Stellar-mass (3-30 M☉)';
+        }
+        ctx.fillText(`Type: ${typeDescription}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Gravitational influence note
+        ctx.fillText(`Event Horizon: Active`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Black hole position
+        ctx.fillText(`Position: (${Math.round(this.selectedBlackHole.x)}, ${Math.round(this.selectedBlackHole.y)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Discovery timestamp if available
+        if (this.selectedBlackHole.timestamp) {
+            const date = new Date(this.selectedBlackHole.timestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
+        
+        ctx.restore();
+    }
+
     generateNebulaDisplayName(nebula: NebulaLike): string {
         // Use stored nebula name from discovery data if available
         if (nebula.objectName) {
@@ -2000,6 +2143,121 @@ export class StellarMap {
             return this.namingService.generateDisplayName(asteroidGarden);
         } catch (error) {
             return `Asteroid Garden`;
+        }
+    }
+
+    renderDiscoveredBlackHoles(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredBlackHoles: BlackHoleLike[]): void {
+        if (!discoveredBlackHoles) return;
+
+        for (const blackHole of discoveredBlackHoles) {
+            // Calculate black hole position on map
+            const blackHoleMapX = mapX + ((blackHole.x - this.centerX) * scale) + mapWidth / 2;
+            const blackHoleMapY = mapY + ((blackHole.y - this.centerY) * scale) + mapHeight / 2;
+
+            // Check if black hole is visible on the map
+            if (blackHoleMapX < mapX - 20 || blackHoleMapX > mapX + mapWidth + 20 ||
+                blackHoleMapY < mapY - 20 || blackHoleMapY > mapY + mapHeight + 20) {
+                continue;
+            }
+
+            ctx.save();
+
+            // Calculate black hole size based on zoom level
+            const baseSize = 8;
+            const blackHoleSize = Math.max(2, baseSize * Math.sqrt(this.zoomLevel));
+            const accretionDiscSize = blackHoleSize * 2.5;
+
+            // Render accretion disc
+            ctx.globalAlpha = 0.6;
+            
+            // Create radial gradient for accretion disc
+            const gradient = ctx.createRadialGradient(blackHoleMapX, blackHoleMapY, blackHoleSize * 0.3, blackHoleMapX, blackHoleMapY, accretionDiscSize);
+            gradient.addColorStop(0, 'rgba(255, 100, 0, 0.8)'); // Hot orange center
+            gradient.addColorStop(0.3, 'rgba(255, 150, 50, 0.6)'); // Orange middle
+            gradient.addColorStop(0.7, 'rgba(200, 50, 100, 0.3)'); // Purple outer
+            gradient.addColorStop(1, 'rgba(100, 0, 150, 0.1)'); // Dark purple edge
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(blackHoleMapX, blackHoleMapY, accretionDiscSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Render event horizon (black center)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(blackHoleMapX, blackHoleMapY, blackHoleSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Add subtle gravitational distortion ring
+            ctx.strokeStyle = 'rgba(100, 100, 255, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(blackHoleMapX, blackHoleMapY, blackHoleSize * 1.2, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Add hover highlight if this black hole is hovered (but not selected)
+            if (this.hoveredBlackHole === blackHole && this.selectedBlackHole !== blackHole) {
+                ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent amber
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                const hoverRadius = accretionDiscSize + 2;
+                ctx.arc(blackHoleMapX, blackHoleMapY, hoverRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // Add selection highlight if this black hole is selected (takes precedence over hover)
+            if (this.selectedBlackHole === blackHole) {
+                ctx.strokeStyle = this.currentPositionColor; // Full amber
+                ctx.lineWidth = 2;
+                const selectionRadius = accretionDiscSize + 3;
+                ctx.beginPath();
+                ctx.arc(blackHoleMapX, blackHoleMapY, selectionRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            // Render black hole label if zoomed in enough or selected
+            if (this.zoomLevel > 2.0 || this.selectedBlackHole === blackHole) {
+                this.renderBlackHoleLabel(ctx, blackHole, blackHoleMapX, blackHoleMapY);
+            }
+        }
+    }
+
+    renderBlackHoleLabel(ctx: CanvasRenderingContext2D, blackHole: BlackHoleLike, mapX: number, mapY: number): void {
+        ctx.save();
+        
+        const displayName = this.generateBlackHoleDisplayName(blackHole);
+        
+        ctx.font = '11px monospace';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        
+        const labelX = mapX + 15;
+        const labelY = mapY - 15;
+        
+        // Draw text outline and fill
+        ctx.strokeText(displayName, labelX, labelY);
+        ctx.fillText(displayName, labelX, labelY);
+        
+        ctx.restore();
+    }
+
+    generateBlackHoleDisplayName(blackHole: BlackHoleLike): string {
+        // Use stored black hole name from discovery data if available
+        if (blackHole.objectName) {
+            return blackHole.objectName;
+        }
+
+        // Fallback based on black hole type
+        if (blackHole.blackHoleTypeName === 'supermassive') {
+            return 'Supermassive Black Hole';
+        } else if (blackHole.blackHoleTypeName === 'stellar') {
+            return 'Stellar Black Hole';
+        } else {
+            return 'Black Hole';
         }
     }
 
