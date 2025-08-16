@@ -79,7 +79,6 @@ npm run test:ui       # Build + visual test interface
 ## 🧪 Testing Strategy
 
 ### **Test Architecture**
-- **66 tests** covering core game systems
 - Tests import from compiled JavaScript in `dist/`
 - **Coverage targets**: 80%+ on critical systems
 - **Current coverage**: 88.54% naming, 93.54% random utilities
@@ -163,10 +162,7 @@ tests/
 ## 🔗 Key References
 
 - **CLAUDE.md**: Core development values and updated workflows
-- **TSMIGRATION.md**: Complete documentation of the TypeScript migration
 - **tsconfig.json**: TypeScript compilation configuration
 - **vitest.config.js**: Test framework configuration with coverage settings
 
 ---
-
-*This development guide reflects the post-TypeScript-migration architecture as of January 2025.*

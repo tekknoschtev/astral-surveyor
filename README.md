@@ -43,16 +43,25 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/gam
 - **Multiple Control Schemes**: Full keyboard, mouse, and touch support for any device
 - **Emergency Controls**: Instant braking and precise maneuvering for careful exploration
 
+### 🕳️ **Black Holes & Exotic Phenomena**
+- **Ultra-Rare Black Holes**: Extremely rare gravitational anomalies with stunning accretion disc visuals
+- **Cosmic Consequences**: Approach too closely and experience complete universe reset - a cosmic do-over
+- **Scientific Classification**: Proper mass classifications and astronomical designations in discovery system
+- **Stellar Map Integration**: Full click/hover interactions and detailed info panels for discovered black holes
+
 ### 🌀 **FTL Travel via Wormholes**
 - **Rare Cosmic Phenomena**: Extremely rare wormhole pairs (~1 per 2000 chunks) enable instantaneous travel across vast distances
+- **Cosmic Scale Distances**: Wormhole pairs separated by 100,000-500,000 pixels for truly meaningful shortcuts
 - **Gravitational Lensing**: Peer through wormhole apertures to see celestial objects waiting at the destination
 - **Scientific Naming**: Greek letter designations (α/β) distinguish paired wormholes with proper astronomical classification
 - **Serene Traversal**: Smooth, momentum-preserving travel with tranquil visual and audio transitions
 
 ### 🎵 **Immersive Audio Design**
-- **Discovery Chimes**: Unique audio signatures for each celestial object type - from deep stellar tones to delicate moon chimes
+- **Enhanced Discovery Chimes**: Unique audio signatures with ethereal reverb effects for each celestial object type
+- **Softer Tones**: Gentle sine wave frequencies designed for tranquil, non-jarring exploration experience
+- **Cosmic Reverb**: Deep, spacious reverb effects that add atmospheric depth to rare discoveries
 - **Wormhole Audio**: Deep, resonant 55Hz discovery tones and otherworldly traversal effects with harmonic richness
-- **Tranquil Sound Design**: Peaceful discovery tones designed to enhance wonder without overwhelming the exploration experience
+- **Extended Durations**: Longer attack/release envelopes create more peaceful, lingering discovery moments
 - **Full Control**: Toggle mute instantly with 'H' key, settings saved automatically
 
 ## 🎮 Controls & Interface
@@ -88,6 +97,7 @@ The universe reveals its secrets at different scales:
 - **🌟 Stars**: Discoverable from 480-540+ pixels away - perfect for long-range navigation and ensuring you never miss a system while cruising at high speeds
 - **🪐 Planets**: Discoverable from ~38-50 pixels - requiring closer approach for detailed study
 - **🌙 Moons**: Discoverable from ~27-30 pixels - intimate encounters with the smallest worlds
+- **🕳️ Black Holes**: Discoverable from ~60-80 pixels - ultra-rare gravitational anomalies with cosmic consequences
 - **🌀 Wormholes**: Discoverable from ~110-120 pixels - rare cosmic phenomena for instantaneous FTL travel
 
 ### **Astronomical Naming**
@@ -95,6 +105,7 @@ Every discovery receives a professional IAU-inspired designation:
 - **Stars**: "ASV-2847 G" (Astral Survey Vessel catalog number + stellar classification)
 - **Planets**: "ASV-2847 b", "ASV-2847 c" (system + orbital designation)
 - **Moons**: "ASV-2847 b I", "ASV-2847 c II" (planet + Roman numeral)
+- **Black Holes**: "BH-1234" (gravitational anomaly catalog with mass classification data)
 - **Wormholes**: "WH-1234-α", "WH-1234-β" (paired Einstein-Rosen bridges with Greek letter designations)
 
 ### **Procedural Generation**
