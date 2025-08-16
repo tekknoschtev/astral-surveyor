@@ -133,7 +133,7 @@ export abstract class CelestialObject {
         // For stars, discovery happens when they're visible on screen (since stars are so bright)
         if (this.type === 'star') {
             const [screenX, screenY] = camera.worldToScreen(this.x, this.y, canvasWidth, canvasHeight);
-            const margin = Math.max((this as any).radius || 50, 50); // Use star radius or minimum 50px margin
+            const margin = Math.max('radius' in this && typeof this.radius === 'number' ? this.radius : 50, 50); // Use star radius or minimum 50px margin
             
             const isVisible = screenX >= -margin && screenX <= canvasWidth + margin && 
                              screenY >= -margin && screenY <= canvasHeight + margin;

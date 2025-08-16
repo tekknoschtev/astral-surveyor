@@ -14,6 +14,7 @@ import { NamingService } from './naming/naming.js';
 import { TouchUI } from './ui/touchui.js';
 import { SoundManager } from './audio/soundmanager.js';
 import { GameConfig } from './config/gameConfig.js';
+// Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
     getStartingCoordinates, 
@@ -22,9 +23,10 @@ import {
     generateSafeSpawnPosition,
     getUniverseResetCount
 } from './utils/random.js';
+// Note: Will add proper types in future phases when we extract celestial classes
 
 // Debug spawner import (development builds only)
-let DebugSpawner: any = null;
+let DebugSpawner: typeof import('./debug/debug-spawner.js').DebugSpawner | null = null;
 
 // Interface definitions
 interface GameStartingPosition {
@@ -32,18 +34,12 @@ interface GameStartingPosition {
     y: number;
 }
 
-interface ActiveObjects {
-    planets: any[];
-    moons: any[];
-    celestialStars: any[];
-    nebulae: any[];
-    wormholes: any[];
-}
-
+// Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
     type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
     x: number;
     y: number;
+    id?: string;
     starTypeName?: string;
     planetTypeName?: string;
     nebulaTypeData?: { name: string };
@@ -51,10 +47,41 @@ interface CelestialObject {
     designation?: 'alpha' | 'beta';
     pairId?: string;
     blackHoleTypeName?: string;
+    twinX?: number;
+    twinY?: number;
+    uniqueId?: string;
+    canTraverse?: boolean | ((camera: Camera) => boolean);
+    nebulaType?: string;
+    gardenType?: string;
+    gardenTypeData?: { name: string };
+    // Preview object properties (added dynamically)
+    relativeX?: number;
+    relativeY?: number;
+    distance?: number;
     updatePosition?(deltaTime: number): void;
     update?(deltaTime: number): void;
-    checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
-    render(renderer: Renderer, camera: Camera): void;
+    checkDiscovery?(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
+    render?(renderer: Renderer, camera: Camera): void;
+    getDestinationCoordinates?(velocityX: number, velocityY: number): { x: number; y: number };
+}
+
+interface ActiveObjects {
+    planets: CelestialObject[];
+    moons: CelestialObject[];
+    celestialStars: CelestialObject[];
+    nebulae: CelestialObject[];
+    wormholes: CelestialObject[];
+    blackholes: CelestialObject[];
+    asteroidGardens: CelestialObject[];
+}
+
+interface TraversalDestination {
+    x: number;
+    y: number;
+    velocityX: number;
+    velocityY: number;
+    wormhole: CelestialObject;
+    stellarMapWasVisible: boolean;
 }
 
 export class Game {
@@ -81,7 +108,7 @@ export class Game {
     isTraversing: boolean;
     traversalStartTime: number;
     traversalDuration: number;
-    traversalDestination?: { x: number; y: number; velocityX: number; velocityY: number; wormhole: any; stellarMapWasVisible: boolean };
+    traversalDestination?: TraversalDestination;
     
     // Distance saving timer (save every 5 seconds)
     distanceSaveTimer: number;
@@ -145,7 +172,8 @@ export class Game {
         this.debugModeEnabled = this.checkDebugMode();
         
         // Connect naming service to stellar map
-        this.stellarMap.setNamingService(this.namingService as any);
+        // TODO: Fix interface mismatch between StellarMap and NamingService in Phase 2
+        // this.stellarMap.setNamingService(this.namingService);
         this.lastTime = 0;
         this.animationId = 0;
         
@@ -312,7 +340,7 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes] as any[];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes];
         
         // Update orbital positions for all planets and moons
         for (const planet of activeObjects.planets) {
@@ -367,9 +395,9 @@ export class Game {
         }
         
         // Restore discovery state for newly loaded objects
-        this.chunkManager.restoreDiscoveryState(celestialObjects);
+        this.chunkManager.restoreDiscoveryState(celestialObjects as any);
         
-        this.camera.update(this.input as any, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
+        this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
         
         // Check for wormhole traversal
         this.checkWormholeTraversal(activeObjects.wormholes);
@@ -396,21 +424,21 @@ export class Game {
         
         // Check for discoveries
         for (const obj of celestialObjects) {
-            if (obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
+            if (obj.checkDiscovery && obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
                 // Generate proper astronomical name for the discovery
                 const objectName = this.namingService.generateDisplayName(obj);
                 const objectType = obj.type === 'planet' ? obj.planetTypeName : 
                                   obj.type === 'moon' ? 'Moon' : 
-                                  obj.type === 'nebula' ? (obj as any).nebulaTypeData?.name || 'Nebula' :
-                                  obj.type === 'asteroids' ? (obj as any).gardenTypeData?.name || 'Asteroid Garden' :
+                                  obj.type === 'nebula' ? ('nebulaTypeData' in obj ? obj.nebulaTypeData?.name : undefined) || 'Nebula' :
+                                  obj.type === 'asteroids' ? ('gardenTypeData' in obj && obj.gardenTypeData?.name ? obj.gardenTypeData.name : 'Asteroid Garden') :
                                   obj.type === 'wormhole' ? 'Stable Traversable Wormhole' :
-                                  obj.type === 'blackhole' ? obj.blackHoleTypeName || 'Black Hole' :
-                                  obj.starTypeName;
+                                  obj.type === 'blackhole' ? ('blackHoleTypeName' in obj ? obj.blackHoleTypeName : undefined) || 'Black Hole' :
+                                  ('starTypeName' in obj ? obj.starTypeName : undefined);
                 
                 // Add discovery with proper name
                 this.discoveryDisplay.addDiscovery(objectName, objectType || 'Unknown');
                 this.discoveryLogbook.addDiscovery(objectName, objectType || 'Unknown');
-                this.chunkManager.markObjectDiscovered(obj, objectName);
+                this.chunkManager.markObjectDiscovered(obj as any, objectName);
                 
                 // Play discovery sound based on object type
                 this.playDiscoverySound(obj, objectType || 'Unknown');
@@ -480,7 +508,7 @@ export class Game {
             return true;
         } else if (obj.type === 'asteroids') {
             // Rare mineral and crystalline asteroid gardens are notable
-            const gardenType = (obj as any).gardenType;
+            const gardenType = 'gardenType' in obj && typeof obj.gardenType === 'string' ? obj.gardenType : undefined;
             return gardenType === 'rare_minerals' || gardenType === 'crystalline' || gardenType === 'icy';
         } else if (obj.type === 'wormhole') {
             // All wormholes are extremely rare and notable discoveries
@@ -524,7 +552,8 @@ export class Game {
             this.soundManager.playMoonDiscovery();
         } else if (obj.type === 'nebula') {
             // Play special sparkly nebula discovery sound
-            this.soundManager.playNebulaDiscovery((obj as any).nebulaType || 'emission');
+            const nebulaType = 'nebulaType' in obj && typeof obj.nebulaType === 'string' ? obj.nebulaType : 'emission';
+            this.soundManager.playNebulaDiscovery(nebulaType);
         } else if (obj.type === 'asteroids') {
             // Play asteroid garden discovery sound (use planet discovery as base sound)
             this.soundManager.playPlanetDiscovery('Asteroid Garden');
@@ -668,14 +697,14 @@ export class Game {
         }
     }
 
-    checkWormholeTraversal(wormholes: any[]): void {
+    checkWormholeTraversal(wormholes: CelestialObject[]): void {
         // Skip if already traversing
         if (this.isTraversing) {
             return;
         }
 
         for (const wormhole of wormholes) {
-            if (wormhole.canTraverse && wormhole.canTraverse(this.camera)) {
+            if (wormhole.canTraverse && (typeof wormhole.canTraverse === 'function' ? wormhole.canTraverse(this.camera) : wormhole.canTraverse)) {
                 // Ship is within wormhole - initiate traversal
                 this.initiateWormholeTraversal(wormhole);
                 return; // Only traverse one wormhole per frame
@@ -683,7 +712,7 @@ export class Game {
         }
     }
 
-    initiateWormholeTraversal(wormhole: any): void {
+    initiateWormholeTraversal(wormhole: CelestialObject): void {
         // Start traversal transition
         this.isTraversing = true;
         this.traversalStartTime = 0;
@@ -993,7 +1022,7 @@ export class Game {
         }
     }
 
-    getDestinationPreviewObjects(wormhole: any): any[] {
+    getDestinationPreviewObjects(wormhole: CelestialObject): CelestialObject[] {
         // Get objects near the destination wormhole for gravitational lensing preview
         if (!wormhole.twinX || !wormhole.twinY) return [];
         
@@ -1002,7 +1031,7 @@ export class Game {
         const previewRadius = 300; // 300 pixel radius around destination
         
         // Get all objects from chunks near the destination
-        const destinationObjects: any[] = [];
+        const destinationObjects: CelestialObject[] = [];
         
         // Sample objects from chunks around destination area
         const chunkSize = 2000; // Should match ChunkManager.CHUNK_SIZE
@@ -1029,7 +1058,7 @@ export class Game {
                     ...chunk.moons,
                     ...chunk.nebulae,
                     ...chunk.asteroidGardens,
-                    ...chunk.wormholes.filter((w: any) => w.uniqueId !== wormhole.uniqueId) // Exclude self
+                    ...chunk.wormholes.filter(w => w.uniqueId !== wormhole.uniqueId) // Exclude self
                 ];
                 
                 for (const obj of allObjects) {
@@ -1048,7 +1077,7 @@ export class Game {
                             relativeY,
                             distance,
                             type: obj.type
-                        });
+                        } as CelestialObject);
                     }
                 }
             }

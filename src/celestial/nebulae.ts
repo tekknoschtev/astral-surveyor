@@ -194,7 +194,7 @@ export class Nebula extends CelestialObject {
         return false;
     }
     
-    shouldDiscover(ship: any, camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
+    shouldDiscover(ship: { x: number; y: number }, camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
         if (this.discovered) {
             return false;
         }
@@ -268,7 +268,7 @@ export class Nebula extends CelestialObject {
         renderer.ctx.restore();
     }
 
-    getDiscoveryData(): any {
+    getDiscoveryData(): { discovered: boolean; nebulaType: string; timestamp: number; discoveryValue: number } {
         return {
             discovered: this.discovered,
             nebulaType: this.nebulaType,

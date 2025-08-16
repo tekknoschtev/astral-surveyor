@@ -91,7 +91,7 @@ export class Wormhole extends CelestialObject {
     uniqueId: string;
 
     constructor(x: number, y: number, wormholeId: string, designation: 'alpha' | 'beta', twinX: number, twinY: number, random: SeededRandom) {
-        super(x, y, 'wormhole' as any); // Cast to bypass type checking for now
+        super(x, y, 'wormhole'); // Wormhole type specification
         
         // Wormhole identification
         this.wormholeId = wormholeId;
@@ -231,7 +231,7 @@ export class Wormhole extends CelestialObject {
         }
     }
 
-    render(renderer: Renderer, camera: Camera, destinationPreview?: any[]): void {
+    render(renderer: Renderer, camera: Camera, destinationPreview?: { x: number; y: number; type: string; relativeX?: number; relativeY?: number }[]): void {
         const [screenX, screenY] = camera.worldToScreen(
             this.x, 
             this.y, 
@@ -363,7 +363,7 @@ export class Wormhole extends CelestialObject {
         }
     }
 
-    private renderAperture(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, destinationPreview?: any[]): void {
+    private renderAperture(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, destinationPreview?: { x: number; y: number; type: string; relativeX?: number; relativeY?: number }[]): void {
         const apertureRadius = this.radius * 0.4;
         
         // Create clipping mask for the aperture
@@ -402,7 +402,7 @@ export class Wormhole extends CelestialObject {
         ctx.stroke();
     }
 
-    private renderLensingPreview(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, apertureRadius: number, previewObjects: any[]): void {
+    private renderLensingPreview(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, apertureRadius: number, previewObjects: { x: number; y: number; type: string; relativeX?: number; relativeY?: number }[]): void {
         // Scale factor for rendering objects within the aperture
         const previewScale = apertureRadius / 150; // 150px preview area maps to aperture
         const maxDistance = 300; // Max distance we're previewing from destination
@@ -431,7 +431,7 @@ export class Wormhole extends CelestialObject {
         this.renderLensingDistortion(ctx, centerX, centerY, apertureRadius);
     }
 
-    private renderPreviewObject(ctx: CanvasRenderingContext2D, x: number, y: number, obj: any, scale: number): void {
+    private renderPreviewObject(ctx: CanvasRenderingContext2D, x: number, y: number, obj: { type: string; radius?: number; color?: string; nebulaType?: string }, scale: number): void {
         const size = Math.max(1, (obj.radius || 10) * scale * 0.3); // Scale down object sizes
         
         switch (obj.type) {
@@ -528,7 +528,7 @@ export class Wormhole extends CelestialObject {
     }
 
     // Get discovery data for saving/loading
-    getDiscoveryData(): any {
+    getDiscoveryData(): { discovered: boolean; wormholeId: string; designation: string; pairId: string; twinX: number; twinY: number; timestamp: number; discoveryValue?: number } {
         return {
             discovered: this.discovered,
             wormholeId: this.wormholeId,

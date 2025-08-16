@@ -59,15 +59,29 @@ interface ActiveObjects {
     blackholes: BlackHole[];
 }
 
+interface NebulaTypeData {
+    name: string;
+    type?: string;
+    color?: string;
+    size?: number;
+}
+
+interface GardenTypeData {
+    name: string;
+    type?: string;
+    density?: number;
+    color?: string;
+}
+
 interface DiscoveryData {
     discovered: boolean;
     timestamp: number;
     starTypeName?: string;
     planetTypeName?: string;
     nebulaType?: string;
-    nebulaTypeData?: any;
+    nebulaTypeData?: NebulaTypeData;
     gardenType?: string;
-    gardenTypeData?: any;
+    gardenTypeData?: GardenTypeData;
     objectName?: string;
     // Wormhole properties
     wormholeId?: string;
@@ -89,7 +103,7 @@ interface DiscoveredPlanet {
     parentStarX: number;
     parentStarY: number;
     planetTypeName: string;
-    planetType: any;
+    planetType: typeof PlanetTypes[keyof typeof PlanetTypes];
     planetIndex: number;
     objectName?: string;
     timestamp: number;
@@ -148,8 +162,15 @@ interface DiscoveredBlackHole {
 }
 
 interface CompanionWeight {
-    type: any;
+    type: typeof StarTypes[keyof typeof StarTypes];
     weight: number;
+}
+
+interface DebugObject {
+    type: string;
+    object: Wormhole | BlackHole;
+    x: number;
+    y: number;
 }
 
 export class ChunkManager {
@@ -157,7 +178,7 @@ export class ChunkManager {
     loadRadius: number;
     activeChunks: Map<string, Chunk>;
     discoveredObjects: Map<string, DiscoveryData>;
-    debugObjects?: Array<{type: string, object: any, x: number, y: number}>;
+    debugObjects?: DebugObject[];
 
     constructor() {
         this.chunkSize = GameConfig.world.chunkSize;
@@ -177,23 +198,23 @@ export class ChunkManager {
         return `${chunkX},${chunkY}`;
     }
 
-    getObjectId(x: number, y: number, type: string, object?: any): string {
+    getObjectId(x: number, y: number, type: string, object?: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole): string {
         // For orbiting planets, use parent star position plus planet index for stable unique ID
-        if (object && object.type === 'planet' && object.parentStar && object.planetIndex !== undefined) {
+        if (object && object.type === 'planet' && 'parentStar' in object && 'planetIndex' in object && object.parentStar && object.planetIndex !== undefined) {
             const starX = Math.floor(object.parentStar.x);
             const starY = Math.floor(object.parentStar.y);
             return `${type}_${starX}_${starY}_planet_${object.planetIndex}`;
         }
         
         // For orbiting moons, use parent planet position plus moon index for stable unique ID
-        if (object && object.type === 'moon' && object.parentPlanet && object.moonIndex !== undefined) {
+        if (object && object.type === 'moon' && 'parentPlanet' in object && 'moonIndex' in object && object.parentPlanet && object.moonIndex !== undefined) {
             const planetX = Math.floor(object.parentPlanet.x);
             const planetY = Math.floor(object.parentPlanet.y);
             return `${type}_${planetX}_${planetY}_moon_${object.moonIndex}`;
         }
         
         // For wormholes, include designation for proper stellar map discovery parsing
-        if (type === 'wormhole' && object && object.designation) {
+        if (type === 'wormhole' && object && 'designation' in object && object.designation) {
             return `${type}_${Math.floor(x)}_${Math.floor(y)}_${object.designation}`;
         }
         
@@ -428,7 +449,7 @@ export class ChunkManager {
         return chunk;
     }
 
-    selectPlanetType(rng: SeededRandom, orbitalDistance: number, star: Star): any {
+    selectPlanetType(rng: SeededRandom, orbitalDistance: number, star: Star): typeof PlanetTypes[keyof typeof PlanetTypes] {
         // Create weighted selection based on orbital distance and star characteristics
         const minDistance = star.radius + 60;
         const relativeDistance = (orbitalDistance - minDistance) / 800; // Normalize to 0-1 range
@@ -490,7 +511,7 @@ export class ChunkManager {
         return PlanetTypes.ROCKY;
     }
 
-    selectStarType(rng: SeededRandom): any {
+    selectStarType(rng: SeededRandom): typeof StarTypes[keyof typeof StarTypes] {
         // Use weighted random selection based on star type rarity
         const roll = rng.nextFloat(0, 1);
         let cumulativeProbability = 0;
@@ -518,7 +539,7 @@ export class ChunkManager {
         return StarTypes.G_TYPE;
     }
 
-    applyStarTypeModifiers(probabilities: Record<string, number>, starType: any, relativeDistance: number): Record<string, number> {
+    applyStarTypeModifiers(probabilities: Record<string, number>, starType: typeof StarTypes[keyof typeof StarTypes], relativeDistance: number): Record<string, number> {
         // Create a copy to avoid modifying the original
         const modifiedProbs = { ...probabilities };
         
@@ -642,7 +663,7 @@ export class ChunkManager {
         return objects;
     }
 
-    markObjectDiscovered(object: any, objectName?: string): void {
+    markObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole, objectName?: string): void {
         const objId = this.getObjectId(object.x, object.y, object.type, object);
         const discoveryData: DiscoveryData = {
             discovered: true,
@@ -650,21 +671,25 @@ export class ChunkManager {
         };
         
         // Store type information for persistent display
-        if (object.type === 'star' && object.starTypeName) {
+        if (object.type === 'star' && 'starTypeName' in object && object.starTypeName) {
             discoveryData.starTypeName = object.starTypeName;
-        } else if (object.type === 'planet' && object.planetTypeName) {
+        } else if (object.type === 'planet' && 'planetTypeName' in object && object.planetTypeName) {
             discoveryData.planetTypeName = object.planetTypeName;
-        } else if (object.type === 'nebula' && object.nebulaType) {
+        } else if (object.type === 'nebula' && 'nebulaType' in object && object.nebulaType) {
             discoveryData.nebulaType = object.nebulaType;
-            discoveryData.nebulaTypeData = object.nebulaTypeData;
-        } else if (object.type === 'wormhole' && object.wormholeId && object.designation) {
+            if ('nebulaTypeData' in object) {
+                discoveryData.nebulaTypeData = object.nebulaTypeData;
+            }
+        } else if (object.type === 'wormhole' && 'wormholeId' in object && 'designation' in object && object.wormholeId && object.designation) {
             discoveryData.wormholeId = object.wormholeId;
             discoveryData.designation = object.designation;
-        } else if (object.type === 'blackhole' && object.blackHoleTypeName) {
+        } else if (object.type === 'blackhole' && 'blackHoleTypeName' in object && object.blackHoleTypeName) {
             discoveryData.blackHoleTypeName = object.blackHoleTypeName;
-        } else if (object.type === 'asteroids' && object.gardenType) {
+        } else if (object.type === 'asteroids' && 'gardenType' in object && object.gardenType) {
             discoveryData.gardenType = object.gardenType;
-            discoveryData.gardenTypeData = object.gardenTypeData;
+            if ('gardenTypeData' in object) {
+                discoveryData.gardenTypeData = object.gardenTypeData;
+            }
         }
         
         // Store the generated name if provided
@@ -676,12 +701,12 @@ export class ChunkManager {
         object.discovered = true;
     }
 
-    isObjectDiscovered(object: any): boolean {
+    isObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole): boolean {
         const objId = this.getObjectId(object.x, object.y, object.type, object);
         return this.discoveredObjects.has(objId);
     }
 
-    restoreDiscoveryState(objects: any[]): void {
+    restoreDiscoveryState(objects: (Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole)[]): void {
         for (const obj of objects) {
             if (this.isObjectDiscovered(obj)) {
                 obj.discovered = true;
@@ -924,7 +949,7 @@ export class ChunkManager {
                             // Generate basic type data
                             nebulaTypeData = {
                                 name: `${nebulaType.charAt(0).toUpperCase()}${nebulaType.slice(1)} Nebula`,
-                                colors: this.getBasicNebulaColors(nebulaType)
+                                color: this.getBasicNebulaColors(nebulaType)?.[0] || '#ff00ff'
                             };
                         }
                         
@@ -1120,7 +1145,7 @@ export class ChunkManager {
     }
 
     // Helper method to find a nebula by its position in active chunks  
-    private findNebulaByPosition(x: number, y: number): any | null {
+    private findNebulaByPosition(x: number, y: number): Nebula | null {
         for (const chunk of this.activeChunks.values()) {
             for (const nebula of chunk.nebulae) {
                 // Check if nebula position matches (using floor to match getObjectId)
@@ -1133,7 +1158,7 @@ export class ChunkManager {
     }
 
     // Helper method to find a wormhole by its position and designation in active chunks
-    private findWormholeByPosition(x: number, y: number, designation: 'alpha' | 'beta'): any | null {
+    private findWormholeByPosition(x: number, y: number, designation: 'alpha' | 'beta'): Wormhole | null {
         for (const chunk of this.activeChunks.values()) {
             for (const wormhole of chunk.wormholes) {
                 // Check if wormhole position and designation match (using floor to match getObjectId)
@@ -1146,7 +1171,7 @@ export class ChunkManager {
     }
 
     // Helper method to find an asteroid garden by its position in active chunks
-    private findAsteroidGardenByPosition(x: number, y: number): any | null {
+    private findAsteroidGardenByPosition(x: number, y: number): AsteroidGarden | null {
         for (const chunk of this.activeChunks.values()) {
             for (const garden of chunk.asteroidGardens) {
                 // Check if asteroid garden position matches (using floor to match getObjectId)
@@ -1159,7 +1184,7 @@ export class ChunkManager {
     }
 
     // Helper method to find a black hole by its position in active chunks
-    private findBlackHoleByPosition(x: number, y: number): any | null {
+    private findBlackHoleByPosition(x: number, y: number): BlackHole | null {
         for (const chunk of this.activeChunks.values()) {
             for (const blackHole of chunk.blackholes) {
                 // Check if black hole position matches (using floor to match getObjectId)
@@ -1300,7 +1325,7 @@ export class ChunkManager {
     }
     
     // Select appropriate companion star type for binary systems
-    selectCompanionStarType(rng: SeededRandom, primaryStarType: any): any {
+    selectCompanionStarType(rng: SeededRandom, primaryStarType: typeof StarTypes[keyof typeof StarTypes]): typeof StarTypes[keyof typeof StarTypes] {
         // Companion stars are typically smaller than the primary
         // Create weighted distribution favoring smaller star types
         const companionWeights: CompanionWeight[] = [];
@@ -1475,7 +1500,7 @@ export class ChunkManager {
                 if (debugObj.type === 'wormhole') {
                     const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
                     if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
-                        chunk.wormholes.push(debugObj.object);
+                        chunk.wormholes.push(debugObj.object as Wormhole);
                         // Continue to check for natural wormholes too
                     }
                 }
@@ -1606,7 +1631,7 @@ export class ChunkManager {
                 if (debugObj.type === 'blackhole') {
                     const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
                     if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
-                        chunk.blackholes.push(debugObj.object);
+                        chunk.blackholes.push(debugObj.object as BlackHole);
                         // Continue to check for natural black holes too
                     }
                 }

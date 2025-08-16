@@ -77,9 +77,12 @@ interface BlackHoleLike {
     timestamp?: number;
 }
 
+// Union type for all discoverable objects
+type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | AsteroidGardenLike | BlackHoleLike;
+
 interface NamingService {
-    generateDisplayName(object: any): string;
-    generateFullDesignation(object: any): {
+    generateDisplayName(object: DiscoverableObject): string;
+    generateFullDesignation(object: DiscoverableObject): {
         catalog: string;
         coordinate: string;
         type: string;
