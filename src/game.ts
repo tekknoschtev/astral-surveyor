@@ -14,6 +14,7 @@ import { NamingService } from './naming/naming.js';
 import { TouchUI } from './ui/touchui.js';
 import { SoundManager } from './audio/soundmanager.js';
 import { GameConfig } from './config/gameConfig.js';
+import { DiscoveryManager } from './services/DiscoveryManager.js';
 // Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
@@ -99,6 +100,12 @@ export class Game {
     namingService: NamingService;
     touchUI: TouchUI;
     soundManager: SoundManager;
+    discoveryManager: DiscoveryManager;
+    
+    // Expose properties for backward compatibility with tests
+    get lastBlackHoleWarnings() {
+        return this.discoveryManager['lastBlackHoleWarnings'];
+    }
     
     // Track previous ship state for audio triggers
     previousThrustState: boolean;
@@ -118,9 +125,6 @@ export class Game {
     animationId: number;
     gameStartingPosition: GameStartingPosition;
     
-    // Black hole warning state tracking
-    lastBlackHoleWarnings: Map<string, { time: number, level: number }>;
-    warningCooldown: number;
     
     // Universe reset state tracking
     isResettingUniverse: boolean;
@@ -145,6 +149,12 @@ export class Game {
         this.namingService = new NamingService();
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
+        this.discoveryManager = new DiscoveryManager(
+            this.soundManager,
+            this.discoveryDisplay,
+            this.discoveryLogbook,
+            this.namingService
+        );
         
         // Track previous ship state for audio triggers
         this.previousThrustState = false;
@@ -160,8 +170,6 @@ export class Game {
         this.distanceSaveInterval = 5.0;
         
         // Black hole warning system - prevent spam notifications
-        this.lastBlackHoleWarnings = new Map();
-        this.warningCooldown = 2.0; // 2 seconds between repeated warnings
         
         // Universe reset system - cosmic rebirth mechanics
         this.isResettingUniverse = false;
@@ -381,7 +389,7 @@ export class Game {
                 if (gravEffects.warningLevel > 0) {
                     const warningMessage = blackHole.getProximityWarning();
                     if (warningMessage) {
-                        this.displayBlackHoleWarning(warningMessage, gravEffects.warningLevel, gravEffects.isPastEventHorizon, blackHole.uniqueId);
+                        this.discoveryManager.displayBlackHoleWarning(warningMessage, gravEffects.warningLevel, gravEffects.isPastEventHorizon, blackHole.uniqueId);
                     }
                 }
             }
@@ -425,31 +433,8 @@ export class Game {
         // Check for discoveries
         for (const obj of celestialObjects) {
             if (obj.checkDiscovery && obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
-                // Generate proper astronomical name for the discovery
-                const objectName = this.namingService.generateDisplayName(obj);
-                const objectType = obj.type === 'planet' ? obj.planetTypeName : 
-                                  obj.type === 'moon' ? 'Moon' : 
-                                  obj.type === 'nebula' ? ('nebulaTypeData' in obj ? obj.nebulaTypeData?.name : undefined) || 'Nebula' :
-                                  obj.type === 'asteroids' ? ('gardenTypeData' in obj && obj.gardenTypeData?.name ? obj.gardenTypeData.name : 'Asteroid Garden') :
-                                  obj.type === 'wormhole' ? 'Stable Traversable Wormhole' :
-                                  obj.type === 'blackhole' ? ('blackHoleTypeName' in obj ? obj.blackHoleTypeName : undefined) || 'Black Hole' :
-                                  ('starTypeName' in obj ? obj.starTypeName : undefined);
-                
-                // Add discovery with proper name
-                this.discoveryDisplay.addDiscovery(objectName, objectType || 'Unknown');
-                this.discoveryLogbook.addDiscovery(objectName, objectType || 'Unknown');
-                this.chunkManager.markObjectDiscovered(obj as any, objectName);
-                
-                // Play discovery sound based on object type
-                this.playDiscoverySound(obj, objectType || 'Unknown');
-                
-                // Log shareable URL for rare discoveries with proper designation
-                if (this.isRareDiscovery(obj)) {
-                    const shareableURL = generateShareableURL(this.camera.x, this.camera.y);
-                    const isNotable = this.namingService.isNotableDiscovery(obj);
-                    const logPrefix = isNotable ? '🌟 RARE DISCOVERY!' : '⭐ Discovery!';
-                    console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
-                }
+                // Process discovery using DiscoveryManager
+                this.discoveryManager.processDiscovery(obj, this.camera, this.chunkManager);
             }
         }
         
@@ -488,36 +473,10 @@ export class Game {
         this.discoveryDisplay.addNotification('Copy URL from console to share coordinates');
     }
 
+
+    // Delegate methods for backward compatibility with tests
     isRareDiscovery(obj: CelestialObject): boolean {
-        if (obj.type === 'star') {
-            // Consider Neutron Stars, White Dwarfs, Blue Giants, and Red Giants as rare
-            return obj.starTypeName === 'Neutron Star' || 
-                   obj.starTypeName === 'White Dwarf' || 
-                   obj.starTypeName === 'Blue Giant' ||
-                   obj.starTypeName === 'Red Giant';
-        } else if (obj.type === 'planet') {
-            // Consider Exotic, Volcanic, and Frozen planets as rare
-            return obj.planetTypeName === 'Exotic World' || 
-                   obj.planetTypeName === 'Volcanic World' || 
-                   obj.planetTypeName === 'Frozen World';
-        } else if (obj.type === 'moon') {
-            // All moon discoveries are notable due to smaller discovery radius
-            return true;
-        } else if (obj.type === 'nebula') {
-            // All nebulae are rare and notable discoveries
-            return true;
-        } else if (obj.type === 'asteroids') {
-            // Rare mineral and crystalline asteroid gardens are notable
-            const gardenType = 'gardenType' in obj && typeof obj.gardenType === 'string' ? obj.gardenType : undefined;
-            return gardenType === 'rare_minerals' || gardenType === 'crystalline' || gardenType === 'icy';
-        } else if (obj.type === 'wormhole') {
-            // All wormholes are extremely rare and notable discoveries
-            return true;
-        } else if (obj.type === 'blackhole') {
-            // All black holes are ultra-rare, cosmic discoveries of ultimate significance
-            return true;
-        }
-        return false;
+        return this.discoveryManager.isRareDiscovery(obj);
     }
 
     updateShipAudio(): void {
@@ -543,66 +502,7 @@ export class Game {
         */
     }
 
-    playDiscoverySound(obj: CelestialObject, objectType: string): void {
-        if (obj.type === 'star') {
-            this.soundManager.playStarDiscovery(obj.starTypeName);
-        } else if (obj.type === 'planet') {
-            this.soundManager.playPlanetDiscovery(obj.planetTypeName);
-        } else if (obj.type === 'moon') {
-            this.soundManager.playMoonDiscovery();
-        } else if (obj.type === 'nebula') {
-            // Play special sparkly nebula discovery sound
-            const nebulaType = 'nebulaType' in obj && typeof obj.nebulaType === 'string' ? obj.nebulaType : 'emission';
-            this.soundManager.playNebulaDiscovery(nebulaType);
-        } else if (obj.type === 'asteroids') {
-            // Play asteroid garden discovery sound (use planet discovery as base sound)
-            this.soundManager.playPlanetDiscovery('Asteroid Garden');
-        } else if (obj.type === 'wormhole') {
-            // Play unique wormhole discovery sound - deep, resonant, otherworldly
-            this.soundManager.playWormholeDiscovery();
-        } else if (obj.type === 'blackhole') {
-            // Play ultra-rare black hole discovery sound - deep, ominous, cosmic
-            // TODO: Add dedicated black hole discovery sound in Phase 6
-            this.soundManager.playWormholeDiscovery(); // Temporary - use wormhole sound
-        }
-        
-        // Play additional rare discovery sound for special objects
-        if (this.isRareDiscovery(obj)) {
-            setTimeout(() => {
-                this.soundManager.playRareDiscovery();
-            }, 300); // Delay for layered effect
-        }
-    }
 
-    displayBlackHoleWarning(message: string, warningLevel: number, isPastEventHorizon: boolean, blackHoleId: string): void {
-        const currentTime = Date.now() / 1000; // Convert to seconds
-        const lastWarning = this.lastBlackHoleWarnings.get(blackHoleId);
-        
-        // Check if we should show warning (different level or enough time passed)
-        const shouldShowWarning = !lastWarning || 
-                                 lastWarning.level !== warningLevel ||
-                                 (currentTime - lastWarning.time) >= this.warningCooldown;
-        
-        if (shouldShowWarning) {
-            // Display proximity warning with appropriate urgency indicators
-            if (isPastEventHorizon) {
-                // Critical warning - past event horizon
-                this.discoveryDisplay.addNotification(`🚨 CRITICAL: ${message}`);
-            } else if (warningLevel >= 2) {
-                // High danger warning
-                this.discoveryDisplay.addNotification(`🔥 DANGER: ${message}`);
-            } else {
-                // Caution level warning
-                this.discoveryDisplay.addNotification(`⚠️ CAUTION: ${message}`);
-            }
-            
-            // Update warning tracking
-            this.lastBlackHoleWarnings.set(blackHoleId, {
-                time: currentTime,
-                level: warningLevel
-            });
-        }
-    }
 
     checkDebugMode(): boolean {
         // Check URL parameters for debug mode
