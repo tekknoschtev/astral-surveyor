@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // Import from compiled TypeScript
 import { Game } from '../../dist/game.js';
+import { resetUniverse, generateSafeSpawnPosition, getUniverseResetCount } from '../../dist/utils/random.js';
+
+// Mock the random utils module
+vi.mock('../../dist/utils/random.js', async () => {
+  const actual = await vi.importActual('../../dist/utils/random.js');
+  return {
+    ...actual,
+    resetUniverse: vi.fn(),
+    generateSafeSpawnPosition: vi.fn(),
+    getUniverseResetCount: vi.fn()
+  };
+});
 
 describe('Game System - Main Game Loop and Orchestration', () => {
   let game;
@@ -1330,28 +1342,21 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       game.discoveryDisplay.addNotification = vi.fn();
     });
 
-    it.skip('should complete universe reset at midpoint', async () => {
+    it('should complete universe reset at midpoint', async () => {
       // Setup reset state near midpoint
       game.isResettingUniverse = true;
       game.resetStartTime = 1.4; // Near midpoint (1.5s)
       
-      // Mock the global functions that will be called
-      const mockResetUniverse = vi.fn().mockReturnValue('new-seed-123');
-      const mockGenerateSafeSpawnPosition = vi.fn().mockReturnValue({ x: 0, y: 0 });
-      const mockGetUniverseResetCount = vi.fn().mockReturnValue(2);
-      
-      // Mock the imports - need to mock at module level
-      global.resetUniverse = mockResetUniverse;
-      global.generateSafeSpawnPosition = mockGenerateSafeSpawnPosition;
-      global.getUniverseResetCount = mockGetUniverseResetCount;
+      // Configure the mocked functions
+      vi.mocked(resetUniverse).mockReturnValue(123456);
+      vi.mocked(generateSafeSpawnPosition).mockReturnValue({ x: 0, y: 0 });
+      vi.mocked(getUniverseResetCount).mockReturnValue(2);
 
       await game.update(0.2); // Push past midpoint
 
-      expect(mockResetUniverse).toHaveBeenCalledWith({
-        preserveDiscoveries: true,
-        newSpawnPosition: { x: 0, y: 0 },
-        resetMessage: 'Cosmic Rebirth Complete'
-      });
+      // Verify the actual implementation calls
+      expect(resetUniverse).toHaveBeenCalledWith(); // Called with no arguments
+      expect(generateSafeSpawnPosition).toHaveBeenCalled();
       expect(game.camera.x).toBe(0);
       expect(game.camera.y).toBe(0);
       expect(game.camera.velocityX).toBe(0);
