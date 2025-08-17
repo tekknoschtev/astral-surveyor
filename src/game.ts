@@ -14,6 +14,9 @@ import { NamingService } from './naming/naming.js';
 import { TouchUI } from './ui/touchui.js';
 import { SoundManager } from './audio/soundmanager.js';
 import { GameConfig } from './config/gameConfig.js';
+import { DiscoveryManager } from './services/DiscoveryManager.js';
+import { StateManager } from './services/StateManager.js';
+// Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
     getStartingCoordinates, 
@@ -22,9 +25,10 @@ import {
     generateSafeSpawnPosition,
     getUniverseResetCount
 } from './utils/random.js';
+// Note: Will add proper types in future phases when we extract celestial classes
 
 // Debug spawner import (development builds only)
-let DebugSpawner: any = null;
+let DebugSpawner: typeof import('./debug/debug-spawner.js').DebugSpawner | null = null;
 
 // Interface definitions
 interface GameStartingPosition {
@@ -32,18 +36,12 @@ interface GameStartingPosition {
     y: number;
 }
 
-interface ActiveObjects {
-    planets: any[];
-    moons: any[];
-    celestialStars: any[];
-    nebulae: any[];
-    wormholes: any[];
-}
-
+// Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
     type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
     x: number;
     y: number;
+    id?: string;
     starTypeName?: string;
     planetTypeName?: string;
     nebulaTypeData?: { name: string };
@@ -51,10 +49,41 @@ interface CelestialObject {
     designation?: 'alpha' | 'beta';
     pairId?: string;
     blackHoleTypeName?: string;
+    twinX?: number;
+    twinY?: number;
+    uniqueId?: string;
+    canTraverse?: boolean | ((camera: Camera) => boolean);
+    nebulaType?: string;
+    gardenType?: string;
+    gardenTypeData?: { name: string };
+    // Preview object properties (added dynamically)
+    relativeX?: number;
+    relativeY?: number;
+    distance?: number;
     updatePosition?(deltaTime: number): void;
     update?(deltaTime: number): void;
-    checkDiscovery(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
-    render(renderer: Renderer, camera: Camera): void;
+    checkDiscovery?(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
+    render?(renderer: Renderer, camera: Camera): void;
+    getDestinationCoordinates?(velocityX: number, velocityY: number): { x: number; y: number };
+}
+
+interface ActiveObjects {
+    planets: CelestialObject[];
+    moons: CelestialObject[];
+    celestialStars: CelestialObject[];
+    nebulae: CelestialObject[];
+    wormholes: CelestialObject[];
+    blackholes: CelestialObject[];
+    asteroidGardens: CelestialObject[];
+}
+
+interface TraversalDestination {
+    x: number;
+    y: number;
+    velocityX: number;
+    velocityY: number;
+    wormhole: CelestialObject;
+    stellarMapWasVisible: boolean;
 }
 
 export class Game {
@@ -72,36 +101,43 @@ export class Game {
     namingService: NamingService;
     touchUI: TouchUI;
     soundManager: SoundManager;
+    discoveryManager: DiscoveryManager;
+    stateManager: StateManager;
     
-    // Track previous ship state for audio triggers
-    previousThrustState: boolean;
-    previousBrakeState: boolean;
+    // Expose properties for backward compatibility with tests
+    get lastBlackHoleWarnings() {
+        return this.discoveryManager['lastBlackHoleWarnings'];
+    }
     
-    // Wormhole traversal transition state
-    isTraversing: boolean;
-    traversalStartTime: number;
-    traversalDuration: number;
-    traversalDestination?: { x: number; y: number; velocityX: number; velocityY: number; wormhole: any; stellarMapWasVisible: boolean };
-    
-    // Distance saving timer (save every 5 seconds)
-    distanceSaveTimer: number;
-    distanceSaveInterval: number;
-    
-    lastTime: number;
-    animationId: number;
-    gameStartingPosition: GameStartingPosition;
-    
-    // Black hole warning state tracking
-    lastBlackHoleWarnings: Map<string, { time: number, level: number }>;
-    warningCooldown: number;
-    
-    // Universe reset state tracking
-    isResettingUniverse: boolean;
-    resetStartTime: number;
-    resetDuration: number;
-    
-    // Debug mode state
-    debugModeEnabled: boolean;
+    // Expose state properties for backward compatibility with tests  
+    get isTraversing() { return this.stateManager.isTraversing; }
+    set isTraversing(value: boolean) { this.stateManager.isTraversing = value; }
+    get traversalStartTime() { return this.stateManager.traversalStartTime; }
+    set traversalStartTime(value: number) { this.stateManager.traversalStartTime = value; }
+    get traversalDuration() { return this.stateManager.traversalDuration; }
+    set traversalDuration(value: number) { this.stateManager.traversalDuration = value; }
+    get traversalDestination() { return this.stateManager.traversalDestination; }
+    set traversalDestination(value: any) { this.stateManager.traversalDestination = value; }
+    get distanceSaveTimer() { return this.stateManager.distanceSaveTimer; }
+    set distanceSaveTimer(value: number) { this.stateManager.distanceSaveTimer = value; }
+    get distanceSaveInterval() { return this.stateManager.distanceSaveInterval; }
+    get lastTime() { return this.stateManager.lastTime; }
+    set lastTime(value: number) { this.stateManager.lastTime = value; }
+    get animationId() { return this.stateManager.animationId; }
+    set animationId(value: number) { this.stateManager.animationId = value; }
+    get gameStartingPosition() { return this.stateManager.gameStartingPosition; }
+    set gameStartingPosition(value: GameStartingPosition) { this.stateManager.gameStartingPosition = value; }
+    get isResettingUniverse() { return this.stateManager.isResettingUniverse; }
+    set isResettingUniverse(value: boolean) { this.stateManager.isResettingUniverse = value; }
+    get resetStartTime() { return this.stateManager.resetStartTime; }
+    set resetStartTime(value: number) { this.stateManager.resetStartTime = value; }
+    get resetDuration() { return this.stateManager.resetDuration; }
+    set resetDuration(value: number) { this.stateManager.resetDuration = value; }
+    get debugModeEnabled() { return this.stateManager.debugModeEnabled; }
+    get previousThrustState() { return this.stateManager.previousThrustState; }
+    set previousThrustState(value: boolean) { this.stateManager.previousThrustState = value; }
+    get previousBrakeState() { return this.stateManager.previousBrakeState; }
+    set previousBrakeState(value: boolean) { this.stateManager.previousBrakeState = value; }
 
     constructor(canvas: HTMLCanvasElement) {
         this.renderer = new Renderer(canvas);
@@ -116,38 +152,19 @@ export class Game {
         this.discoveryLogbook = new DiscoveryLogbook();
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
+        this.stellarMap.setNamingService(this.namingService);
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
-        
-        // Track previous ship state for audio triggers
-        this.previousThrustState = false;
-        this.previousBrakeState = false;
-        
-        // Initialize wormhole traversal state
-        this.isTraversing = false;
-        this.traversalStartTime = 0;
-        this.traversalDuration = 2.0; // 2 second transition
-        
-        // Distance saving timer (save every 5 seconds)
-        this.distanceSaveTimer = 0;
-        this.distanceSaveInterval = 5.0;
-        
-        // Black hole warning system - prevent spam notifications
-        this.lastBlackHoleWarnings = new Map();
-        this.warningCooldown = 2.0; // 2 seconds between repeated warnings
-        
-        // Universe reset system - cosmic rebirth mechanics
-        this.isResettingUniverse = false;
-        this.resetStartTime = 0;
-        this.resetDuration = 3.0; // 3 seconds for cosmic transition
-        
-        // Debug mode system - URL parameter controlled
-        this.debugModeEnabled = this.checkDebugMode();
+        this.discoveryManager = new DiscoveryManager(
+            this.soundManager,
+            this.discoveryDisplay,
+            this.discoveryLogbook,
+            this.namingService
+        );
         
         // Connect naming service to stellar map
-        this.stellarMap.setNamingService(this.namingService as any);
-        this.lastTime = 0;
-        this.animationId = 0;
+        // TODO: Fix interface mismatch between StellarMap and NamingService in Phase 2
+        // this.stellarMap.setNamingService(this.namingService);
         
         this.setupCanvas();
         
@@ -159,11 +176,14 @@ export class Game {
             console.log(`📍 Camera positioned at shared coordinates: (${startingCoords.x}, ${startingCoords.y})`);
         }
         
-        // Track starting position for stellar map reference
-        this.gameStartingPosition = {
+        // Create starting position object for stellar map reference
+        const startingPosition = {
             x: this.camera.x,
             y: this.camera.y
         };
+        
+        // Initialize state manager with starting position
+        this.stateManager = new StateManager(startingPosition);
         
         // Log lifetime distance traveled
         const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
@@ -202,17 +222,30 @@ export class Game {
     async update(deltaTime: number): Promise<void> {
         this.input.update(deltaTime);
         
+        // Debug: Check initial state
+        if (!this.stateManager) {
+            console.error('❌ StateManager not initialized!');
+            return;
+        }
+        
         // Handle wormhole traversal transition
-        if (this.isTraversing) {
-            this.updateTraversal(deltaTime);
+        if (this.stateManager.isTraversing) {
+            this.stateManager.updateTraversal(deltaTime, this.camera, this.stellarMap, this.discoveryDisplay, this.chunkManager);
             // Still clear frame state to prevent input corruption during traversal
             this.input.clearFrameState();
             return; // Skip normal updates during traversal
         }
         
         // Handle universe reset transition
-        if (this.isResettingUniverse) {
-            this.updateUniverseReset(deltaTime);
+        if (this.stateManager.isResettingUniverse) {
+            this.stateManager.updateUniverseReset(
+                deltaTime, 
+                this.camera, 
+                this.chunkManager, 
+                this.discoveryLogbook,
+                this.stellarMap,
+                this.soundManager
+            );
             // Still clear frame state to prevent input corruption during cosmic transition
             this.input.clearFrameState();
             return; // Skip normal updates during cosmic transition
@@ -277,12 +310,8 @@ export class Game {
                 this.input.consumeTouch();
             } else if (this.stellarMap.isVisible() && !this.input.isTouchConsumed()) {
                 // Handle stellar map interactions (simplified) - only if not panning
-                const discoveredStars = this.chunkManager.getDiscoveredStars();
-                const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
-                const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-                const discoveredAsteroidGardens = this.chunkManager.getDiscoveredAsteroidGardens();
-                const discoveredBlackHoles = this.chunkManager.getDiscoveredBlackHoles();
-                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discoveredStars, this.renderer.canvas, discoveredPlanets, discoveredNebulae, discoveredAsteroidGardens, discoveredBlackHoles);
+                const discovered = this.getDiscoveredObjects();
+                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
             }
         }
         
@@ -294,12 +323,8 @@ export class Game {
         
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
-            const discoveredStars = this.chunkManager.getDiscoveredStars();
-            const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
-            const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-            const discoveredAsteroidGardens = this.chunkManager.getDiscoveredAsteroidGardens();
-            const discoveredBlackHoles = this.chunkManager.getDiscoveredBlackHoles();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discoveredStars, discoveredPlanets, discoveredNebulae, discoveredAsteroidGardens, discoveredBlackHoles);
+            const discovered = this.getDiscoveredObjects();
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.asteroidGardens, discovered.blackHoles);
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);
@@ -312,64 +337,18 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes] as any[];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes];
         
-        // Update orbital positions for all planets and moons
-        for (const planet of activeObjects.planets) {
-            if (planet.updatePosition) {
-                planet.updatePosition(deltaTime);
-            }
-        }
-        for (const moon of activeObjects.moons) {
-            if (moon.updatePosition) {
-                moon.updatePosition(deltaTime);
-            }
-        }
-        
-        // Update wormhole animations and effects
-        for (const wormhole of activeObjects.wormholes) {
-            if (wormhole.update) {
-                wormhole.update(deltaTime);
-            }
-        }
+        // Update orbital positions and animations for all celestial objects
+        this.updateCelestialObjects(activeObjects, deltaTime);
         
         // Update black hole animations and apply gravitational effects
-        for (const blackHole of activeObjects.blackholes) {
-            if (blackHole.update) {
-                blackHole.update(deltaTime);
-            }
-            
-            // Apply gravitational effects to camera/ship
-            if (blackHole.updateGravitationalEffects) {
-                const gravEffects = blackHole.updateGravitationalEffects(this.camera, deltaTime);
-                
-                // Apply gravitational pull to ship movement
-                if (gravEffects.pullForceX !== 0 || gravEffects.pullForceY !== 0) {
-                    this.camera.velocityX += gravEffects.pullForceX * deltaTime;
-                    this.camera.velocityY += gravEffects.pullForceY * deltaTime;
-                }
-                
-                // Handle proximity warnings - Phase 1 Safety System
-                if (gravEffects.warningLevel > 0) {
-                    const warningMessage = blackHole.getProximityWarning();
-                    if (warningMessage) {
-                        this.displayBlackHoleWarning(warningMessage, gravEffects.warningLevel, gravEffects.isPastEventHorizon, blackHole.uniqueId);
-                    }
-                }
-            }
-            
-            // Check for singularity collision (universe reset)
-            if (blackHole.checkSingularityCollision && blackHole.checkSingularityCollision(this.camera)) {
-                if (!this.isResettingUniverse) {
-                    this.initiateUniverseReset();
-                }
-            }
-        }
+        this.updateBlackHoles(activeObjects.blackholes, deltaTime);
         
         // Restore discovery state for newly loaded objects
-        this.chunkManager.restoreDiscoveryState(celestialObjects);
+        this.chunkManager.restoreDiscoveryState(celestialObjects as any);
         
-        this.camera.update(this.input as any, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
+        this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
         
         // Check for wormhole traversal
         this.checkWormholeTraversal(activeObjects.wormholes);
@@ -395,45 +374,101 @@ export class Game {
         }
         
         // Check for discoveries
-        for (const obj of celestialObjects) {
-            if (obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
-                // Generate proper astronomical name for the discovery
-                const objectName = this.namingService.generateDisplayName(obj);
-                const objectType = obj.type === 'planet' ? obj.planetTypeName : 
-                                  obj.type === 'moon' ? 'Moon' : 
-                                  obj.type === 'nebula' ? (obj as any).nebulaTypeData?.name || 'Nebula' :
-                                  obj.type === 'asteroids' ? (obj as any).gardenTypeData?.name || 'Asteroid Garden' :
-                                  obj.type === 'wormhole' ? 'Stable Traversable Wormhole' :
-                                  obj.type === 'blackhole' ? obj.blackHoleTypeName || 'Black Hole' :
-                                  obj.starTypeName;
-                
-                // Add discovery with proper name
-                this.discoveryDisplay.addDiscovery(objectName, objectType || 'Unknown');
-                this.discoveryLogbook.addDiscovery(objectName, objectType || 'Unknown');
-                this.chunkManager.markObjectDiscovered(obj, objectName);
-                
-                // Play discovery sound based on object type
-                this.playDiscoverySound(obj, objectType || 'Unknown');
-                
-                // Log shareable URL for rare discoveries with proper designation
-                if (this.isRareDiscovery(obj)) {
-                    const shareableURL = generateShareableURL(this.camera.x, this.camera.y);
-                    const isNotable = this.namingService.isNotableDiscovery(obj);
-                    const logPrefix = isNotable ? '🌟 RARE DISCOVERY!' : '⭐ Discovery!';
-                    console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
-                }
-            }
-        }
+        this.processDiscoveries(celestialObjects);
         
         // Periodically save distance traveled data
-        this.distanceSaveTimer += deltaTime;
-        if (this.distanceSaveTimer >= this.distanceSaveInterval) {
-            this.camera.saveDistanceTraveled();
-            this.distanceSaveTimer = 0;
-        }
+        this.stateManager.updateDistanceSaving(deltaTime, this.camera);
         
         // Clear frame state at end of update
         this.input.clearFrameState();
+    }
+
+    /**
+     * Update orbital positions and animations for all celestial objects
+     */
+    private updateCelestialObjects(activeObjects: ActiveObjects, deltaTime: number): void {
+        // Update orbital positions for planets and moons
+        for (const planet of activeObjects.planets) {
+            if (planet.updatePosition) {
+                planet.updatePosition(deltaTime);
+            }
+        }
+        for (const moon of activeObjects.moons) {
+            if (moon.updatePosition) {
+                moon.updatePosition(deltaTime);
+            }
+        }
+        
+        // Update wormhole animations and effects
+        for (const wormhole of activeObjects.wormholes) {
+            if (wormhole.update) {
+                wormhole.update(deltaTime);
+            }
+        }
+    }
+
+    /**
+     * Update black hole animations and handle gravitational effects
+     */
+    private updateBlackHoles(blackHoles: any[], deltaTime: number): void {
+        for (const blackHole of blackHoles) {
+            if (blackHole.update) {
+                blackHole.update(deltaTime);
+            }
+            
+            // Apply gravitational effects to camera/ship
+            if (blackHole.updateGravitationalEffects) {
+                const gravEffects = blackHole.updateGravitationalEffects(this.camera, deltaTime);
+                
+                // Apply gravitational pull to ship movement
+                if (gravEffects.pullForceX !== 0 || gravEffects.pullForceY !== 0) {
+                    this.camera.velocityX += gravEffects.pullForceX * deltaTime;
+                    this.camera.velocityY += gravEffects.pullForceY * deltaTime;
+                }
+                
+                // Handle proximity warnings - Phase 1 Safety System
+                if (gravEffects.warningLevel > 0) {
+                    const warningMessage = blackHole.getProximityWarning();
+                    if (warningMessage) {
+                        this.discoveryManager.displayBlackHoleWarning(warningMessage, gravEffects.warningLevel, gravEffects.isPastEventHorizon, blackHole.uniqueId);
+                    }
+                }
+            }
+            
+            // Check for singularity collision (universe reset)
+            if (blackHole.checkSingularityCollision && blackHole.checkSingularityCollision(this.camera)) {
+                if (!this.stateManager.isResettingUniverse) {
+                    this.stateManager.initiateUniverseReset();
+                    this.discoveryDisplay.addNotification('🚨 Singularity Contact - Cosmic Rebirth Initiated');
+                }
+            }
+        }
+    }
+
+    /**
+     * Process discovery checks for all celestial objects
+     */
+    private processDiscoveries(celestialObjects: CelestialObject[]): void {
+        for (const obj of celestialObjects) {
+            if (obj.checkDiscovery && obj.checkDiscovery(this.camera, this.renderer.canvas.width, this.renderer.canvas.height)) {
+                // Process discovery using DiscoveryManager
+                this.discoveryManager.processDiscovery(obj, this.camera, this.chunkManager);
+            }
+        }
+    }
+
+    /**
+     * Get all discovered objects from chunk manager
+     */
+    private getDiscoveredObjects() {
+        return {
+            stars: this.chunkManager.getDiscoveredStars(),
+            planets: this.chunkManager.getDiscoveredPlanets(),
+            nebulae: this.chunkManager.getDiscoveredNebulae(),
+            wormholes: this.chunkManager.getDiscoveredWormholes(),
+            asteroidGardens: this.chunkManager.getDiscoveredAsteroidGardens(),
+            blackHoles: this.chunkManager.getDiscoveredBlackHoles()
+        };
     }
 
     copyCurrentCoordinates(): void {
@@ -460,36 +495,10 @@ export class Game {
         this.discoveryDisplay.addNotification('Copy URL from console to share coordinates');
     }
 
+
+    // Delegate methods for backward compatibility with tests
     isRareDiscovery(obj: CelestialObject): boolean {
-        if (obj.type === 'star') {
-            // Consider Neutron Stars, White Dwarfs, Blue Giants, and Red Giants as rare
-            return obj.starTypeName === 'Neutron Star' || 
-                   obj.starTypeName === 'White Dwarf' || 
-                   obj.starTypeName === 'Blue Giant' ||
-                   obj.starTypeName === 'Red Giant';
-        } else if (obj.type === 'planet') {
-            // Consider Exotic, Volcanic, and Frozen planets as rare
-            return obj.planetTypeName === 'Exotic World' || 
-                   obj.planetTypeName === 'Volcanic World' || 
-                   obj.planetTypeName === 'Frozen World';
-        } else if (obj.type === 'moon') {
-            // All moon discoveries are notable due to smaller discovery radius
-            return true;
-        } else if (obj.type === 'nebula') {
-            // All nebulae are rare and notable discoveries
-            return true;
-        } else if (obj.type === 'asteroids') {
-            // Rare mineral and crystalline asteroid gardens are notable
-            const gardenType = (obj as any).gardenType;
-            return gardenType === 'rare_minerals' || gardenType === 'crystalline' || gardenType === 'icy';
-        } else if (obj.type === 'wormhole') {
-            // All wormholes are extremely rare and notable discoveries
-            return true;
-        } else if (obj.type === 'blackhole') {
-            // All black holes are ultra-rare, cosmic discoveries of ultimate significance
-            return true;
-        }
-        return false;
+        return this.discoveryManager.isRareDiscovery(obj);
     }
 
     updateShipAudio(): void {
@@ -515,85 +524,8 @@ export class Game {
         */
     }
 
-    playDiscoverySound(obj: CelestialObject, objectType: string): void {
-        if (obj.type === 'star') {
-            this.soundManager.playStarDiscovery(obj.starTypeName);
-        } else if (obj.type === 'planet') {
-            this.soundManager.playPlanetDiscovery(obj.planetTypeName);
-        } else if (obj.type === 'moon') {
-            this.soundManager.playMoonDiscovery();
-        } else if (obj.type === 'nebula') {
-            // Play special sparkly nebula discovery sound
-            this.soundManager.playNebulaDiscovery((obj as any).nebulaType || 'emission');
-        } else if (obj.type === 'asteroids') {
-            // Play asteroid garden discovery sound (use planet discovery as base sound)
-            this.soundManager.playPlanetDiscovery('Asteroid Garden');
-        } else if (obj.type === 'wormhole') {
-            // Play unique wormhole discovery sound - deep, resonant, otherworldly
-            this.soundManager.playWormholeDiscovery();
-        } else if (obj.type === 'blackhole') {
-            // Play ultra-rare black hole discovery sound - deep, ominous, cosmic
-            // TODO: Add dedicated black hole discovery sound in Phase 6
-            this.soundManager.playWormholeDiscovery(); // Temporary - use wormhole sound
-        }
-        
-        // Play additional rare discovery sound for special objects
-        if (this.isRareDiscovery(obj)) {
-            setTimeout(() => {
-                this.soundManager.playRareDiscovery();
-            }, 300); // Delay for layered effect
-        }
-    }
 
-    displayBlackHoleWarning(message: string, warningLevel: number, isPastEventHorizon: boolean, blackHoleId: string): void {
-        const currentTime = Date.now() / 1000; // Convert to seconds
-        const lastWarning = this.lastBlackHoleWarnings.get(blackHoleId);
-        
-        // Check if we should show warning (different level or enough time passed)
-        const shouldShowWarning = !lastWarning || 
-                                 lastWarning.level !== warningLevel ||
-                                 (currentTime - lastWarning.time) >= this.warningCooldown;
-        
-        if (shouldShowWarning) {
-            // Display proximity warning with appropriate urgency indicators
-            if (isPastEventHorizon) {
-                // Critical warning - past event horizon
-                this.discoveryDisplay.addNotification(`🚨 CRITICAL: ${message}`);
-            } else if (warningLevel >= 2) {
-                // High danger warning
-                this.discoveryDisplay.addNotification(`🔥 DANGER: ${message}`);
-            } else {
-                // Caution level warning
-                this.discoveryDisplay.addNotification(`⚠️ CAUTION: ${message}`);
-            }
-            
-            // Update warning tracking
-            this.lastBlackHoleWarnings.set(blackHoleId, {
-                time: currentTime,
-                level: warningLevel
-            });
-        }
-    }
 
-    checkDebugMode(): boolean {
-        // Check URL parameters for debug mode
-        const urlParams = new URLSearchParams(window.location.search);
-        const debugEnabled = urlParams.has('debug') || urlParams.get('debug') === 'true';
-        
-        if (debugEnabled) {
-            // Enable the debug configuration when URL debug mode is active
-            GameConfig.debug.enabled = true;
-            
-            console.log('🛠️  DEBUG MODE ENABLED via URL parameter');
-            console.log('Available commands:');
-            console.log('  Shift + H: Show debug help');
-            console.log('  Shift + W: Spawn wormhole pair');
-            console.log('  Shift + B: Spawn black hole');
-            console.log('  Debug features: Chunk boundaries, coordinates, etc.');
-        }
-        
-        return debugEnabled;
-    }
 
     async handleDebugInput(): Promise<void> {
         // Only process debug input if debug mode is enabled
@@ -668,14 +600,14 @@ export class Game {
         }
     }
 
-    checkWormholeTraversal(wormholes: any[]): void {
+    checkWormholeTraversal(wormholes: CelestialObject[]): void {
         // Skip if already traversing
         if (this.isTraversing) {
             return;
         }
 
         for (const wormhole of wormholes) {
-            if (wormhole.canTraverse && wormhole.canTraverse(this.camera)) {
+            if (wormhole.canTraverse && (typeof wormhole.canTraverse === 'function' ? wormhole.canTraverse(this.camera) : wormhole.canTraverse)) {
                 // Ship is within wormhole - initiate traversal
                 this.initiateWormholeTraversal(wormhole);
                 return; // Only traverse one wormhole per frame
@@ -683,25 +615,18 @@ export class Game {
         }
     }
 
-    initiateWormholeTraversal(wormhole: any): void {
-        // Start traversal transition
-        this.isTraversing = true;
-        this.traversalStartTime = 0;
-        
+    initiateWormholeTraversal(wormhole: CelestialObject): void {
         // Store destination and momentum (pass velocity for smart exit positioning)
         const destination = wormhole.getDestinationCoordinates(this.camera.velocityX, this.camera.velocityY);
-        this.traversalDestination = {
-            x: destination.x,
-            y: destination.y,
-            velocityX: this.camera.velocityX,
-            velocityY: this.camera.velocityY,
-            wormhole: wormhole,
-            stellarMapWasVisible: this.stellarMap.isVisible()
-        };
         
-        // Stop ship movement during traversal
-        this.camera.velocityX = 0;
-        this.camera.velocityY = 0;
+        // Start traversal using StateManager
+        this.stateManager.startTraversal(
+            wormhole,
+            destination.x,
+            destination.y,
+            this.camera,
+            this.stellarMap
+        );
         
         // Play dedicated wormhole traversal sound effect
         this.soundManager.playWormholeTraversal();
@@ -710,128 +635,14 @@ export class Game {
         console.log(`🌀 Starting wormhole traversal: ${wormhole.pairId} → destination ${destinationDesignation}`);
     }
 
-    updateTraversal(deltaTime: number): void {
-        if (!this.traversalDestination) return;
-        
-        this.traversalStartTime += deltaTime;
-        
-        // Complete traversal at midpoint (1 second in)
-        if (this.traversalStartTime >= this.traversalDuration / 2 && this.traversalStartTime - deltaTime < this.traversalDuration / 2) {
-            // Teleport to destination
-            this.camera.x = this.traversalDestination.x;
-            this.camera.y = this.traversalDestination.y;
-            
-            // Update chunks for new location
-            this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
-            
-            // If stellar map was visible before traversal, center it on new position
-            if (this.traversalDestination.stellarMapWasVisible) {
-                this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
-            }
-            
-            // Show traversal notification
-            const destinationDesignation = this.traversalDestination.wormhole.designation === 'alpha' ? 'β' : 'α';
-            this.discoveryDisplay.addNotification(`Traversed to ${this.traversalDestination.wormhole.wormholeId}-${destinationDesignation}`);
-            
-            console.log(`🌀 Completed wormhole traversal to ${destinationDesignation}`);
-        }
-        
-        // End traversal
-        if (this.traversalStartTime >= this.traversalDuration) {
-            // Restore momentum
-            this.camera.velocityX = this.traversalDestination.velocityX;
-            this.camera.velocityY = this.traversalDestination.velocityY;
-            
-            // Reset traversal state
-            this.isTraversing = false;
-            this.traversalDestination = undefined;
-        }
-    }
 
-    initiateUniverseReset(): void {
-        // Start cosmic transition sequence
-        this.isResettingUniverse = true;
-        this.resetStartTime = 0;
-        
-        console.log('🕳️ SINGULARITY COLLISION - Initiating cosmic rebirth...');
-        
-        // Show critical notification
-        this.discoveryDisplay.addNotification('🚨 Singularity Contact - Cosmic Rebirth Initiated');
-    }
-
-    updateUniverseReset(deltaTime: number): void {
-        this.resetStartTime += deltaTime;
-        
-        // Complete reset at midpoint (1.5 seconds in)
-        if (this.resetStartTime >= this.resetDuration / 2 && this.resetStartTime - deltaTime < this.resetDuration / 2) {
-            // Preserve discovery data
-            const discoveries = this.discoveryLogbook.getDiscoveries();
-            
-            // Reset universe with new seed
-            const newSeed = resetUniverse({
-                preserveDiscoveries: true,
-                newSpawnPosition: generateSafeSpawnPosition(),
-                resetMessage: 'Cosmic Rebirth Complete'
-            });
-            
-            // Respawn at safe location
-            const safePosition = generateSafeSpawnPosition();
-            this.camera.x = safePosition.x;
-            this.camera.y = safePosition.y;
-            this.camera.velocityX = 0;
-            this.camera.velocityY = 0;
-            
-            // Clear chunk data to force regeneration with new seed
-            this.chunkManager.clearAllChunks();
-            this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
-            
-            // Restore discovery data
-            for (const discovery of discoveries) {
-                this.discoveryLogbook.addDiscovery(discovery.name, discovery.type, discovery.timestamp);
-            }
-            
-            // Show rebirth notification
-            const resetCount = getUniverseResetCount();
-            this.discoveryDisplay.addNotification(`✨ Cosmic Rebirth Complete - Universe ${resetCount}`);
-            this.discoveryDisplay.addNotification(`📚 Discovery logbook preserved (${discoveries.length} entries)`);
-            
-            console.log(`✨ COSMIC REBIRTH COMPLETE - Welcome to Universe ${resetCount}`);
-        }
-        
-        // End reset transition
-        if (this.resetStartTime >= this.resetDuration) {
-            // Reset state
-            this.isResettingUniverse = false;
-        }
-    }
 
     render(): void {
         this.renderer.clear();
         
         // Calculate fade alpha for traversal and universe reset effects
-        let fadeAlpha = 0;
-        let isCosmicTransition = false;
-        
-        if (this.isTraversing) {
-            const progress = this.traversalStartTime / this.traversalDuration;
-            // Fade to black in first half, fade from black in second half
-            if (progress < 0.5) {
-                fadeAlpha = progress * 2; // 0 to 1
-            } else {
-                fadeAlpha = 2 - (progress * 2); // 1 to 0
-            }
-            fadeAlpha = Math.min(1, Math.max(0, fadeAlpha));
-        } else if (this.isResettingUniverse) {
-            isCosmicTransition = true;
-            const progress = this.resetStartTime / this.resetDuration;
-            // Cosmic transition: fade to cosmic colors, then fade from cosmic colors
-            if (progress < 0.5) {
-                fadeAlpha = progress * 2; // 0 to 1
-            } else {
-                fadeAlpha = 2 - (progress * 2); // 1 to 0
-            }
-            fadeAlpha = Math.min(1, Math.max(0, fadeAlpha));
-        }
+        const fadeAlpha = this.stateManager.calculateFadeAlpha();
+        const isCosmicTransition = this.stateManager.isResettingUniverse;
         
         this.starField.render(this.renderer, this.camera);
         
@@ -878,13 +689,8 @@ export class Game {
         this.discoveryLogbook.render(this.renderer, this.camera);
         
         // Render stellar map overlay (renders on top of everything)
-        const discoveredStars = this.chunkManager.getDiscoveredStars();
-        const discoveredPlanets = this.chunkManager.getDiscoveredPlanets();
-        const discoveredNebulae = this.chunkManager.getDiscoveredNebulae();
-        const discoveredWormholes = this.chunkManager.getDiscoveredWormholes();
-        const discoveredAsteroidGardens = this.chunkManager.getDiscoveredAsteroidGardens();
-        const discoveredBlackHoles = this.chunkManager.getDiscoveredBlackHoles();
-        this.stellarMap.render(this.renderer, this.camera, discoveredStars, this.gameStartingPosition, discoveredPlanets, discoveredNebulae, discoveredWormholes, discoveredAsteroidGardens, discoveredBlackHoles);
+        const discovered = this.getDiscoveredObjects();
+        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
@@ -918,7 +724,7 @@ export class Game {
     renderTraversalTunnel(ctx: CanvasRenderingContext2D, intensity: number): void {
         const centerX = this.renderer.canvas.width / 2;
         const centerY = this.renderer.canvas.height / 2;
-        const time = this.traversalStartTime * 4; // Speed up animation
+        const time = this.stateManager.getTraversalAnimationTime(); // Speed up animation
         
         // Draw subtle tunnel particles
         for (let i = 0; i < 20; i++) {
@@ -938,7 +744,7 @@ export class Game {
     renderCosmicRebirth(ctx: CanvasRenderingContext2D, intensity: number): void {
         const centerX = this.renderer.canvas.width / 2;
         const centerY = this.renderer.canvas.height / 2;
-        const time = this.resetStartTime * 2; // Slower, more majestic animation
+        const time = this.stateManager.resetStartTime * 2; // Slower, more majestic animation
         
         // Cosmic background with swirling energies
         const cosmicAlpha = (intensity - 0.8) * 5; // Scale from 0.8-1.0 to 0-1.0
@@ -993,7 +799,7 @@ export class Game {
         }
     }
 
-    getDestinationPreviewObjects(wormhole: any): any[] {
+    getDestinationPreviewObjects(wormhole: CelestialObject): CelestialObject[] {
         // Get objects near the destination wormhole for gravitational lensing preview
         if (!wormhole.twinX || !wormhole.twinY) return [];
         
@@ -1002,7 +808,7 @@ export class Game {
         const previewRadius = 300; // 300 pixel radius around destination
         
         // Get all objects from chunks near the destination
-        const destinationObjects: any[] = [];
+        const destinationObjects: CelestialObject[] = [];
         
         // Sample objects from chunks around destination area
         const chunkSize = 2000; // Should match ChunkManager.CHUNK_SIZE
@@ -1029,7 +835,7 @@ export class Game {
                     ...chunk.moons,
                     ...chunk.nebulae,
                     ...chunk.asteroidGardens,
-                    ...chunk.wormholes.filter((w: any) => w.uniqueId !== wormhole.uniqueId) // Exclude self
+                    ...chunk.wormholes.filter(w => w.uniqueId !== wormhole.uniqueId) // Exclude self
                 ];
                 
                 for (const obj of allObjects) {
@@ -1048,7 +854,7 @@ export class Game {
                             relativeY,
                             distance,
                             type: obj.type
-                        });
+                        } as CelestialObject);
                     }
                 }
             }

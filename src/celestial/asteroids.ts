@@ -4,6 +4,7 @@
 // Import dependencies
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
+import { DiscoveryService } from '../services/DiscoveryService.js';
 
 // Interface definitions
 interface Renderer {
@@ -239,12 +240,11 @@ export class AsteroidGarden extends CelestialObject {
             return false;
         }
 
-        // Asteroid gardens use distance-based discovery (like planets/moons/nebulae)
-        const distance = Math.sqrt(
-            Math.pow(camera.x - this.x, 2) + Math.pow(camera.y - this.y, 2)
-        );
-
-        if (distance <= this.discoveryDistance) {
+        // Use the centralized DiscoveryService for consistent discovery logic
+        const discoveryService = new DiscoveryService();
+        const shouldDiscover = discoveryService.checkDiscovery(this, camera, canvasWidth, canvasHeight);
+        
+        if (shouldDiscover) {
             this.discovered = true;
             return true; // Newly discovered
         }
@@ -252,7 +252,7 @@ export class AsteroidGarden extends CelestialObject {
         return false;
     }
     
-    shouldDiscover(ship: any, camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
+    shouldDiscover(ship: { x: number; y: number }, camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
         if (this.discovered) {
             return false;
         }
@@ -383,7 +383,7 @@ export class AsteroidGarden extends CelestialObject {
         renderer.ctx.restore();
     }
 
-    getDiscoveryData(): any {
+    getDiscoveryData(): { discovered: boolean; gardenType: string; timestamp: number; discoveryValue: number } {
         return {
             discovered: this.discovered,
             gardenType: this.gardenType,

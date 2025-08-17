@@ -11,6 +11,7 @@ interface CelestialObject {
 interface Star extends CelestialObject {
     type: 'star';
     starTypeName?: string;
+    planets?: Planet[];
 }
 
 interface Planet extends CelestialObject {
@@ -45,6 +46,14 @@ interface BlackHole extends CelestialObject {
     type: 'blackhole';
     blackHoleTypeName?: string;
     uniqueId?: string;
+}
+
+interface AsteroidGarden extends CelestialObject {
+    type: 'asteroids';
+    gardenType?: string;
+    gardenTypeData?: {
+        name: string;
+    };
 }
 
 // Full designation result for detailed information
@@ -337,7 +346,7 @@ export class NamingService {
      * Generate asteroid garden name following astronomical field/belt naming conventions
      * Examples: "ASV-1234 Belt A", "ASV-1234 Field", "ASV-1234 Cluster"
      */
-    generateAsteroidGardenName(garden: any): string {
+    generateAsteroidGardenName(garden: AsteroidGarden): string {
         // Generate base catalog number using star catalog system
         const catalogNumber = this.generateStarCatalogNumber(garden.x, garden.y);
         const baseName = `${this.catalogPrefix}-${catalogNumber}`;
@@ -401,12 +410,12 @@ export class NamingService {
      * Calculate planet's index in its star system based on orbital distance
      */
     calculatePlanetIndex(planet: Planet): number {
-        if (!planet.parentStar || !(planet.parentStar as any).planets) {
+        if (!planet.parentStar || !planet.parentStar.planets) {
             return 0;
         }
         
         // Sort planets by orbital distance and find this planet's index
-        const planets = (planet.parentStar as any).planets as Planet[];
+        const planets = planet.parentStar.planets;
         const sortedPlanets = [...planets].sort((a, b) => (a.orbitalDistance || 0) - (b.orbitalDistance || 0));
         return sortedPlanets.findIndex(p => p === planet);
     }
@@ -415,9 +424,9 @@ export class NamingService {
      * Generate short display name for UI contexts
      * Examples: "ASV-2847", "ASV-2847 b"
      */
-    generateDisplayName(object: Star | Planet | Moon | Nebula | Wormhole | any): string {
+    generateDisplayName(object: Star | Planet | Moon | Nebula | Wormhole | AsteroidGarden | BlackHole): string {
         // Handle both full objects and discovered star data
-        if (object.type === 'star' || object.starTypeName) {
+        if (object.type === 'star' || ('starTypeName' in object && object.starTypeName)) {
             const catalogNumber = this.generateStarCatalogNumber(object.x, object.y);
             return `${this.catalogPrefix}-${catalogNumber}`;
         } else if (object.type === 'planet') {
@@ -441,16 +450,17 @@ export class NamingService {
      * Generate full scientific designation with all details
      * Used for detailed information panels and exports
      */
-    generateFullDesignation(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | any): FullDesignation | null {
+    generateFullDesignation(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | AsteroidGarden): FullDesignation | null {
         // Handle both full objects and discovered star data
-        if (object.type === 'star' || object.starTypeName) {
+        if (object.type === 'star' || ('starTypeName' in object && object.starTypeName)) {
             const standardName = this.generateStarName(object as Star);
             const coordName = this.generateCoordinateDesignation(object.x, object.y);
+            const starTypeName = 'starTypeName' in object && typeof object.starTypeName === 'string' ? object.starTypeName : 'Unknown Star';
             return {
                 catalog: standardName,
                 coordinate: coordName,
-                type: object.starTypeName || 'Unknown Star',
-                classification: this.getStarClassification(object.starTypeName)
+                type: starTypeName,
+                classification: this.getStarClassification(starTypeName === 'Unknown Star' ? '' : starTypeName)
             };
         } else if (object.type === 'planet') {
             const planet = object as Planet;
@@ -511,7 +521,7 @@ export class NamingService {
     /**
      * Check if an object deserves special recognition (rare discoveries)
      */
-    isNotableDiscovery(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | any): boolean {
+    isNotableDiscovery(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | AsteroidGarden): boolean {
         if (object.type === 'star') {
             const rareStars = ['Neutron Star', 'White Dwarf', 'Blue Giant', 'Red Giant'];
             return rareStars.includes(object.starTypeName);
