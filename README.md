@@ -152,11 +152,15 @@ Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL tra
 
 ## 🛠️ Technical Features
 
-### **Modern TypeScript Architecture**
+### **Modern Service-Oriented Architecture**
 - **Type-Safe Development**: Full TypeScript codebase with comprehensive type definitions
+- **Service Architecture**: Dependency injection and event-driven communication patterns
+- **Plugin System**: Extensible architecture enabling community contributions and custom content
+- **Error Resilience**: Comprehensive error handling with circuit breakers and graceful degradation
+- **Performance Monitoring**: Real-time tracking, optimization, and regression detection
 - **ES6 Modules**: Modern module system with proper imports/exports
 - **Build Pipeline**: TypeScript compilation with cross-platform build scripts
-- **Test Coverage**: 88%+ coverage on core systems with comprehensive test suite
+- **Test Coverage**: 100% test success rate with 1,157+ comprehensive tests
 
 ### **Browser-First Architecture**
 - **No Installation Required**: Runs directly in any modern web browser
@@ -229,8 +233,18 @@ tests/         # Test suite
 
 ### **Contributing**
 - Follow the development workflow in `CLAUDE.md`
-- All PRs require passing tests and TypeScript compilation
-- See `TSMIGRATION.md` for architecture details
+- Use the service-oriented architecture with dependency injection
+- Write plugins instead of modifying core files for extensibility
+- All PRs require passing tests (1,157+ tests must pass) and TypeScript compilation
+- Follow TDD principles for new architectural changes
+- See `DEVELOPMENT.md` for complete architecture details
+
+### **Plugin Development**
+- **Get Started**: Follow the plugin interface in `src/types/PluginTypes.ts`
+- **Examples**: See comprehensive plugin examples in `tests/services/exampleplugin.test.js`
+- **Types Available**: Celestial objects, discovery types, audio content, visual effects, gameplay mechanics
+- **Safe Integration**: Plugin failures are isolated from the core system
+- **Community Ready**: Full documentation and testing patterns provided
 
 ---
 

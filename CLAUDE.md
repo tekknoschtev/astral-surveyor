@@ -16,7 +16,9 @@ Avoid relying on side effects or global state - keep behavior predictable.
 * If a solution seems clever, pause.  Ask:  Is this easier to read, maintain, or extend?
 * Prefer boring, understandable code.
 * Avoid abstractions unless they remove repetition _and_ improve clarity.
-* Group files by **domain** (e.g., `navigation/`, `galaxy/`) not type (`utils/`, `models/`).
+* Group files by **domain** (e.g., `celestial/`, `services/`, `world/`) not type (`utils/`, `models/`).
+* Follow **service-oriented architecture** with dependency injection for testability and modularity.
+* Use **event-driven patterns** for loose coupling between services.
 
 # Game Intent
 **Chill, Non-violent Exploration**
@@ -44,7 +46,11 @@ Avoid relying on side effects or global state - keep behavior predictable.
 - Browser-based with localStorage saves
 - Uses deterministic seeded generation for consistent universes
 - Chunk-based loading for infinite world generation
-- Core values: testability, simplicity, emergent wonder
+- **Service-oriented architecture** with dependency injection and event-driven communication
+- **Plugin system** enables community extensibility for celestial objects, discovery types, and audio content
+- **Error resilience** with comprehensive error handling and graceful degradation
+- **Performance monitoring** for optimization and regression detection
+- Core values: testability, simplicity, emergent wonder, extensibility
 
 # Not Yet Prioritized 
 Some things that **are not** priorities right now:
@@ -64,8 +70,11 @@ Some things that **are not** priorities right now:
 * Tests are in `tests/` directory testing TypeScript-compiled code in `dist/`
 * Test files end with `.test.js` and import from compiled JavaScript modules
 * Source code is in `src/` directory with TypeScript files (`.ts`)
-* Critical systems tested: random generation, naming service, celestial discovery
-* Integration tests for cross-component interactions
+* Critical systems tested: random generation, naming service, celestial discovery, service architecture
+* **Service-level testing**: Comprehensive tests for all services (WorldService, CelestialService, AudioService)
+* **Plugin system testing**: Tests for plugin registration, lifecycle, and API integration
+* **Integration tests**: Cross-service interactions and event system validation
+* **Performance tests**: Monitoring, optimization, and regression detection
 
 **Testing Commands**
 ```bash
@@ -83,6 +92,9 @@ npm run dev           # TypeScript watch mode for development
 * **Source files**: Edit `.ts` files in `src/` directory (TypeScript)
 * **Build output**: Compiled `.js` files generated in `dist/` directory  
 * **Tests**: Run against compiled JavaScript in `dist/` for accurate coverage
+* **Service architecture**: Services in `src/services/` with dependency injection
+* **Type definitions**: Comprehensive types in `src/types/` for all major systems
+* **Domain organization**: Related functionality grouped in domain folders (`celestial/`, `world/`, `ui/`)
 
 ## Development Commands
 * **Build**: `npm run build` - Compile TypeScript + copy assets
@@ -103,3 +115,39 @@ When starting a new feature or refactor branch, try to follow the steps below:
 9. **Wait for CI**: GitHub Actions will run TypeScript compilation + tests automatically
 10. Merge and delete branch: `git checkout main` then `git pull origin main` then `git branch -d {{feature-name}}`
 11. Final sync: `git fetch -p`
+
+# Plugin Development Guidelines
+
+**Creating New Plugins**
+* Follow the plugin interface in `src/types/PluginTypes.ts`
+* Support proper lifecycle management (register/unregister)
+* Handle errors gracefully without crashing the core system
+* Write comprehensive tests following the patterns in `tests/services/exampleplugin.test.js`
+* Document plugin APIs and provide usage examples
+
+**Plugin Types Supported**
+* **Celestial**: New celestial object types (quasars, artifacts, etc.)
+* **Discovery**: Custom discovery conditions and lore content
+* **Audio**: Soundscapes and ambient audio for specific zones
+* **Visual**: Rendering effects and visual enhancements
+* **Gameplay**: New mechanics and interactions
+* **Data**: Save/load formats and data processing
+
+**Service Integration Guidelines**
+* Use dependency injection for service access
+* Follow event-driven patterns for service communication
+* Write service tests before implementation (TDD approach)
+* Maintain service boundaries and avoid tight coupling
+* Use the ServiceOrchestrator for cross-service coordination
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+
+**Architecture Considerations**
+* Follow the established service-oriented architecture
+* Use the plugin system for extensibility rather than modifying core files
+* Maintain comprehensive test coverage for all new functionality
+* Consider performance impact and use PerformanceMonitor for optimization
