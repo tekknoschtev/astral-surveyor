@@ -4,11 +4,14 @@
 // Import dependencies
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 
 // Interface definitions
 interface Renderer {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
+    drawDiscoveryIndicator(x: number, y: number, radius: number, color: string, lineWidth?: number, opacity?: number, dashPattern?: number[] | null): void;
+    drawDiscoveryPulse(x: number, y: number, radius: number, color: string, opacity?: number, lineWidth?: number): void;
 }
 
 interface Camera {
@@ -89,6 +92,9 @@ export class Wormhole extends CelestialObject {
     
     // Unique identifier for this specific wormhole instance
     uniqueId: string;
+    
+    // Discovery timestamp for animation system
+    discoveryTimestamp?: number;
 
     constructor(x: number, y: number, wormholeId: string, designation: 'alpha' | 'beta', twinX: number, twinY: number, random: SeededRandom) {
         super(x, y, 'wormhole'); // Wormhole type specification
@@ -263,7 +269,7 @@ export class Wormhole extends CelestialObject {
         
         // Render discovery indicator if discovered
         if (this.discovered) {
-            this.renderDiscoveryIndicator(ctx, screenX, screenY);
+            this.renderDiscoveryIndicator(renderer, screenX, screenY);
         }
 
         ctx.restore();
@@ -498,33 +504,64 @@ export class Wormhole extends CelestialObject {
         }
     }
 
-    private renderDiscoveryIndicator(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
-        // Golden rotating ring for discovered wormholes
-        const indicatorRadius = this.radius + 10;
-        const rotationSpeed = this.vortexRotation * 2; // Rotate faster than vortex
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system with wormhole specific styling
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `wormhole-${this.x}-${this.y}`;
+        const currentTime = Date.now();
         
-        ctx.strokeStyle = '#FFD700'; // Gold
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 6]); // Dashed line
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 10,
+            rarity: visualizationService.getObjectRarity('wormhole'),
+            objectType: 'wormhole',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime,
+            colorOverride: '#FFD700' // Special gold color for wormholes
+        });
+
+        // Render base discovery indicator with golden styling
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 10,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active (extra special for rare wormholes)
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
+        }
         
-        ctx.save();
-        ctx.translate(screenX, screenY);
-        ctx.rotate(rotationSpeed);
-        
-        ctx.beginPath();
-        ctx.arc(0, 0, indicatorRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.restore();
-        ctx.setLineDash([]); // Reset line dash
-        
-        // Add designation marker (α or β)
+        // Add designation marker (α or β) - preserve special wormhole identifier
         const designation = this.designation === 'alpha' ? 'α' : 'β';
+        const ctx = renderer.ctx;
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 16px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(designation, screenX + indicatorRadius + 15, screenY - 5);
+        ctx.fillText(designation, screenX + (this.radius + 10) + 15, screenY - 5);
     }
 
     // Get discovery data for saving/loading

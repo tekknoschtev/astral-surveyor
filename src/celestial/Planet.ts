@@ -5,6 +5,7 @@
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { CelestialObject } from './CelestialTypes.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 import type { 
     Renderer, 
     Camera, 
@@ -38,6 +39,9 @@ export class Planet extends CelestialObject {
     // Identification
     uniqueId?: string;
     planetIndex?: number;
+    
+    // Discovery timestamp for animation system
+    discoveryTimestamp?: number;
     
     // Pre-calculated crater positions (to avoid recalculating each frame)
     craterPositions: Array<{x: number, y: number, size: number}> = [];
@@ -235,13 +239,9 @@ export class Planet extends CelestialObject {
                 this.drawRings(renderer, screenX, screenY, true); // Front portion
             }
             
-            // Visual indicator if discovered
+            // Visual indicator if discovered using unified system
             if (this.discovered) {
-                renderer.ctx.strokeStyle = '#00ff88';
-                renderer.ctx.lineWidth = 2;
-                renderer.ctx.beginPath();
-                renderer.ctx.arc(screenX, screenY, this.radius + 5, 0, Math.PI * 2);
-                renderer.ctx.stroke();
+                this.renderDiscoveryIndicator(renderer, screenX, screenY);
             }
         }
     }
@@ -704,6 +704,56 @@ export class Planet extends CelestialObject {
         const newB = Math.max(0, Math.floor(b * (1 - amount)));
         
         return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+    }
+    
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `planet-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 5,
+            rarity: visualizationService.getObjectRarity('planet'),
+            objectType: 'planet',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 5,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
+        }
     }
 }
 

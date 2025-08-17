@@ -31,7 +31,9 @@ describe('Nebulae System', () => {
         lineTo: vi.fn(),
         moveTo: vi.fn()
       },
-      drawCircle: vi.fn()
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
 
     // Mock camera
@@ -217,7 +219,15 @@ describe('Nebulae System', () => {
       
       nebula.render(mockRenderer, mockCamera);
       
-      expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
+      // Should render discovery indicator using unified system
+      expect(mockRenderer.drawDiscoveryIndicator).toHaveBeenCalled();
+      
+      // Verify the discovery indicator is called with the correct parameters
+      const call = mockRenderer.drawDiscoveryIndicator.mock.calls[0];
+      expect(call[0]).toBe(400); // screenX
+      expect(call[1]).toBe(300); // screenY
+      expect(call[2]).toBeGreaterThan(0); // radius (nebula radius + 10)
+      expect(call[3]).toEqual(expect.any(String)); // color
     });
 
     it('should render multiple particle layers for depth', () => {

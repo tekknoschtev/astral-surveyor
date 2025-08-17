@@ -1,11 +1,14 @@
 import { SeededRandom } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 
 // Interface definitions
 interface Renderer {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     drawCircle(x: number, y: number, radius: number, color: string): void;
+    drawDiscoveryIndicator(x: number, y: number, radius: number, color: string, lineWidth?: number, opacity?: number, dashPattern?: number[] | null): void;
+    drawDiscoveryPulse(x: number, y: number, radius: number, color: string, opacity?: number, lineWidth?: number): void;
 }
 
 interface Camera {
@@ -94,6 +97,9 @@ export class BlackHole extends CelestialObject {
     
     // Identification
     uniqueId: string;
+    
+    // Discovery timestamp for animation system
+    discoveryTimestamp?: number;
 
     constructor(x: number, y: number, blackHoleType?: BlackHoleType) {
         super(x, y, 'blackhole');
@@ -427,19 +433,54 @@ export class BlackHole extends CelestialObject {
     }
 
     private renderDiscoveryIndicator(renderer: Renderer, centerX: number, centerY: number): void {
-        const ctx = renderer.ctx;
-        const time = Date.now() * 0.003;
+        // Use unified discovery visualization system with black hole specific rarity
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `blackhole-${this.x}-${this.y}`;
+        const currentTime = Date.now();
         
-        // Special discovery indicator for black holes - pulsing danger ring
-        const indicatorRadius = this.eventHorizonRadius + 20 + Math.sin(time) * 5;
-        const alpha = (Math.sin(time * 2) * 0.5 + 0.5) * 0.8;
-        const alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
-        
-        ctx.strokeStyle = '#ff0000' + alphaHex; // Red danger indicator
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, indicatorRadius, 0, Math.PI * 2);
-        ctx.stroke();
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: centerX,
+            y: centerY,
+            baseRadius: this.eventHorizonRadius + 20,
+            rarity: visualizationService.getObjectRarity('blackhole'),
+            objectType: 'blackhole',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime,
+            colorOverride: '#ff0000' // Special red danger color for black holes
+        });
+
+        // Render base discovery indicator with danger styling
+        renderer.drawDiscoveryIndicator(
+            centerX, 
+            centerY, 
+            this.eventHorizonRadius + 20,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                centerX,
+                centerY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active (more intense for black holes)
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                centerX,
+                centerY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
+        }
     }
 }
 

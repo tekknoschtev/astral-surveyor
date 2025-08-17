@@ -295,7 +295,9 @@ describe('Star Class', () => {
         lineTo: vi.fn(),
         quadraticCurveTo: vi.fn()
       },
-      drawCircle: vi.fn()
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
   });
   
@@ -375,8 +377,8 @@ describe('Star Class', () => {
     
     star.render(mockRenderer, mockCamera);
     
-    expect(mockRenderer.ctx.strokeStyle).toBe('#00ff88');
-    expect(mockRenderer.ctx.lineWidth).toBe(3);
+    // Should call unified discovery indicator system
+    expect(mockRenderer.drawDiscoveryIndicator).toHaveBeenCalled();
   });
   
   it('should lighten colors correctly', () => {
@@ -445,7 +447,9 @@ describe('Planet Class', () => {
         quadraticCurveTo: vi.fn(),
         fillRect: vi.fn()
       },
-      drawCircle: vi.fn()
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
   });
   
@@ -569,8 +573,8 @@ describe('Planet Class', () => {
     
     planet.render(mockRenderer, mockCamera);
     
-    expect(mockRenderer.ctx.strokeStyle).toBe('#00ff88');
-    expect(mockRenderer.ctx.lineWidth).toBe(2);
+    // Should call unified discovery indicator system
+    expect(mockRenderer.drawDiscoveryIndicator).toHaveBeenCalled();
   });
   
   it('should darken and lighten colors correctly', () => {
@@ -608,7 +612,9 @@ describe('Moon Class', () => {
         arc: vi.fn(),
         stroke: vi.fn()
       },
-      drawCircle: vi.fn()
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
   });
   
@@ -708,8 +714,8 @@ describe('Moon Class', () => {
     
     moon.render(mockRenderer, mockCamera);
     
-    expect(mockRenderer.ctx.strokeStyle).toBe('#00ff88');
-    expect(mockRenderer.ctx.lineWidth).toBe(1);
+    // Should call unified discovery indicator system
+    expect(mockRenderer.drawDiscoveryIndicator).toHaveBeenCalled();
   });
   
   it('should darken colors correctly', () => {
@@ -805,7 +811,9 @@ describe('Enhanced Corona System', () => {
     mockRenderer = {
       canvas: mockCanvas,
       ctx: mockContext,
-      drawCircle: vi.fn()
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
   });
   

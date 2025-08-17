@@ -5,12 +5,15 @@
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
 import { DiscoveryService } from '../services/DiscoveryService.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 
 // Interface definitions
 interface Renderer {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     drawCircle(x: number, y: number, radius: number, color: string): void;
+    drawDiscoveryIndicator(x: number, y: number, radius: number, color: string, lineWidth?: number, opacity?: number, dashPattern?: number[] | null): void;
+    drawDiscoveryPulse(x: number, y: number, radius: number, color: string, opacity?: number, lineWidth?: number): void;
 }
 
 interface Camera {
@@ -92,6 +95,7 @@ export class Nebula extends CelestialObject {
     particles: NebulaParticle[];
     particleCount: number;
     id: string;
+    discoveryTimestamp?: number;
 
     constructor(x: number, y: number, nebulaType: string, random: SeededRandom) {
         super(x, y, 'nebula');
@@ -188,6 +192,7 @@ export class Nebula extends CelestialObject {
         
         if (shouldDiscover) {
             this.discovered = true;
+            this.discoveryTimestamp = Date.now();
             return true; // Newly discovered
         }
         
@@ -253,19 +258,62 @@ export class Nebula extends CelestialObject {
             renderer.ctx.fill();
         }
 
-        // Render discovery indicator if discovered
+        // Render discovery indicator if discovered using unified system
         if (this.discovered) {
-            renderer.ctx.globalAlpha = 0.8;
-            renderer.ctx.strokeStyle = '#ffeaa7';
-            renderer.ctx.lineWidth = 2;
-            renderer.ctx.setLineDash([5, 5]);
-            renderer.ctx.beginPath();
-            renderer.ctx.arc(screenX, screenY, this.radius + 10, 0, Math.PI * 2);
-            renderer.ctx.stroke();
-            renderer.ctx.setLineDash([]); // Reset line dash
+            this.renderDiscoveryIndicator(renderer, screenX, screenY);
         }
 
         renderer.ctx.restore();
+    }
+
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `nebula-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 10,
+            rarity: visualizationService.getObjectRarity('nebula'),
+            objectType: 'nebula',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 10,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
+        }
     }
 
     getDiscoveryData(): { discovered: boolean; nebulaType: string; timestamp: number; discoveryValue: number } {

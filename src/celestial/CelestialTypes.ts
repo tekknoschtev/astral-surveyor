@@ -10,6 +10,8 @@ export interface Renderer {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     drawCircle(x: number, y: number, radius: number, color: string): void;
+    drawDiscoveryIndicator(x: number, y: number, radius: number, color: string, lineWidth?: number, opacity?: number, dashPattern?: number[] | null): void;
+    drawDiscoveryPulse(x: number, y: number, radius: number, color: string, opacity?: number, lineWidth?: number): void;
 }
 
 export interface Camera {

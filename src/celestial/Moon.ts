@@ -5,6 +5,7 @@
 import { SeededRandom } from '../utils/random.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { CelestialObject } from './CelestialTypes.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 import type { 
     Renderer, 
     Camera 
@@ -28,6 +29,9 @@ export class Moon extends CelestialObject {
     // Identification
     uniqueId?: string;
     moonIndex?: number;
+    
+    // Discovery timestamp for animation system
+    discoveryTimestamp?: number;
 
     constructor(x: number, y: number, parentPlanet?: Planet, orbitalDistance: number = 0, orbitalAngle: number = 0, orbitalSpeed: number = 0) {
         super(x, y, 'moon');
@@ -170,14 +174,60 @@ export class Moon extends CelestialObject {
             // Draw simple moon - just a solid circle
             renderer.drawCircle(screenX, screenY, this.radius, this.color);
             
-            // Visual indicator if discovered
+            // Visual indicator if discovered using unified system
             if (this.discovered) {
-                renderer.ctx.strokeStyle = '#00ff88';
-                renderer.ctx.lineWidth = 1;
-                renderer.ctx.beginPath();
-                renderer.ctx.arc(screenX, screenY, this.radius + 3, 0, Math.PI * 2);
-                renderer.ctx.stroke();
+                this.renderDiscoveryIndicator(renderer, screenX, screenY);
             }
+        }
+    }
+    
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `moon-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 3,
+            rarity: visualizationService.getObjectRarity('moon'),
+            objectType: 'moon',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 3,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
         }
     }
 }
