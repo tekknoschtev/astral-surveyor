@@ -230,7 +230,7 @@ export class Game {
         
         // Handle wormhole traversal transition
         if (this.stateManager.isTraversing) {
-            this.stateManager.updateTraversal(deltaTime, this.camera, this.stellarMap, this.discoveryDisplay, this.chunkManager);
+            await this.stateManager.updateTraversal(deltaTime, this.camera, this.stellarMap, this.discoveryDisplay, this.chunkManager);
             // Still clear frame state to prevent input corruption during traversal
             this.input.clearFrameState();
             return; // Skip normal updates during traversal

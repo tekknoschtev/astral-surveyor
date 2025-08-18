@@ -112,7 +112,7 @@ export class StateManager {
     /**
      * Update traversal state during transition
      */
-    updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: any): void {
+    async updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: any): Promise<void> {
         if (!this.traversalDestination) return;
         
         this.traversalStartTime += deltaTime;
@@ -150,6 +150,11 @@ export class StateManager {
         
         // End traversal
         if (this.traversalStartTime >= this.traversalDuration) {
+            // Ensure the beta wormhole exists at the destination before completing traversal
+            if (chunkManager) {
+                await this.ensureBetaWormholeExists(camera, chunkManager);
+            }
+            
             // Restore ship velocity
             camera.velocityX = this.traversalDestination.velocityX;
             camera.velocityY = this.traversalDestination.velocityY;
@@ -157,6 +162,66 @@ export class StateManager {
             // Reset traversal state
             this.isTraversing = false;
             this.traversalDestination = undefined;
+        }
+    }
+
+    /**
+     * Ensure the beta wormhole exists at the current destination
+     */
+    private async ensureBetaWormholeExists(camera: any, chunkManager: any): Promise<void> {
+        if (!this.traversalDestination) return;
+        
+        const sourceWormhole = this.traversalDestination.wormhole;
+        const destChunkX = Math.floor(camera.x / 2000);
+        const destChunkY = Math.floor(camera.y / 2000);
+        
+        const betaChunkX = Math.floor(sourceWormhole.twinX / 2000);
+        const betaChunkY = Math.floor(sourceWormhole.twinY / 2000);
+        
+        // Get or generate the destination chunk
+        const destChunk = chunkManager.generateChunk(destChunkX, destChunkY);
+        if (!destChunk) {
+            return;
+        }
+        
+        // Check if the beta wormhole already exists in this chunk
+        const expectedDesignation = sourceWormhole.designation === 'alpha' ? 'beta' : 'alpha';
+        const betaExists = destChunk.wormholes.some((w: any) => 
+            w.wormholeId === sourceWormhole.wormholeId && w.designation === expectedDesignation
+        );
+        
+        
+        if (!betaExists) {
+            
+            // Create the missing beta wormhole at the expected location
+            // Import the classes dynamically 
+            const wormholesModule = await import('../celestial/wormholes.js');
+            const randomModule = await import('../utils/random.js');
+            const { Wormhole } = wormholesModule;
+            const { SeededRandom, hashPosition } = randomModule;
+            
+            // Use the source wormhole's twin coordinates (where it thinks the beta should be)
+            const betaX = sourceWormhole.twinX;
+            const betaY = sourceWormhole.twinY;
+            const betaRng = new SeededRandom(hashPosition(betaX, betaY));
+            
+            const betaWormhole = new Wormhole(
+                betaX,
+                betaY,
+                sourceWormhole.wormholeId,
+                expectedDesignation,
+                sourceWormhole.x,
+                sourceWormhole.y,
+                betaRng
+            );
+            
+            // Link the wormholes
+            betaWormhole.twinWormhole = sourceWormhole;
+            sourceWormhole.twinWormhole = betaWormhole;
+            
+            // Add to the chunk
+            destChunk.wormholes.push(betaWormhole);
+            
         }
     }
 
