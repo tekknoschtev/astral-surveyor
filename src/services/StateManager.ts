@@ -30,6 +30,10 @@ export class StateManager {
     traversalDuration: number = 2.0; // 2 second transition
     traversalDestination?: TraversalDestination;
     
+    // Beta wormhole creation tracking to prevent multiple calls
+    private betaCreationInProgress: boolean = false;
+    private traversalMidpointReached: boolean = false;
+    
     // Universe reset state
     isResettingUniverse: boolean = false;
     resetStartTime: number = 0;
@@ -93,6 +97,8 @@ export class StateManager {
     ): void {
         this.isTraversing = true;
         this.traversalStartTime = 0;
+        this.traversalMidpointReached = false; // Reset for new traversal
+        this.betaCreationInProgress = false; // Reset for new traversal
         
         // Store traversal destination and current state
         this.traversalDestination = {
@@ -112,7 +118,7 @@ export class StateManager {
     /**
      * Update traversal state during transition
      */
-    async updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: any): Promise<void> {
+    updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: any): void {
         if (!this.traversalDestination) return;
         
         this.traversalStartTime += deltaTime;
@@ -125,16 +131,30 @@ export class StateManager {
             return;
         }
         
-        // Complete traversal at midpoint (1 second in)
+        // Complete traversal at midpoint (1 second in) - but only once!
         if (this.traversalStartTime >= this.traversalDuration / 2 && 
-            this.traversalStartTime - deltaTime < this.traversalDuration / 2) {
+            this.traversalStartTime - deltaTime < this.traversalDuration / 2 &&
+            !this.traversalMidpointReached) {
+            
+            this.traversalMidpointReached = true; // Prevent multiple executions
             
             // Teleport to destination at midpoint
             camera.x = this.traversalDestination.x;
             camera.y = this.traversalDestination.y;
             
-            // Update chunks for new location
+            // Update chunks for new location FIRST so beta existence check works properly
+            console.log(`🌀 DEBUG: Calling updateActiveChunks BEFORE beta creation at (${camera.x}, ${camera.y})`);
             chunkManager.updateActiveChunks(camera.x, camera.y);
+            
+            // CRITICAL FIX: Create beta wormhole AFTER updating chunks to prevent duplication
+            console.log('🌀 DEBUG: About to call ensureBetaWormholeExists');
+            this.ensureBetaWormholeExists(camera, chunkManager).catch(err => {
+                console.error('Failed to create beta wormhole:', err);
+            });
+            
+            // DEBUG: Check active objects after chunk update
+            const activeObjects = chunkManager.getAllActiveObjects();
+            console.log(`🌀 DEBUG: After updateActiveChunks - total active wormholes: ${activeObjects.wormholes.length}`);
             
             // If stellar map was visible before traversal, center it on new position
             if (this.traversalDestination.stellarMapWasVisible) {
@@ -150,11 +170,6 @@ export class StateManager {
         
         // End traversal
         if (this.traversalStartTime >= this.traversalDuration) {
-            // Ensure the beta wormhole exists at the destination before completing traversal
-            if (chunkManager) {
-                await this.ensureBetaWormholeExists(camera, chunkManager);
-            }
-            
             // Restore ship velocity
             camera.velocityX = this.traversalDestination.velocityX;
             camera.velocityY = this.traversalDestination.velocityY;
@@ -171,6 +186,17 @@ export class StateManager {
     private async ensureBetaWormholeExists(camera: any, chunkManager: any): Promise<void> {
         if (!this.traversalDestination) return;
         
+        // CRITICAL: Prevent multiple simultaneous calls
+        if (this.betaCreationInProgress) {
+            console.log(`🌀 DEBUG: Beta creation already in progress, skipping duplicate call`);
+            return;
+        }
+        
+        this.betaCreationInProgress = true;
+        
+        // DEBUG: Log when beta creation is triggered
+        console.log(`🌀 DEBUG: ensureBetaWormholeExists called at traversal time ${this.traversalStartTime}/${this.traversalDuration}`);
+        
         const sourceWormhole = this.traversalDestination.wormhole;
         const destChunkX = Math.floor(camera.x / 2000);
         const destChunkY = Math.floor(camera.y / 2000);
@@ -184,45 +210,133 @@ export class StateManager {
             return;
         }
         
-        // Check if the beta wormhole already exists in this chunk
+        // Check if the beta wormhole already exists ANYWHERE in active objects
         const expectedDesignation = sourceWormhole.designation === 'alpha' ? 'beta' : 'alpha';
-        const betaExists = destChunk.wormholes.some((w: any) => 
+        
+        // CRITICAL: Check in all active objects to prevent duplication
+        const allActiveObjects = chunkManager.getAllActiveObjects();
+        const betaExistsAnywhere = allActiveObjects.wormholes.some((w: any) => 
             w.wormholeId === sourceWormhole.wormholeId && w.designation === expectedDesignation
         );
         
-        
-        if (!betaExists) {
+        if (betaExistsAnywhere) {
+            console.log(`🌀 DEBUG: Beta wormhole ${sourceWormhole.wormholeId}-${expectedDesignation} already exists globally, skipping creation`);
             
-            // Create the missing beta wormhole at the expected location
-            // Import the classes dynamically 
-            const wormholesModule = await import('../celestial/wormholes.js');
-            const randomModule = await import('../utils/random.js');
-            const { Wormhole } = wormholesModule;
-            const { SeededRandom, hashPosition } = randomModule;
-            
-            // Use the source wormhole's twin coordinates (where it thinks the beta should be)
-            const betaX = sourceWormhole.twinX;
-            const betaY = sourceWormhole.twinY;
-            const betaRng = new SeededRandom(hashPosition(betaX, betaY));
-            
-            const betaWormhole = new Wormhole(
-                betaX,
-                betaY,
-                sourceWormhole.wormholeId,
-                expectedDesignation,
-                sourceWormhole.x,
-                sourceWormhole.y,
-                betaRng
+            // CRITICAL: Clean up duplicate beta wormholes if they exist
+            const duplicateBetas = allActiveObjects.wormholes.filter(w => 
+                w.wormholeId === sourceWormhole.wormholeId && w.designation === expectedDesignation
             );
             
-            // Link the wormholes
-            betaWormhole.twinWormhole = sourceWormhole;
-            sourceWormhole.twinWormhole = betaWormhole;
+            if (duplicateBetas.length > 1) {
+                console.warn(`🧹 CLEANUP: Found ${duplicateBetas.length} duplicate beta wormholes, removing extras`);
+                this.cleanupDuplicateBetaWormholes(duplicateBetas, chunkManager);
+            }
             
-            // Add to the chunk
-            destChunk.wormholes.push(betaWormhole);
-            
+            this.betaCreationInProgress = false; // Reset flag
+            return; // Don't create another one!
         }
+        
+        // If we get here, the beta wormhole doesn't exist anywhere, so create it
+        
+        // Create the missing beta wormhole at the expected location
+        // Import the classes dynamically 
+        const wormholesModule = await import('../celestial/wormholes.js');
+        const randomModule = await import('../utils/random.js');
+        const { Wormhole } = wormholesModule;
+        const { SeededRandom, hashPosition } = randomModule;
+        
+        // Use the source wormhole's twin coordinates (where it thinks the beta should be)
+        const betaX = sourceWormhole.twinX;
+        const betaY = sourceWormhole.twinY;
+        const betaRng = new SeededRandom(hashPosition(betaX, betaY));
+        
+        const betaWormhole = new Wormhole(
+            betaX,
+            betaY,
+            sourceWormhole.wormholeId,
+            expectedDesignation,
+            sourceWormhole.x,
+            sourceWormhole.y,
+            betaRng
+        );
+        
+        // Link the wormholes
+        betaWormhole.twinWormhole = sourceWormhole;
+        sourceWormhole.twinWormhole = betaWormhole;
+        
+        // Inherit discovery state from alpha wormhole
+        if (sourceWormhole.discovered) {
+            betaWormhole.discovered = true;
+            betaWormhole.discoveryTimestamp = sourceWormhole.discoveryTimestamp;
+        }
+        
+        // CRITICAL: Reset animation state to prevent rendering corruption
+        // The beta wormhole should start with a clean rendering state
+        betaWormhole.vortexRotation = 0;
+        betaWormhole.energyPulse = 0;
+        
+        // Add to the chunk
+        destChunk.wormholes.push(betaWormhole);
+        
+        // DEBUG: Log beta wormhole creation details
+        console.log(`🌀 DEBUG: Created beta wormhole ${betaWormhole.pairId} at (${betaWormhole.x}, ${betaWormhole.y})`);
+        console.log(`🌀 DEBUG: Destination chunk (${destChunkX}, ${destChunkY}) now has ${destChunk.wormholes.length} wormholes`);
+        console.log(`🌀 DEBUG: Beta creation timestamp: ${betaWormhole.creationTimestamp}, current time: ${Date.now()}`);
+        
+        // Check if this wormhole might already exist somewhere else  
+        const existingBetas = allActiveObjects.wormholes.filter(w => w.wormholeId === betaWormhole.wormholeId && w.designation === 'beta');
+        const existingBetaCount = existingBetas.length;
+        
+        console.log(`🌀 DEBUG: Beta wormhole existence check - found ${existingBetaCount} beta wormholes with ID ${betaWormhole.wormholeId}`);
+        
+        if (existingBetaCount > 1) {
+            console.error(`🌀 CRITICAL: Multiple beta wormholes detected! Found ${existingBetaCount} beta wormholes with ID ${betaWormhole.wormholeId}`);
+            existingBetas.forEach((beta, index) => {
+                console.log(`  Beta #${index + 1}: ${beta.pairId} at (${beta.x}, ${beta.y}), object ref: ${beta.uniqueId}`);
+            });
+            
+            // This is likely the source of the excessive rendering!
+            console.error(`🔥 SMOKING GUN: Beta wormhole exists in multiple collections - this will cause ${existingBetaCount}x rendering per frame!`);
+        }
+        
+        // Reset the flag when done
+        this.betaCreationInProgress = false;
+    }
+
+    /**
+     * Clean up duplicate beta wormholes by keeping only the first one
+     */
+    private cleanupDuplicateBetaWormholes(duplicateBetas: any[], chunkManager: any): void {
+        console.log(`🧹 CLEANUP: Removing ${duplicateBetas.length - 1} duplicate beta wormholes`);
+        
+        // Keep the first one, remove the rest
+        const keepWormhole = duplicateBetas[0];
+        const removeWormholes = duplicateBetas.slice(1);
+        
+        // Get all chunks and remove duplicates from each chunk
+        let totalRemoved = 0;
+        
+        for (const chunk of chunkManager.activeChunks.values()) {
+            if (chunk.wormholes) {
+                const originalLength = chunk.wormholes.length;
+                
+                // Remove duplicates but keep the first occurrence
+                chunk.wormholes = chunk.wormholes.filter(w => {
+                    if (removeWormholes.includes(w)) {
+                        return false; // Remove this duplicate
+                    }
+                    return true; // Keep this wormhole
+                });
+                
+                const removed = originalLength - chunk.wormholes.length;
+                if (removed > 0) {
+                    totalRemoved += removed;
+                    console.log(`🧹 CLEANUP: Removed ${removed} duplicates from chunk`);
+                }
+            }
+        }
+        
+        console.log(`🧹 CLEANUP COMPLETE: Removed ${totalRemoved} duplicate beta wormholes total`);
     }
 
     /**

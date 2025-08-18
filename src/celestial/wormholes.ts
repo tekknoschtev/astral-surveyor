@@ -67,6 +67,11 @@ export const WormholeTypes: Record<string, WormholeType> = {
 };
 
 export class Wormhole extends CelestialObject {
+    // Debug tracking for render investigation
+    private static frameRenderCounts = new Map<string, number>();
+    private static currentFrame = 0;
+    private static lastFrameReset = 0;
+
     // Wormhole identification and pairing
     wormholeId: string; // Shared ID for the pair (e.g., "WH-1234")
     designation: 'alpha' | 'beta'; // α or β designation
@@ -95,6 +100,9 @@ export class Wormhole extends CelestialObject {
     
     // Discovery timestamp for animation system
     discoveryTimestamp?: number;
+    
+    // Performance optimization: gradual spin-up for just-in-time created wormholes
+    creationTimestamp: number;
 
     constructor(x: number, y: number, wormholeId: string, designation: 'alpha' | 'beta', twinX: number, twinY: number, random: SeededRandom) {
         super(x, y, 'wormhole'); // Wormhole type specification
@@ -118,12 +126,32 @@ export class Wormhole extends CelestialObject {
         // Generate unique identifier
         this.uniqueId = `wormhole_${Math.floor(x)}_${Math.floor(y)}_${designation}`;
         
+        // Track creation time for performance optimization
+        this.creationTimestamp = Date.now();
+        
         // Initialize visual system
         this.generateParticles(random);
         
         // Initialize animation states
         this.vortexRotation = random.next() * Math.PI * 2; // Random starting rotation
         this.energyPulse = random.next() * Math.PI * 2; // Random pulse phase
+    }
+
+    /**
+     * Calculate the spin-up intensity for performance optimization
+     * Newly created wormholes gradually increase their visual complexity
+     */
+    private getSpinUpIntensity(): number {
+        const spinUpDuration = 1000; // 1 second to reach full intensity
+        const age = Date.now() - this.creationTimestamp;
+        
+        if (age >= spinUpDuration) {
+            return 1.0; // Full intensity
+        }
+        
+        // Smooth easing curve from 0.1 to 1.0
+        const progress = Math.min(age / spinUpDuration, 1.0);
+        return 0.1 + (0.9 * progress * progress); // Quadratic easing
     }
 
     private generateParticles(random: SeededRandom): void {
@@ -238,12 +266,44 @@ export class Wormhole extends CelestialObject {
     }
 
     render(renderer: Renderer, camera: Camera, destinationPreview?: { x: number; y: number; type: string; relativeX?: number; relativeY?: number }[]): void {
+        // DEBUG: Track render counts per frame to identify double-rendering
+        const now = performance.now();
+        const frameThreshold = 16; // ~60fps frame boundary
+        
+        if (now - Wormhole.lastFrameReset > frameThreshold) {
+            // New frame detected - log previous frame's render counts, but only for beta wormholes since alpha double-rendering is normal
+            if (Wormhole.frameRenderCounts.size > 0) {
+                for (const [wormholeId, count] of Wormhole.frameRenderCounts) {
+                    if (count > 1 && wormholeId.includes('-β')) {
+                        console.warn(`🌀 BETA DOUBLE RENDER: ${wormholeId} rendered ${count} times in frame ${Wormhole.currentFrame}`);
+                    }
+                }
+            }
+            Wormhole.frameRenderCounts.clear();
+            Wormhole.currentFrame++;
+            Wormhole.lastFrameReset = now;
+        }
+        
+        // Count this render
+        const renderCount = (Wormhole.frameRenderCounts.get(this.pairId) || 0) + 1;
+        Wormhole.frameRenderCounts.set(this.pairId, renderCount);
+        
         const [screenX, screenY] = camera.worldToScreen(
             this.x, 
             this.y, 
             renderer.canvas.width, 
             renderer.canvas.height
         );
+        
+        // DEBUG: For beta wormholes, log additional details about each render call
+        if (this.designation === 'beta' && renderCount > 2) {  // Only log excessive renders (>2)
+            console.log(`🌀 BETA EXCESSIVE RENDER #${renderCount}: ${this.pairId} at world(${this.x}, ${this.y}) screen(${screenX}, ${screenY})`);
+            console.log(`  Animation state: vortex=${this.vortexRotation.toFixed(3)}, pulse=${this.energyPulse.toFixed(3)}`);
+            console.log(`  Creation age: ${Date.now() - this.creationTimestamp}ms`);
+            
+            // CRITICAL: Add stack trace to see WHERE these excessive renders are coming from
+            console.trace(`🔍 BETA RENDER CALL STACK #${renderCount}`);
+        }
 
         // Skip rendering if wormhole is way off screen
         const renderRadius = this.radius + 30;
@@ -276,12 +336,13 @@ export class Wormhole extends CelestialObject {
     }
 
     private renderEnergyField(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
+        const spinUpIntensity = this.getSpinUpIntensity();
         const config = this.wormholeType.energyField;
         const innerRadius = this.radius * config.innerRadius;
         const outerRadius = this.radius * config.outerRadius;
         
-        // Pulsing energy field
-        const pulseIntensity = Math.sin(this.energyPulse) * 0.3 + 0.7;
+        // Pulsing energy field, modulated by spin-up
+        const pulseIntensity = (Math.sin(this.energyPulse) * 0.3 + 0.7) * spinUpIntensity;
         
         // Create radial gradient for energy field
         const gradient = ctx.createRadialGradient(
@@ -303,13 +364,16 @@ export class Wormhole extends CelestialObject {
     }
 
     private renderVortex(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
+        const spinUpIntensity = this.getSpinUpIntensity();
+        
         // Create the main swirling vortex with multiple layers
         const layerCount = 4;
+        const visibleLayerCount = Math.ceil(layerCount * spinUpIntensity);
         
-        for (let layer = 0; layer < layerCount; layer++) {
+        for (let layer = 0; layer < visibleLayerCount; layer++) {
             const layerRadius = this.radius * (1 - layer * 0.15); // Concentric layers
             const layerRotation = this.vortexRotation + layer * 0.3; // Different rotation per layer
-            const layerAlpha = (0.3 - layer * 0.05) * this.wormholeType.vortexIntensity;
+            const layerAlpha = (0.3 - layer * 0.05) * this.wormholeType.vortexIntensity * spinUpIntensity;
             
             // Create spiral gradient
             const spiralGradient = ctx.createRadialGradient(
@@ -346,12 +410,18 @@ export class Wormhole extends CelestialObject {
     }
 
     private renderParticles(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
-        for (const particle of this.particles) {
+        const spinUpIntensity = this.getSpinUpIntensity();
+        
+        // Reduce particle count during spin-up for performance
+        const visibleParticleCount = Math.ceil(this.particles.length * spinUpIntensity);
+        
+        for (let i = 0; i < visibleParticleCount; i++) {
+            const particle = this.particles[i];
             const particleX = screenX + Math.cos(particle.angle + this.vortexRotation * 0.3) * particle.radius;
             const particleY = screenY + Math.sin(particle.angle + this.vortexRotation * 0.3) * particle.radius;
             
-            // Dynamic brightness based on position and time
-            const dynamicBrightness = particle.brightness * (Math.sin(this.energyPulse + particle.angle) * 0.3 + 0.7);
+            // Dynamic brightness based on position and time, modulated by spin-up
+            const dynamicBrightness = particle.brightness * (Math.sin(this.energyPulse + particle.angle) * 0.3 + 0.7) * spinUpIntensity;
             const alpha = Math.floor(dynamicBrightness * 255).toString(16).padStart(2, '0');
             
             ctx.fillStyle = particle.color + alpha;

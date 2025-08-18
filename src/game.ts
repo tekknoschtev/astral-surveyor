@@ -209,17 +209,42 @@ export class Game {
         this.gameLoop(0);
     }
 
-    gameLoop = async (currentTime: number): Promise<void> => {
+    private gameLoopCallCount = 0;
+    private maxGameLoopCalls = 100;
+
+    gameLoop = (currentTime: number): void => {
+        this.gameLoopCallCount++;
+        
+        // CRITICAL: Detect infinite recursion and break it
+        if (this.gameLoopCallCount > this.maxGameLoopCalls) {
+            console.error(`🔥 INFINITE RECURSION DETECTED! Game loop called ${this.gameLoopCallCount} times. Breaking loop.`);
+            console.trace("🔍 RECURSION BREAK POINT");
+            return; // Stop the recursion
+        }
+        
+        // Reset counter on new animation frame (different timestamp)
+        const timeDiff = Math.abs(currentTime - this.lastTime);
+        if (timeDiff > 1) { // New frame if time difference > 1ms
+            this.gameLoopCallCount = 1;
+        }
+
         const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
 
-        await this.update(deltaTime);
-        this.render();
+        try {
+            this.update(deltaTime);
+            this.render();
+        } catch (error) {
+            console.error('🔥 Game loop error:', error);
+            console.trace("🔍 ERROR STACK TRACE");
+            // Don't request another frame if there's an error
+            return;
+        }
 
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
-    async update(deltaTime: number): Promise<void> {
+    update(deltaTime: number): void {
         this.input.update(deltaTime);
         
         // Debug: Check initial state
@@ -230,7 +255,7 @@ export class Game {
         
         // Handle wormhole traversal transition
         if (this.stateManager.isTraversing) {
-            await this.stateManager.updateTraversal(deltaTime, this.camera, this.stellarMap, this.discoveryDisplay, this.chunkManager);
+            this.stateManager.updateTraversal(deltaTime, this.camera, this.stellarMap, this.discoveryDisplay, this.chunkManager);
             // Still clear frame state to prevent input corruption during traversal
             this.input.clearFrameState();
             return; // Skip normal updates during traversal
@@ -284,7 +309,7 @@ export class Game {
         }
         
         // Handle debug commands (development builds only)
-        await this.handleDebugInput();
+        this.handleDebugInput().catch(err => console.error('Debug input error:', err));
         
         // Handle map/logbook close (Escape key)
         if (this.input.wasJustPressed('Escape')) {
@@ -637,7 +662,24 @@ export class Game {
 
 
 
+    private renderCallCount = 0;
+    private lastRenderFrame = 0;
+
     render(): void {
+        this.renderCallCount++;
+        const currentFrame = performance.now();
+        
+        // DEBUG: Detect multiple render calls per frame
+        if (currentFrame - this.lastRenderFrame < 16) { // Same frame
+            if (this.renderCallCount > 1) {
+                console.warn(`🎨 MULTIPLE RENDER CALLS: render() called ${this.renderCallCount} times in same frame`);
+            }
+        } else {
+            // New frame
+            this.renderCallCount = 1;
+            this.lastRenderFrame = currentFrame;
+        }
+        
         this.renderer.clear();
         
         // Calculate fade alpha for traversal and universe reset effects
@@ -671,6 +713,22 @@ export class Game {
         }
         
         // Render wormholes (prominent foreground layer, after stars)
+        // CRITICAL FIX: Remove duplicate beta wormholes immediately 
+        const betaWormholes = activeObjects.wormholes.filter(w => w.designation === 'beta');
+        if (betaWormholes.length > 1) {
+            console.error(`🔥 BETA DUPLICATION DETECTED: ${betaWormholes.length} beta wormholes found - REMOVING DUPLICATES NOW`);
+            
+            // Keep only the first beta wormhole, remove all others
+            const keepBeta = betaWormholes[0];
+            const removeBetas = betaWormholes.slice(1);
+            
+            // Remove duplicates from activeObjects.wormholes array
+            activeObjects.wormholes = activeObjects.wormholes.filter(w => !removeBetas.includes(w));
+            
+            console.warn(`🧹 EMERGENCY CLEANUP: Removed ${removeBetas.length} duplicate beta wormholes from render loop`);
+            console.log(`✅ FIXED: Now rendering ${activeObjects.wormholes.filter(w => w.designation === 'beta').length} beta wormhole(s)`);
+        }
+        
         for (const obj of activeObjects.wormholes) {
             // Get destination preview objects for gravitational lensing
             const destinationPreview = this.getDestinationPreviewObjects(obj);
