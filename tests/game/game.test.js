@@ -1588,7 +1588,7 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: []
       });
 
-      await expect(game.update(0.016)).resolves.not.toThrow();
+      expect(() => game.update(0.016)).not.toThrow();
     });
 
     it('should handle empty active objects correctly', async () => {
@@ -1605,7 +1605,7 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
 
-      await expect(game.update(0.016)).resolves.not.toThrow();
+      expect(() => game.update(0.016)).not.toThrow();
       expect(() => game.render()).not.toThrow();
     });
   });

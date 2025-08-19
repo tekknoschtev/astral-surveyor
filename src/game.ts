@@ -209,25 +209,7 @@ export class Game {
         this.gameLoop(0);
     }
 
-    private gameLoopCallCount = 0;
-    private maxGameLoopCalls = 100;
-
     gameLoop = (currentTime: number): void => {
-        this.gameLoopCallCount++;
-        
-        // CRITICAL: Detect infinite recursion and break it
-        if (this.gameLoopCallCount > this.maxGameLoopCalls) {
-            console.error(`🔥 INFINITE RECURSION DETECTED! Game loop called ${this.gameLoopCallCount} times. Breaking loop.`);
-            console.trace("🔍 RECURSION BREAK POINT");
-            return; // Stop the recursion
-        }
-        
-        // Reset counter on new animation frame (different timestamp)
-        const timeDiff = Math.abs(currentTime - this.lastTime);
-        if (timeDiff > 1) { // New frame if time difference > 1ms
-            this.gameLoopCallCount = 1;
-        }
-
         const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
 
@@ -309,7 +291,7 @@ export class Game {
         }
         
         // Handle debug commands (development builds only)
-        this.handleDebugInput().catch(err => console.error('Debug input error:', err));
+        this.handleDebugInput();
         
         // Handle map/logbook close (Escape key)
         if (this.input.wasJustPressed('Escape')) {
@@ -552,20 +534,16 @@ export class Game {
 
 
 
-    async handleDebugInput(): Promise<void> {
+    handleDebugInput(): void {
         // Only process debug input if debug mode is enabled
         if (!this.debugModeEnabled) {
             return;
         }
 
-        // Lazy load debug spawner only when needed
+        // Lazy load debug spawner only when needed (skip debug if not loaded)
         if (!DebugSpawner) {
-            try {
-                DebugSpawner = (await import('./debug/debug-spawner.js')).DebugSpawner;
-            } catch (error) {
-                console.warn('Failed to load debug spawner:', error);
-                return;
-            }
+            // Skip debug functionality if module isn't loaded yet
+            return;
         }
 
         // Handle debug help (Shift + H)
