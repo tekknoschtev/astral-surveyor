@@ -662,24 +662,7 @@ export class Game {
 
 
 
-    private renderCallCount = 0;
-    private lastRenderFrame = 0;
-
     render(): void {
-        this.renderCallCount++;
-        const currentFrame = performance.now();
-        
-        // DEBUG: Detect multiple render calls per frame
-        if (currentFrame - this.lastRenderFrame < 16) { // Same frame
-            if (this.renderCallCount > 1) {
-                console.warn(`🎨 MULTIPLE RENDER CALLS: render() called ${this.renderCallCount} times in same frame`);
-            }
-        } else {
-            // New frame
-            this.renderCallCount = 1;
-            this.lastRenderFrame = currentFrame;
-        }
-        
         this.renderer.clear();
         
         // Calculate fade alpha for traversal and universe reset effects
@@ -713,20 +696,15 @@ export class Game {
         }
         
         // Render wormholes (prominent foreground layer, after stars)
-        // CRITICAL FIX: Remove duplicate beta wormholes immediately 
+        // EMERGENCY FIX: Remove duplicate beta wormholes if they still exist (should be rare now)
         const betaWormholes = activeObjects.wormholes.filter(w => w.designation === 'beta');
         if (betaWormholes.length > 1) {
-            console.error(`🔥 BETA DUPLICATION DETECTED: ${betaWormholes.length} beta wormholes found - REMOVING DUPLICATES NOW`);
-            
-            // Keep only the first beta wormhole, remove all others
+            // Keep only the first beta wormhole, remove all others  
             const keepBeta = betaWormholes[0];
             const removeBetas = betaWormholes.slice(1);
             
             // Remove duplicates from activeObjects.wormholes array
             activeObjects.wormholes = activeObjects.wormholes.filter(w => !removeBetas.includes(w));
-            
-            console.warn(`🧹 EMERGENCY CLEANUP: Removed ${removeBetas.length} duplicate beta wormholes from render loop`);
-            console.log(`✅ FIXED: Now rendering ${activeObjects.wormholes.filter(w => w.designation === 'beta').length} beta wormhole(s)`);
         }
         
         for (const obj of activeObjects.wormholes) {

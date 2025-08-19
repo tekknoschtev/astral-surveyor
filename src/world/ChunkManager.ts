@@ -1594,8 +1594,15 @@ export class ChunkManager {
         // Generate or get the remote chunk
         const remoteChunk = this.generateChunk(remoteChunkX, remoteChunkY);
         
-        // Add the beta wormhole directly to the remote chunk
-        remoteChunk.wormholes.push(betaWormhole);
+        // CRITICAL FIX: Only add beta wormhole if it doesn't already exist in the remote chunk
+        const betaAlreadyExists = remoteChunk.wormholes.some(w => 
+            (w.wormholeId === wormholeId && w.designation === 'beta') ||
+            (Math.floor(w.x) === Math.floor(pairLocation.x) && Math.floor(w.y) === Math.floor(pairLocation.y) && w.designation === 'beta')
+        );
+        
+        if (!betaAlreadyExists) {
+            remoteChunk.wormholes.push(betaWormhole);
+        }
         
         // Debug logging can be enabled for development
         // console.log(`Generated wormhole pair ${wormholeId}: Alpha at (${chunkX}, ${chunkY}), Beta placed at (${remoteChunkX}, ${remoteChunkY})`);
@@ -1619,6 +1626,10 @@ export class ChunkManager {
         
         // Also check discovered wormholes to see if any alpha wormholes point to this chunk
         // This handles the case where wormholes were discovered in previous sessions
+        
+        // CRITICAL FIX: Create a comprehensive set of unique wormhole IDs that need beta wormholes in this chunk
+        const requiredBetaWormholes = new Map<string, { wormholeId: string, alphaX: number, alphaY: number, betaX: number, betaY: number }>();
+        
         for (const [objId, discoveryData] of this.discoveredObjects) {
             if (objId.startsWith('wormhole_') && discoveryData.wormholeId && discoveryData.designation === 'alpha') {
                 // Extract alpha wormhole position from the object ID
@@ -1643,31 +1654,43 @@ export class ChunkManager {
                     const betaChunkY = Math.floor(pairLocation.y / this.chunkSize);
                     
                     if (betaChunkX === chunkX && betaChunkY === chunkY) {
-                        // Check if beta wormhole already exists
-                        const betaAlreadyExists = chunk.wormholes.some(w => 
-                            w.wormholeId === wormholeId && w.designation === 'beta'
-                        );
-                        
-                        if (!betaAlreadyExists) {
-                            // Create the beta wormhole
-                            const betaRng = new SeededRandom(hashPosition(pairLocation.x, pairLocation.y));
-                            const betaWormhole = new Wormhole(
-                                pairLocation.x,
-                                pairLocation.y,
+                        // CRITICAL FIX: Only add to the map if we haven't seen this wormhole ID yet
+                        if (!requiredBetaWormholes.has(wormholeId)) {
+                            requiredBetaWormholes.set(wormholeId, {
                                 wormholeId,
-                                'beta',
                                 alphaX,
                                 alphaY,
-                                betaRng
-                            );
-                            
-                            chunk.wormholes.push(betaWormhole);
-                            
-                            // Debug logging can be enabled for development
-                            // console.log(`Recreated beta wormhole ${wormholeId} from discovered data at chunk (${chunkX}, ${chunkY})`);
+                                betaX: pairLocation.x,
+                                betaY: pairLocation.y
+                            });
                         }
                     }
                 }
+            }
+        }
+        
+        // CRITICAL FIX: Now create exactly one beta wormhole for each unique wormhole ID
+        for (const [wormholeId, betaData] of requiredBetaWormholes) {
+            // Check if beta wormhole already exists in chunk
+            const betaAlreadyExists = chunk.wormholes.some(w => 
+                (w.wormholeId === wormholeId && w.designation === 'beta') ||
+                (Math.floor(w.x) === Math.floor(betaData.betaX) && Math.floor(w.y) === Math.floor(betaData.betaY) && w.designation === 'beta')
+            );
+            
+            if (!betaAlreadyExists) {
+                // Create the beta wormhole
+                const betaRng = new SeededRandom(hashPosition(betaData.betaX, betaData.betaY));
+                const betaWormhole = new Wormhole(
+                    betaData.betaX,
+                    betaData.betaY,
+                    wormholeId,
+                    'beta',
+                    betaData.alphaX,
+                    betaData.alphaY,
+                    betaRng
+                );
+                
+                chunk.wormholes.push(betaWormhole);
             }
         }
     }

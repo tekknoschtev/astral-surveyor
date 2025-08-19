@@ -266,44 +266,12 @@ export class Wormhole extends CelestialObject {
     }
 
     render(renderer: Renderer, camera: Camera, destinationPreview?: { x: number; y: number; type: string; relativeX?: number; relativeY?: number }[]): void {
-        // DEBUG: Track render counts per frame to identify double-rendering
-        const now = performance.now();
-        const frameThreshold = 16; // ~60fps frame boundary
-        
-        if (now - Wormhole.lastFrameReset > frameThreshold) {
-            // New frame detected - log previous frame's render counts, but only for beta wormholes since alpha double-rendering is normal
-            if (Wormhole.frameRenderCounts.size > 0) {
-                for (const [wormholeId, count] of Wormhole.frameRenderCounts) {
-                    if (count > 1 && wormholeId.includes('-β')) {
-                        console.warn(`🌀 BETA DOUBLE RENDER: ${wormholeId} rendered ${count} times in frame ${Wormhole.currentFrame}`);
-                    }
-                }
-            }
-            Wormhole.frameRenderCounts.clear();
-            Wormhole.currentFrame++;
-            Wormhole.lastFrameReset = now;
-        }
-        
-        // Count this render
-        const renderCount = (Wormhole.frameRenderCounts.get(this.pairId) || 0) + 1;
-        Wormhole.frameRenderCounts.set(this.pairId, renderCount);
-        
         const [screenX, screenY] = camera.worldToScreen(
             this.x, 
             this.y, 
             renderer.canvas.width, 
             renderer.canvas.height
         );
-        
-        // DEBUG: For beta wormholes, log additional details about each render call
-        if (this.designation === 'beta' && renderCount > 2) {  // Only log excessive renders (>2)
-            console.log(`🌀 BETA EXCESSIVE RENDER #${renderCount}: ${this.pairId} at world(${this.x}, ${this.y}) screen(${screenX}, ${screenY})`);
-            console.log(`  Animation state: vortex=${this.vortexRotation.toFixed(3)}, pulse=${this.energyPulse.toFixed(3)}`);
-            console.log(`  Creation age: ${Date.now() - this.creationTimestamp}ms`);
-            
-            // CRITICAL: Add stack trace to see WHERE these excessive renders are coming from
-            console.trace(`🔍 BETA RENDER CALL STACK #${renderCount}`);
-        }
 
         // Skip rendering if wormhole is way off screen
         const renderRadius = this.radius + 30;
