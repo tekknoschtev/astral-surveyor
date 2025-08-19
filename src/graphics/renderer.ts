@@ -119,4 +119,38 @@ export class Renderer {
         
         this.ctx.restore();
     }
+
+    drawDiscoveryIndicator(x: number, y: number, radius: number, color: string, lineWidth: number = 2, opacity: number = 1.0, dashPattern: number[] | null = null): void {
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.globalAlpha = opacity;
+        
+        // Set dash pattern if provided
+        if (dashPattern) {
+            this.ctx.setLineDash(dashPattern);
+        } else {
+            this.ctx.setLineDash([]); // Solid line
+        }
+        
+        this.ctx.beginPath();
+        this.ctx.arc(Math.floor(x), Math.floor(y), radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        this.ctx.restore();
+    }
+
+    drawDiscoveryPulse(x: number, y: number, radius: number, color: string, opacity: number = 1.0, lineWidth: number = 2): void {
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.globalAlpha = opacity;
+        this.ctx.setLineDash([]); // Always solid for pulses
+        
+        this.ctx.beginPath();
+        this.ctx.arc(Math.floor(x), Math.floor(y), radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        this.ctx.restore();
+    }
 }

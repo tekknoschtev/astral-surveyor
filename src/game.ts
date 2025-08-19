@@ -209,17 +209,24 @@ export class Game {
         this.gameLoop(0);
     }
 
-    gameLoop = async (currentTime: number): Promise<void> => {
+    gameLoop = (currentTime: number): void => {
         const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
 
-        await this.update(deltaTime);
-        this.render();
+        try {
+            this.update(deltaTime);
+            this.render();
+        } catch (error) {
+            console.error('🔥 Game loop error:', error);
+            console.trace("🔍 ERROR STACK TRACE");
+            // Don't request another frame if there's an error
+            return;
+        }
 
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
-    async update(deltaTime: number): Promise<void> {
+    update(deltaTime: number): void {
         this.input.update(deltaTime);
         
         // Debug: Check initial state
@@ -284,7 +291,7 @@ export class Game {
         }
         
         // Handle debug commands (development builds only)
-        await this.handleDebugInput();
+        this.handleDebugInput();
         
         // Handle map/logbook close (Escape key)
         if (this.input.wasJustPressed('Escape')) {
@@ -527,20 +534,16 @@ export class Game {
 
 
 
-    async handleDebugInput(): Promise<void> {
+    handleDebugInput(): void {
         // Only process debug input if debug mode is enabled
         if (!this.debugModeEnabled) {
             return;
         }
 
-        // Lazy load debug spawner only when needed
+        // Lazy load debug spawner only when needed (skip debug if not loaded)
         if (!DebugSpawner) {
-            try {
-                DebugSpawner = (await import('./debug/debug-spawner.js')).DebugSpawner;
-            } catch (error) {
-                console.warn('Failed to load debug spawner:', error);
-                return;
-            }
+            // Skip debug functionality if module isn't loaded yet
+            return;
         }
 
         // Handle debug help (Shift + H)
@@ -671,6 +674,17 @@ export class Game {
         }
         
         // Render wormholes (prominent foreground layer, after stars)
+        // EMERGENCY FIX: Remove duplicate beta wormholes if they still exist (should be rare now)
+        const betaWormholes = activeObjects.wormholes.filter(w => w.designation === 'beta');
+        if (betaWormholes.length > 1) {
+            // Keep only the first beta wormhole, remove all others  
+            const keepBeta = betaWormholes[0];
+            const removeBetas = betaWormholes.slice(1);
+            
+            // Remove duplicates from activeObjects.wormholes array
+            activeObjects.wormholes = activeObjects.wormholes.filter(w => !removeBetas.includes(w));
+        }
+        
         for (const obj of activeObjects.wormholes) {
             // Get destination preview objects for gravitational lensing
             const destinationPreview = this.getDestinationPreviewObjects(obj);

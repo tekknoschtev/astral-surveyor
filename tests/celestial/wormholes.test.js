@@ -46,7 +46,9 @@ describe('Wormhole System', () => {
         lineTo: vi.fn(),
         quadraticCurveTo: vi.fn()
       },
-      drawCircle: vi.fn()
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
 
     // Mock camera
@@ -254,8 +256,8 @@ describe('Wormhole System', () => {
 
       wormhole.render(mockRenderer, mockCamera);
 
-      // Should render golden ring and designation
-      expect(mockRenderer.ctx.strokeStyle).toContain('#FFD700'); // Gold color
+      // Should use unified discovery indicator system and render designation
+      expect(mockRenderer.drawDiscoveryIndicator).toHaveBeenCalled();
       expect(mockRenderer.ctx.fillText).toHaveBeenCalledWith('α', expect.any(Number), expect.any(Number));
     });
 

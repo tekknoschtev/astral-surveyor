@@ -4,11 +4,14 @@
 // Import dependencies
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 
 // Interface definitions
 interface Renderer {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
+    drawDiscoveryIndicator(x: number, y: number, radius: number, color: string, lineWidth?: number, opacity?: number, dashPattern?: number[] | null): void;
+    drawDiscoveryPulse(x: number, y: number, radius: number, color: string, opacity?: number, lineWidth?: number): void;
 }
 
 interface Camera {
@@ -64,6 +67,11 @@ export const WormholeTypes: Record<string, WormholeType> = {
 };
 
 export class Wormhole extends CelestialObject {
+    // Debug tracking for render investigation
+    private static frameRenderCounts = new Map<string, number>();
+    private static currentFrame = 0;
+    private static lastFrameReset = 0;
+
     // Wormhole identification and pairing
     wormholeId: string; // Shared ID for the pair (e.g., "WH-1234")
     designation: 'alpha' | 'beta'; // α or β designation
@@ -89,6 +97,12 @@ export class Wormhole extends CelestialObject {
     
     // Unique identifier for this specific wormhole instance
     uniqueId: string;
+    
+    // Discovery timestamp for animation system
+    discoveryTimestamp?: number;
+    
+    // Performance optimization: gradual spin-up for just-in-time created wormholes
+    creationTimestamp: number;
 
     constructor(x: number, y: number, wormholeId: string, designation: 'alpha' | 'beta', twinX: number, twinY: number, random: SeededRandom) {
         super(x, y, 'wormhole'); // Wormhole type specification
@@ -112,12 +126,32 @@ export class Wormhole extends CelestialObject {
         // Generate unique identifier
         this.uniqueId = `wormhole_${Math.floor(x)}_${Math.floor(y)}_${designation}`;
         
+        // Track creation time for performance optimization
+        this.creationTimestamp = Date.now();
+        
         // Initialize visual system
         this.generateParticles(random);
         
         // Initialize animation states
         this.vortexRotation = random.next() * Math.PI * 2; // Random starting rotation
         this.energyPulse = random.next() * Math.PI * 2; // Random pulse phase
+    }
+
+    /**
+     * Calculate the spin-up intensity for performance optimization
+     * Newly created wormholes gradually increase their visual complexity
+     */
+    private getSpinUpIntensity(): number {
+        const spinUpDuration = 1000; // 1 second to reach full intensity
+        const age = Date.now() - this.creationTimestamp;
+        
+        if (age >= spinUpDuration) {
+            return 1.0; // Full intensity
+        }
+        
+        // Smooth easing curve from 0.1 to 1.0
+        const progress = Math.min(age / spinUpDuration, 1.0);
+        return 0.1 + (0.9 * progress * progress); // Quadratic easing
     }
 
     private generateParticles(random: SeededRandom): void {
@@ -263,19 +297,20 @@ export class Wormhole extends CelestialObject {
         
         // Render discovery indicator if discovered
         if (this.discovered) {
-            this.renderDiscoveryIndicator(ctx, screenX, screenY);
+            this.renderDiscoveryIndicator(renderer, screenX, screenY);
         }
 
         ctx.restore();
     }
 
     private renderEnergyField(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
+        const spinUpIntensity = this.getSpinUpIntensity();
         const config = this.wormholeType.energyField;
         const innerRadius = this.radius * config.innerRadius;
         const outerRadius = this.radius * config.outerRadius;
         
-        // Pulsing energy field
-        const pulseIntensity = Math.sin(this.energyPulse) * 0.3 + 0.7;
+        // Pulsing energy field, modulated by spin-up
+        const pulseIntensity = (Math.sin(this.energyPulse) * 0.3 + 0.7) * spinUpIntensity;
         
         // Create radial gradient for energy field
         const gradient = ctx.createRadialGradient(
@@ -297,13 +332,16 @@ export class Wormhole extends CelestialObject {
     }
 
     private renderVortex(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
+        const spinUpIntensity = this.getSpinUpIntensity();
+        
         // Create the main swirling vortex with multiple layers
         const layerCount = 4;
+        const visibleLayerCount = Math.ceil(layerCount * spinUpIntensity);
         
-        for (let layer = 0; layer < layerCount; layer++) {
+        for (let layer = 0; layer < visibleLayerCount; layer++) {
             const layerRadius = this.radius * (1 - layer * 0.15); // Concentric layers
             const layerRotation = this.vortexRotation + layer * 0.3; // Different rotation per layer
-            const layerAlpha = (0.3 - layer * 0.05) * this.wormholeType.vortexIntensity;
+            const layerAlpha = (0.3 - layer * 0.05) * this.wormholeType.vortexIntensity * spinUpIntensity;
             
             // Create spiral gradient
             const spiralGradient = ctx.createRadialGradient(
@@ -340,12 +378,18 @@ export class Wormhole extends CelestialObject {
     }
 
     private renderParticles(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
-        for (const particle of this.particles) {
+        const spinUpIntensity = this.getSpinUpIntensity();
+        
+        // Reduce particle count during spin-up for performance
+        const visibleParticleCount = Math.ceil(this.particles.length * spinUpIntensity);
+        
+        for (let i = 0; i < visibleParticleCount; i++) {
+            const particle = this.particles[i];
             const particleX = screenX + Math.cos(particle.angle + this.vortexRotation * 0.3) * particle.radius;
             const particleY = screenY + Math.sin(particle.angle + this.vortexRotation * 0.3) * particle.radius;
             
-            // Dynamic brightness based on position and time
-            const dynamicBrightness = particle.brightness * (Math.sin(this.energyPulse + particle.angle) * 0.3 + 0.7);
+            // Dynamic brightness based on position and time, modulated by spin-up
+            const dynamicBrightness = particle.brightness * (Math.sin(this.energyPulse + particle.angle) * 0.3 + 0.7) * spinUpIntensity;
             const alpha = Math.floor(dynamicBrightness * 255).toString(16).padStart(2, '0');
             
             ctx.fillStyle = particle.color + alpha;
@@ -498,33 +542,64 @@ export class Wormhole extends CelestialObject {
         }
     }
 
-    private renderDiscoveryIndicator(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
-        // Golden rotating ring for discovered wormholes
-        const indicatorRadius = this.radius + 10;
-        const rotationSpeed = this.vortexRotation * 2; // Rotate faster than vortex
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system with wormhole specific styling
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `wormhole-${this.x}-${this.y}`;
+        const currentTime = Date.now();
         
-        ctx.strokeStyle = '#FFD700'; // Gold
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 6]); // Dashed line
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 10,
+            rarity: visualizationService.getObjectRarity('wormhole'),
+            objectType: 'wormhole',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime,
+            colorOverride: '#FFD700' // Special gold color for wormholes
+        });
+
+        // Render base discovery indicator with golden styling
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 10,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active (extra special for rare wormholes)
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
+        }
         
-        ctx.save();
-        ctx.translate(screenX, screenY);
-        ctx.rotate(rotationSpeed);
-        
-        ctx.beginPath();
-        ctx.arc(0, 0, indicatorRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.restore();
-        ctx.setLineDash([]); // Reset line dash
-        
-        // Add designation marker (α or β)
+        // Add designation marker (α or β) - preserve special wormhole identifier
         const designation = this.designation === 'alpha' ? 'α' : 'β';
+        const ctx = renderer.ctx;
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 16px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(designation, screenX + indicatorRadius + 15, screenY - 5);
+        ctx.fillText(designation, screenX + (this.radius + 10) + 15, screenY - 5);
     }
 
     // Get discovery data for saving/loading

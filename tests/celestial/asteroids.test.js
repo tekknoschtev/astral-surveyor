@@ -32,7 +32,10 @@ describe('Asteroid Garden System', () => {
         createRadialGradient: vi.fn().mockReturnValue({
           addColorStop: vi.fn()
         })
-      }
+      },
+      drawCircle: vi.fn(),
+      drawDiscoveryIndicator: vi.fn(),
+      drawDiscoveryPulse: vi.fn()
     };
     
     // Mock camera
@@ -278,10 +281,15 @@ describe('Asteroid Garden System', () => {
       
       garden.render(mockRenderer, mockCamera);
       
-      // Should render discovery indicator
-      expect(mockRenderer.ctx.setLineDash).toHaveBeenCalledWith([5, 5]);
-      expect(mockRenderer.ctx.stroke).toHaveBeenCalled();
-      expect(mockRenderer.ctx.setLineDash).toHaveBeenCalledWith([]); // Reset line dash
+      // Should render discovery indicator using unified system
+      expect(mockRenderer.drawDiscoveryIndicator).toHaveBeenCalled();
+      
+      // Verify the discovery indicator is called with the correct parameters
+      const call = mockRenderer.drawDiscoveryIndicator.mock.calls[0];
+      expect(call[0]).toBe(500); // screenX
+      expect(call[1]).toBe(400); // screenY
+      expect(call[2]).toBeGreaterThan(0); // radius (fieldRadius + 15)
+      expect(call[3]).toEqual(expect.any(String)); // color
     });
     
     it('should render different rock shapes correctly', () => {

@@ -299,6 +299,81 @@ export const RenderingConfig = {
     }
 };
 
+// Discovery Visualization Configuration
+export const DiscoveryVisualizationConfig = {
+    // Discovery pulse animation settings
+    discoveryPulse: {
+        duration: 2500, // 2.5 seconds
+        maxRadiusMultiplier: 2.5, // Pulse expands to 2.5x the base radius
+        fadeOutStart: 0.3, // Start fading when pulse is 30% complete
+        defaultColor: '#ffa500' // Orange for general rare discoveries
+    },
+    
+    // Ongoing pulse animation settings (for ultra-rare objects)
+    ongoingPulse: {
+        duration: 4000, // 4 second cycle
+        maxRadiusMultiplier: 1.3, // Subtle expansion
+        minOpacity: 0.3, // Minimum opacity during pulse
+        maxOpacity: 0.9, // Maximum opacity during pulse
+        enabled: true // Can be disabled for performance
+    },
+    
+    // Rarity-based visual settings
+    raritySettings: {
+        common: {
+            baseRadius: 15, // Standard radius offset from object
+            color: '#e8f4f8', // Soft white/blue
+            lineWidth: 1,
+            opacity: 0.6,
+            dashPattern: [8, 4], // Subtle dashed line
+            pulseEnabled: false
+        },
+        uncommon: {
+            baseRadius: 18,
+            color: '#fff3cd', // Soft yellow
+            lineWidth: 1.5,
+            opacity: 0.7,
+            dashPattern: null, // Solid line
+            pulseEnabled: false
+        },
+        rare: {
+            baseRadius: 20,
+            color: '#ffa500', // Orange
+            lineWidth: 2,
+            opacity: 0.8,
+            dashPattern: null, // Solid line
+            pulseEnabled: true,
+            discoveryPulseOnly: true
+        },
+        ultraRare: {
+            baseRadius: 25,
+            color: '#ff6b6b', // Red (can be overridden per object type)
+            lineWidth: 3,
+            opacity: 0.9,
+            dashPattern: null, // Solid line
+            pulseEnabled: true,
+            ongoingPulseEnabled: true
+        }
+    },
+    
+    // Special object type color overrides
+    specialColors: {
+        neutronStar: '#00ffff', // Bright cyan
+        blackHole: '#ff0000',   // Red danger
+        wormhole: '#8b5cf6',    // Purple spacetime
+        exoticPlanet: '#a855f7', // Purple exotic
+        binaryStar: '#ffd700'   // Gold for binary systems
+    },
+    
+    // Performance settings
+    performance: {
+        maxActiveAnimations: 50, // Limit concurrent animations
+        enablePulseAnimations: true, // Global toggle for pulse effects
+        reduceAnimationsOnLowPerformance: true, // Adaptive quality
+        animationFrameSkip: 1 // Skip frames if needed (1 = no skipping)
+    }
+};
+
 // Combined visual configuration export
 export const VisualConfig = {
     colors: ColorSchemes,
@@ -307,6 +382,7 @@ export const VisualConfig = {
     lighting: LightingConfig,
     ui: UIVisualConfig,
     rendering: RenderingConfig,
+    discovery: DiscoveryVisualizationConfig,
 };
 
 export default VisualConfig;

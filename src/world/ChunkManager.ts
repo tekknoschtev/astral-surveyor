@@ -439,8 +439,13 @@ export class ChunkManager {
         // Generate asteroid gardens for this chunk
         this.generateAsteroidGardensForChunk(chunkX, chunkY, chunk);
         
-        // Generate wormholes for this chunk (extremely rare)
-        this.generateWormholesForChunk(chunkX, chunkY, chunk);
+        // Check for pending wormhole pairs that should be placed in this chunk FIRST
+        this.placePendingWormholePairs(chunkX, chunkY, chunk);
+        
+        // Generate new wormholes for this chunk (extremely rare) - only if no pending pairs were placed
+        if (chunk.wormholes.length === 0) {
+            this.generateWormholesForChunk(chunkX, chunkY, chunk);
+        }
         
         // Generate black holes for this chunk (ultra-rare - cosmic reset points)
         this.generateBlackHolesForChunk(chunkX, chunkY, chunk);
@@ -1582,13 +1587,112 @@ export class ChunkManager {
         // Add the local wormhole to this chunk
         chunk.wormholes.push(alphaWormhole);
         
-        // Store pair information for future chunk generation
-        this.pendingWormholePairs.set(wormholeId, {
-            localWormhole: alphaWormhole,
-            remoteWormhole: betaWormhole,
-            remoteChunkX: Math.floor(pairLocation.x / this.chunkSize),
-            remoteChunkY: Math.floor(pairLocation.y / this.chunkSize)
-        });
+        // Immediately generate the remote chunk to ensure the beta wormhole exists
+        const remoteChunkX = Math.floor(pairLocation.x / this.chunkSize);
+        const remoteChunkY = Math.floor(pairLocation.y / this.chunkSize);
+        
+        // Generate or get the remote chunk
+        const remoteChunk = this.generateChunk(remoteChunkX, remoteChunkY);
+        
+        // CRITICAL FIX: Only add beta wormhole if it doesn't already exist in the remote chunk
+        const betaAlreadyExists = remoteChunk.wormholes.some(w => 
+            (w.wormholeId === wormholeId && w.designation === 'beta') ||
+            (Math.floor(w.x) === Math.floor(pairLocation.x) && Math.floor(w.y) === Math.floor(pairLocation.y) && w.designation === 'beta')
+        );
+        
+        if (!betaAlreadyExists) {
+            remoteChunk.wormholes.push(betaWormhole);
+        }
+        
+        // Debug logging can be enabled for development
+        // console.log(`Generated wormhole pair ${wormholeId}: Alpha at (${chunkX}, ${chunkY}), Beta placed at (${remoteChunkX}, ${remoteChunkY})`);
+    }
+    
+    // Place beta wormholes from pending pairs into the appropriate chunk
+    private placePendingWormholePairs(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // Check all pending wormhole pairs to see if any belong to this chunk
+        for (const [wormholeId, pairData] of this.pendingWormholePairs) {
+            if (pairData.remoteChunkX === chunkX && pairData.remoteChunkY === chunkY) {
+                // This chunk should contain the beta wormhole for this pair
+                chunk.wormholes.push(pairData.remoteWormhole);
+                
+                // Remove from pending since we've placed it
+                this.pendingWormholePairs.delete(wormholeId);
+                
+                // Debug logging can be enabled for development
+                // console.log(`Placed beta wormhole ${wormholeId} (${pairData.remoteWormhole.designation}) at chunk (${chunkX}, ${chunkY})`);
+            }
+        }
+        
+        // Also check discovered wormholes to see if any alpha wormholes point to this chunk
+        // This handles the case where wormholes were discovered in previous sessions
+        
+        // CRITICAL FIX: Create a comprehensive set of unique wormhole IDs that need beta wormholes in this chunk
+        const requiredBetaWormholes = new Map<string, { wormholeId: string, alphaX: number, alphaY: number, betaX: number, betaY: number }>();
+        
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('wormhole_') && discoveryData.wormholeId && discoveryData.designation === 'alpha') {
+                // Extract alpha wormhole position from the object ID
+                const parts = objId.split('_');
+                if (parts.length >= 4) {
+                    const alphaX = parseInt(parts[1]);
+                    const alphaY = parseInt(parts[2]);
+                    
+                    // Generate the alpha wormhole deterministically to get its twin coordinates
+                    // This recreates the same logic as when it was originally generated
+                    const alphaChunkX = Math.floor(alphaX / this.chunkSize);
+                    const alphaChunkY = Math.floor(alphaY / this.chunkSize);
+                    const wormholeId = discoveryData.wormholeId;
+                    
+                    // Generate the same alpha wormhole to get its pair location
+                    const wormholeSeed = hashPosition(alphaChunkX * this.chunkSize, alphaChunkY * this.chunkSize) ^ 0x789ABCDE;
+                    const wormholeRng = new SeededRandom(wormholeSeed);
+                    const pairLocation = this.generateWormholePairLocation(alphaChunkX, alphaChunkY, wormholeRng);
+                    
+                    // Check if the beta should be in this chunk
+                    const betaChunkX = Math.floor(pairLocation.x / this.chunkSize);
+                    const betaChunkY = Math.floor(pairLocation.y / this.chunkSize);
+                    
+                    if (betaChunkX === chunkX && betaChunkY === chunkY) {
+                        // CRITICAL FIX: Only add to the map if we haven't seen this wormhole ID yet
+                        if (!requiredBetaWormholes.has(wormholeId)) {
+                            requiredBetaWormholes.set(wormholeId, {
+                                wormholeId,
+                                alphaX,
+                                alphaY,
+                                betaX: pairLocation.x,
+                                betaY: pairLocation.y
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // CRITICAL FIX: Now create exactly one beta wormhole for each unique wormhole ID
+        for (const [wormholeId, betaData] of requiredBetaWormholes) {
+            // Check if beta wormhole already exists in chunk
+            const betaAlreadyExists = chunk.wormholes.some(w => 
+                (w.wormholeId === wormholeId && w.designation === 'beta') ||
+                (Math.floor(w.x) === Math.floor(betaData.betaX) && Math.floor(w.y) === Math.floor(betaData.betaY) && w.designation === 'beta')
+            );
+            
+            if (!betaAlreadyExists) {
+                // Create the beta wormhole
+                const betaRng = new SeededRandom(hashPosition(betaData.betaX, betaData.betaY));
+                const betaWormhole = new Wormhole(
+                    betaData.betaX,
+                    betaData.betaY,
+                    wormholeId,
+                    'beta',
+                    betaData.alphaX,
+                    betaData.alphaY,
+                    betaRng
+                );
+                
+                chunk.wormholes.push(betaWormhole);
+            }
+        }
     }
     
     private generateWormholeId(chunkX: number, chunkY: number, rng: SeededRandom): string {

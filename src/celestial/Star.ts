@@ -5,6 +5,7 @@
 import { SeededRandom } from '../utils/random.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { CelestialObject } from './CelestialTypes.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 import type { 
     Renderer, 
     Camera, 
@@ -38,6 +39,9 @@ export class Star extends CelestialObject {
     
     // Sunspot data for G-type stars
     sunspots?: Sunspot[];
+    
+    // Discovery timestamp for animation system
+    discoveryTimestamp?: number;
 
     constructor(x: number, y: number, starType?: StarType) {
         super(x, y, 'star');
@@ -167,13 +171,9 @@ export class Star extends CelestialObject {
             // Draw the main star with enhanced luminosity
             this.drawStarWithLuminosity(renderer, screenX, screenY, this.radius);
             
-            // Visual indicator if discovered
+            // Visual indicator if discovered using unified system
             if (this.discovered) {
-                renderer.ctx.strokeStyle = '#00ff88';
-                renderer.ctx.lineWidth = 3;
-                renderer.ctx.beginPath();
-                renderer.ctx.arc(screenX, screenY, this.radius + 8, 0, Math.PI * 2);
-                renderer.ctx.stroke();
+                this.renderDiscoveryIndicator(renderer, screenX, screenY);
             }
         }
     }
@@ -510,6 +510,56 @@ export class Star extends CelestialObject {
         const newB = Math.max(0, Math.floor(b * (1 - amount)));
         
         return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+    }
+    
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `star-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 8,
+            rarity: visualizationService.getObjectRarity('star'),
+            objectType: 'star',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 8,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+
+        // Render ongoing pulse if active
+        if (indicatorData.ongoingPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.ongoingPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.ongoingPulse.opacity
+            );
+        }
     }
 }
 
