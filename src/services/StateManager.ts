@@ -257,6 +257,10 @@ export class StateManager {
         if (sourceWormhole.discovered) {
             betaWormhole.discovered = true;
             betaWormhole.discoveryTimestamp = sourceWormhole.discoveryTimestamp;
+            
+            // CRITICAL FIX: Add beta wormhole to discovery database so it appears on stellar map
+            // This ensures wormhole pairs show connection lines on the stellar map
+            chunkManager.markObjectDiscovered(betaWormhole);
         }
         
         // CRITICAL: Reset animation state to prevent rendering corruption
