@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet';
 }
 
 interface Star extends CelestialObject {
@@ -53,6 +53,18 @@ interface AsteroidGarden extends CelestialObject {
     gardenType?: string;
     gardenTypeData?: {
         name: string;
+    };
+}
+
+interface Comet extends CelestialObject {
+    type: 'comet';
+    parentStar?: Star;
+    cometIndex?: number;
+    cometType?: {
+        name: string;
+        rarity: number;
+        discoveryValue: number;
+        description: string;
     };
 }
 
@@ -515,6 +527,18 @@ export class NamingService {
                 type: garden.gardenTypeData?.name || 'Asteroid Garden',
                 classification: this.getAsteroidGardenClassification(garden.gardenType)
             };
+        } else if (object.type === 'comet') {
+            const comet = object as Comet;
+            const cometName = this.generateCometName(comet);
+            const coordName = this.generateCoordinateDesignation(comet.x, comet.y);
+            const parentStarName = comet.parentStar ? this.generateDisplayName(comet.parentStar) : 'Unknown Star';
+            return {
+                catalog: cometName,
+                coordinate: coordName,
+                type: comet.cometType?.name || 'Comet',
+                classification: this.getCometClassification(comet.cometType?.name),
+                parentStar: parentStarName
+            };
         }
         
         return null;
@@ -578,6 +602,20 @@ export class NamingService {
         };
         
         return gardenType ? classifications[gardenType] || null : null;
+    }
+
+    /**
+     * Get comet classification for scientific designation
+     */
+    private getCometClassification(cometTypeName?: string): string | null {
+        const classifications: Record<string, string> = {
+            'Ice Comet': 'H2O-Rich (Periodic Visitor)',
+            'Dust Comet': 'Silicate-Rich (Debris Trail)',
+            'Rocky Comet': 'Metal-Rich (Dense Core)',
+            'Organic Comet': 'Carbon-Rich (Primordial Composition)'
+        };
+        
+        return cometTypeName ? classifications[cometTypeName] || null : null;
     }
     
     /**

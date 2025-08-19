@@ -7,7 +7,7 @@ import { DiscoveryConfig } from '../../dist/config/gameConfig.js';
 import { DiscoveryService } from '../../dist/services/DiscoveryService.js';
 
 describe('Comet Discovery Integration Tests', () => {
-  it('should set discoveryDistance from DiscoveryConfig on creation', () => {
+  it('should set discoveryDistance dynamically based on visibility', () => {
     // Create minimal test objects
     const star = new Star(100, 100, StarTypes.G_TYPE, 0);
     const orbit = {
@@ -23,10 +23,16 @@ describe('Comet Discovery Integration Tests', () => {
     
     const comet = new Comet(200, 200, star, orbit, CometTypes.ICE, 0);
     
-    // Verify configuration integration
-    expect(comet.discoveryDistance).toBe(DiscoveryConfig.distances.comet);
-    expect(comet.discoveryDistance).toBe(275);
+    // Verify dynamic discovery distance behavior
     expect(comet.type).toBe('comet');
+    
+    // Discovery distance should be dynamic, not static config value
+    if (comet.isVisible) {
+      expect(comet.discoveryDistance).toBeGreaterThan(0);
+      expect(comet.discoveryDistance).toBe(Math.max(30, comet.tailLength + 20));
+    } else {
+      expect(comet.discoveryDistance).toBe(0);
+    }
   });
 
   it('should work with DiscoveryService using mock object', () => {
@@ -66,28 +72,15 @@ describe('Comet Discovery Integration Tests', () => {
     expect(result2).toBe(false);
   });
 
-  it('should have correct discovery distance relative to other objects', () => {
-    const star = new Star(100, 100, StarTypes.G_TYPE, 0);
-    const orbit = {
-      semiMajorAxis: 500,
-      eccentricity: 0.7,
-      perihelionDistance: 150,
-      aphelionDistance: 850,
-      orbitalPeriod: 10000,
-      argumentOfPerihelion: 0,
-      meanAnomalyAtEpoch: 0,
-      epoch: 0
-    };
-    
-    const comet = new Comet(200, 200, star, orbit, CometTypes.ICE, 0);
-    
-    // Verify comet discovery distance is between asteroids and nebulae
-    expect(comet.discoveryDistance).toBeGreaterThan(DiscoveryConfig.distances.asteroidGarden);
-    expect(comet.discoveryDistance).toBeLessThan(DiscoveryConfig.distances.nebula);
-    
-    // Verify specific values
+  it('should have correct static config values for discovery system', () => {
+    // Verify the static configuration is still properly set
+    // (even though comets now use dynamic discovery distances)
     expect(DiscoveryConfig.distances.asteroidGarden).toBe(250);
-    expect(comet.discoveryDistance).toBe(275);
+    expect(DiscoveryConfig.distances.comet).toBe(275);
     expect(DiscoveryConfig.distances.nebula).toBe(300);
+    
+    // Verify comet config distance is between asteroids and nebulae
+    expect(DiscoveryConfig.distances.comet).toBeGreaterThan(DiscoveryConfig.distances.asteroidGarden);
+    expect(DiscoveryConfig.distances.comet).toBeLessThan(DiscoveryConfig.distances.nebula);
   });
 });

@@ -113,8 +113,8 @@ export class Comet extends CelestialObject {
         this.cometType = cometType;
         this.cometIndex = cometIndex;
         
-        // Set discovery distance from configuration
-        this.discoveryDistance = DiscoveryConfig.distances.comet;
+        // Discovery distance will be set dynamically in updateVisualProperties()
+        // based on visibility and tail length
         
         // Generate unique identifier for this comet
         this.uniqueId = this.generateUniqueId();
@@ -167,7 +167,7 @@ export class Comet extends CelestialObject {
     }
     
     // Calculate deterministic universal time based on star position and universe seed
-    private calculateUniversalTime(): number {
+    calculateUniversalTime(): number {
         // Use star position and comet index to create deterministic time
         const timeSeed = hashPosition(this.parentStar.x, this.parentStar.y) + this.cometIndex * 1000;
         return timeSeed % this.orbit.orbitalPeriod;
@@ -175,7 +175,7 @@ export class Comet extends CelestialObject {
     
     // Solve Kepler's equation: M = E - e*sin(E) for eccentric anomaly E
     // Uses Newton-Raphson iteration for accuracy
-    private solveKeplersEquation(meanAnomaly: number, eccentricity: number): number {
+    solveKeplersEquation(meanAnomaly: number, eccentricity: number): number {
         let eccentricAnomaly = meanAnomaly; // Initial guess
         
         // Newton-Raphson iteration (typically converges in 3-4 iterations)
@@ -211,14 +211,15 @@ export class Comet extends CelestialObject {
         }
         
         // Determine visibility based on distance threshold
-        // TODO: Get actual outermost planet orbit from star system
-        const visibilityThreshold = 500; // Placeholder - will be calculated from star system
+        // Use configured visibility threshold from gameConfig
+        const visibilityThreshold = this.orbit.perihelionDistance * DiscoveryConfig.distances.comet / 50; // Dynamic based on orbit
         this.isVisible = this.currentDistance <= visibilityThreshold;
         
         if (!this.isVisible) {
             this.tailLength = 0;
             this.nucleusBrightness = 0.1;
             this.comaRadius = 0;
+            this.discoveryDistance = 0; // Not discoverable when not visible
             return;
         }
         
@@ -228,13 +229,16 @@ export class Comet extends CelestialObject {
         // Update tail length (longer when closer to star)
         const baseTailLength = 30; // Minimum tail length when visible
         const maxTailLength = 120; // Maximum tail length at perihelion
-        this.tailLength = baseTailLength + (maxTailLength - baseTailLength) * Math.min(brightnessFactor - 1, 2);
+        // Ensure brightnessFactor >= 1 before subtracting 1 to prevent negative values
+        const scaledBrightness = Math.max(0, Math.min(brightnessFactor - 1, 2));
+        this.tailLength = baseTailLength + (maxTailLength - baseTailLength) * scaledBrightness;
         
         // Update nucleus brightness
         this.nucleusBrightness = Math.min(brightnessFactor, 2.0);
         
         // Update coma radius (fuzzy glow around nucleus)
-        this.comaRadius = 3 + 7 * Math.min(brightnessFactor - 1, 1);
+        const scaledComaFactor = Math.max(0, Math.min(brightnessFactor - 1, 1));
+        this.comaRadius = 3 + 7 * scaledComaFactor;
         
         // Set discovery distance based on visibility
         this.discoveryDistance = this.isVisible ? Math.max(30, this.tailLength + 20) : 0;

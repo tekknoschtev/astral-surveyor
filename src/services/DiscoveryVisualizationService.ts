@@ -9,8 +9,10 @@ import {
     DiscoveryPulseState,
     DISCOVERY_RARITY_CONFIGS,
     ULTRA_RARE_COLORS,
+    SPECIAL_DISCOVERY_EFFECTS,
     OBJECT_RARITY_MAP,
     DISCOVERY_PULSE_CONFIG,
+    SPECIAL_PULSE_CONFIGS,
     ONGOING_PULSE_CONFIG
 } from '../types/DiscoveryVisualizationTypes.js';
 
@@ -43,6 +45,12 @@ export class DiscoveryVisualizationService {
             }
         }
 
+        // Apply special discovery effects for specific object types
+        if (objectType && SPECIAL_DISCOVERY_EFFECTS[objectType]) {
+            const specialEffects = SPECIAL_DISCOVERY_EFFECTS[objectType];
+            Object.assign(baseConfig, specialEffects);
+        }
+
         return baseConfig;
     }
 
@@ -55,15 +63,20 @@ export class DiscoveryVisualizationService {
 
         // Handle discovery pulse (one-time effect)
         if (config.hasDiscoveryPulse && options.discoveryTimestamp) {
+            // Get pulse config (use special config for specific object types if available)
+            const pulseConfig = SPECIAL_PULSE_CONFIGS[options.objectType] ? 
+                { ...DISCOVERY_PULSE_CONFIG, ...SPECIAL_PULSE_CONFIGS[options.objectType] } :
+                DISCOVERY_PULSE_CONFIG;
+            
             const timeSinceDiscovery = options.currentTime - options.discoveryTimestamp;
             
-            if (timeSinceDiscovery <= DISCOVERY_PULSE_CONFIG.duration) {
+            if (timeSinceDiscovery <= pulseConfig.duration) {
                 if (!animationState.discoveryPulse || !animationState.discoveryPulse.isActive) {
                     animationState.discoveryPulse = {
                         isActive: true,
                         startTime: options.discoveryTimestamp,
-                        duration: DISCOVERY_PULSE_CONFIG.duration,
-                        maxRadius: options.baseRadius * DISCOVERY_PULSE_CONFIG.maxRadiusMultiplier,
+                        duration: pulseConfig.duration,
+                        maxRadius: options.baseRadius * pulseConfig.maxRadiusMultiplier,
                         pulseType: 'discovery'
                     };
                 }
@@ -101,7 +114,7 @@ export class DiscoveryVisualizationService {
     /**
      * Calculate discovery pulse properties for rendering
      */
-    getDiscoveryPulseProperties(pulse: DiscoveryPulseState, currentTime: number): {
+    getDiscoveryPulseProperties(pulse: DiscoveryPulseState, currentTime: number, objectType?: string): {
         radius: number;
         opacity: number;
         isVisible: boolean;
@@ -120,11 +133,16 @@ export class DiscoveryVisualizationService {
         // Radius expands linearly
         const radius = pulse.maxRadius * progress;
 
+        // Get fade out start point (use special config if available)
+        const pulseConfig = SPECIAL_PULSE_CONFIGS[objectType || ''] ? 
+            { ...DISCOVERY_PULSE_CONFIG, ...SPECIAL_PULSE_CONFIGS[objectType || ''] } :
+            DISCOVERY_PULSE_CONFIG;
+
         // Opacity fades out after the fade start point
         let opacity = 1;
-        if (progress > DISCOVERY_PULSE_CONFIG.fadeOutStart) {
-            const fadeProgress = (progress - DISCOVERY_PULSE_CONFIG.fadeOutStart) / 
-                               (1 - DISCOVERY_PULSE_CONFIG.fadeOutStart);
+        if (progress > pulseConfig.fadeOutStart) {
+            const fadeProgress = (progress - pulseConfig.fadeOutStart) / 
+                               (1 - pulseConfig.fadeOutStart);
             opacity = 1 - fadeProgress;
         }
 
@@ -197,7 +215,8 @@ export class DiscoveryVisualizationService {
         if (animationState.discoveryPulse) {
             result.discoveryPulse = this.getDiscoveryPulseProperties(
                 animationState.discoveryPulse, 
-                options.currentTime
+                options.currentTime,
+                options.objectType
             );
         }
 
