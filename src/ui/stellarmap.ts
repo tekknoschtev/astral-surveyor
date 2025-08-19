@@ -99,6 +99,10 @@ interface GameStartingPosition {
 }
 
 export class StellarMap {
+    // Constants for consistent styling
+    private static readonly LABEL_FONT_SIZE = 12;
+    private static readonly LABEL_FONT_FAMILY = '"Courier New", monospace';
+    
     visible: boolean;
     zoomLevel: number;
     centerX: number;
@@ -177,6 +181,10 @@ export class StellarMap {
             'White Dwarf': '#ffffff',
             'Neutron Star': '#ddddff'
         };
+    }
+
+    private getLabelFont(): string {
+        return `${StellarMap.LABEL_FONT_SIZE}px ${StellarMap.LABEL_FONT_FAMILY}`;
     }
 
     toggle(): void {
@@ -1212,21 +1220,47 @@ export class StellarMap {
         
         const nebulaName = nebula.objectName || this.namingService.generateDisplayName(nebula);
         
+        // Calculate offset position for scientific diagram style
+        const offsetDistance = 25; // Distance from nebula center
+        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = nebulaMapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = nebulaMapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from nebula edge to text
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of nebula (approximate size)
+        const nebulaSize = 8; // Approximate nebula visual size
+        const lineStartX = nebulaMapX + Math.cos(offsetAngle) * (nebulaSize + 2);
+        const lineStartY = nebulaMapY + Math.sin(offsetAngle) * (nebulaSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
         ctx.save();
         ctx.fillStyle = '#e8f4fd';
-        ctx.font = '10px "Courier New", monospace';
-        ctx.textAlign = 'center';
+        ctx.font = this.getLabelFont();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
         
         // Draw text background for readability
         const textWidth = ctx.measureText(nebulaName).width;
         const bgPadding = 3;
         ctx.fillStyle = '#000000B0';
-        ctx.fillRect(nebulaMapX - textWidth/2 - bgPadding, nebulaMapY + 12, textWidth + bgPadding*2, 12);
+        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
         
         // Draw label text
         ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(nebulaName, nebulaMapX, nebulaMapY + 22);
+        ctx.fillText(nebulaName, labelX, labelY);
         
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
         ctx.restore();
     }
 
@@ -1446,34 +1480,61 @@ export class StellarMap {
         
         const wormholeName = wormhole.objectName || this.namingService.generateDisplayName(wormhole);
         
+        // Calculate offset position for scientific diagram style
+        const offsetDistance = 30; // Distance from wormhole center
+        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = wormholeMapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = wormholeMapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from wormhole edge to text
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of wormhole (approximate size)
+        const wormholeSize = 6; // Approximate wormhole visual size
+        const lineStartX = wormholeMapX + Math.cos(offsetAngle) * (wormholeSize + 2);
+        const lineStartY = wormholeMapY + Math.sin(offsetAngle) * (wormholeSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
         ctx.save();
         ctx.fillStyle = '#e8f4fd';
-        ctx.font = '11px "Courier New", monospace';
-        ctx.textAlign = 'center';
+        ctx.font = this.getLabelFont();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
         
         // Draw text background for readability
         const textWidth = ctx.measureText(wormholeName).width;
         const bgPadding = 4;
         ctx.fillStyle = '#000000C0';
-        ctx.fillRect(wormholeMapX - textWidth/2 - bgPadding, wormholeMapY + 16, textWidth + bgPadding*2, 14);
+        ctx.fillRect(labelX - bgPadding, labelY - 7, textWidth + bgPadding*2, 14);
         
         // Draw label text
         ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(wormholeName, wormholeMapX, wormholeMapY + 27);
+        ctx.fillText(wormholeName, labelX, labelY);
         
         // Draw twin coordinates if zoomed in enough
         if (this.zoomLevel > 2.0) {
             const twinText = `→ (${Math.round(wormhole.twinX)}, ${Math.round(wormhole.twinY)})`;
-            const twinTextWidth = ctx.measureText(twinText).width;
             ctx.font = '9px "Courier New", monospace';
+            const twinTextWidth = ctx.measureText(twinText).width;
             
+            const twinLabelY = labelY + 15;
             ctx.fillStyle = '#000000A0';
-            ctx.fillRect(wormholeMapX - twinTextWidth/2 - 2, wormholeMapY + 32, twinTextWidth + 4, 12);
+            ctx.fillRect(labelX - 2, twinLabelY - 6, twinTextWidth + 4, 12);
             
             ctx.fillStyle = '#aaaaaa';
-            ctx.fillText(twinText, wormholeMapX, wormholeMapY + 42);
+            ctx.fillText(twinText, labelX, twinLabelY);
         }
         
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
         ctx.restore();
     }
 
@@ -1649,21 +1710,47 @@ export class StellarMap {
         
         const gardenName = asteroidGarden.objectName || this.namingService.generateDisplayName(asteroidGarden);
         
+        // Calculate offset position for scientific diagram style
+        const offsetDistance = 30; // Distance from garden center
+        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = gardenMapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = gardenMapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from garden edge to text
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of asteroid garden (approximate size)
+        const gardenSize = 10; // Approximate asteroid garden visual size
+        const lineStartX = gardenMapX + Math.cos(offsetAngle) * (gardenSize + 2);
+        const lineStartY = gardenMapY + Math.sin(offsetAngle) * (gardenSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
         ctx.save();
         ctx.fillStyle = '#e8f4fd';
-        ctx.font = '10px "Courier New", monospace';
-        ctx.textAlign = 'center';
+        ctx.font = this.getLabelFont();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
         
         // Draw text background for readability
         const textWidth = ctx.measureText(gardenName).width;
         const bgPadding = 3;
         ctx.fillStyle = '#000000B0';
-        ctx.fillRect(gardenMapX - textWidth/2 - bgPadding, gardenMapY + 12, textWidth + bgPadding*2, 12);
+        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
         
         // Draw label text
         ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(gardenName, gardenMapX, gardenMapY + 22);
+        ctx.fillText(gardenName, labelX, labelY);
         
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
         ctx.restore();
     }
 
@@ -1729,7 +1816,7 @@ export class StellarMap {
         
         // Draw star name at offset position
         ctx.fillStyle = '#b0c4d4';
-        ctx.font = '12px "Courier New", monospace';
+        ctx.font = this.getLabelFont();
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(starName, labelX, labelY);
@@ -2377,18 +2464,42 @@ export class StellarMap {
         
         const displayName = this.generateBlackHoleDisplayName(blackHole);
         
-        ctx.font = '11px monospace';
+        // Calculate offset position for scientific diagram style  
+        const offsetDistance = 25; // Distance from black hole center
+        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = mapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = mapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from black hole edge to text
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of black hole (approximate size)
+        const blackHoleSize = 8; // Approximate black hole visual size
+        const lineStartX = mapX + Math.cos(offsetAngle) * (blackHoleSize + 2);
+        const lineStartY = mapY + Math.sin(offsetAngle) * (blackHoleSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
+        ctx.font = this.getLabelFont();
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 3;
-        
-        const labelX = mapX + 15;
-        const labelY = mapY - 15;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
         
         // Draw text outline and fill
         ctx.strokeText(displayName, labelX, labelY);
         ctx.fillText(displayName, labelX, labelY);
         
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
         ctx.restore();
     }
 
