@@ -221,10 +221,21 @@ describe('ServiceOrchestrator', () => {
             orchestrator.emitDiscovery(discoveryData);
 
             // Check that rare sound is called after delay
-            setTimeout(() => {
-                expect(mockAudioService.playDiscoverySound).toHaveBeenCalledWith('rare');
-                done();
+            const timeoutId = setTimeout(() => {
+                try {
+                    expect(mockAudioService.playDiscoverySound).toHaveBeenCalledWith('rare');
+                    done();
+                } catch (error) {
+                    done(error);
+                }
             }, 250);
+            
+            // Clean up timeout if test fails or ends early
+            const originalDone = done;
+            done = (error) => {
+                clearTimeout(timeoutId);
+                originalDone(error);
+            };
         });
     });
 

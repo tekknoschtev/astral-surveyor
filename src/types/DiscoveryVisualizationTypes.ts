@@ -119,6 +119,7 @@ export const OBJECT_RARITY_MAP: Record<string, DiscoveryRarity> = {
     'binary-star': 'rare', // Special case for binary systems
     'asteroid-garden': 'rare',
     'nebula': 'rare',
+    'comet': 'uncommon', // Comets fit between common and rare discoveries
     
     // Ultra-Rare Objects (<1% frequency)
     'NEUTRON_STAR': 'ultra-rare',

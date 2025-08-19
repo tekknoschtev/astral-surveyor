@@ -136,6 +136,22 @@ describe('DiscoveryService Interface Tests', () => {
       const result = discoveryService.checkDiscovery(mockObject, mockCamera, 800, 600);
       expect(result).toBe(true);
     });
+    
+    it('should discover comets within discovery distance', () => {
+      mockObject.type = 'comet';
+      mockObject.discoveryDistance = 80;
+      // Distance from (100,100) to (150,150) is ~70.7, within 80
+      const result = discoveryService.checkDiscovery(mockObject, mockCamera, 800, 600);
+      expect(result).toBe(true);
+    });
+    
+    it('should not discover comets outside discovery distance', () => {
+      mockObject.type = 'comet';
+      mockObject.discoveryDistance = 50;
+      // Distance from (100,100) to (150,150) is ~70.7, outside 50
+      const result = discoveryService.checkDiscovery(mockObject, mockCamera, 800, 600);
+      expect(result).toBe(false);
+    });
   });
   
   describe('Distance Calculation', () => {
@@ -158,7 +174,7 @@ describe('DiscoveryService Interface Tests', () => {
   });
   
   describe('Discovery Type Support', () => {
-    const types = ['star', 'planet', 'moon', 'nebula', 'asteroids', 'wormhole', 'blackhole'];
+    const types = ['star', 'planet', 'moon', 'nebula', 'asteroids', 'wormhole', 'blackhole', 'comet'];
     
     types.forEach(type => {
       it(`should support discovery checking for ${type}`, () => {

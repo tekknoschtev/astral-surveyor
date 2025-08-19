@@ -64,6 +64,25 @@ export const WorldConfig = {
         blackHoles: {
             spawnChance: 0.000001,      // 0.0001% chance (ultra rare - 1 in 1,000,000)
             minDistance: 2000,          // 2000px minimum distance from any major object
+        },
+        comets: {
+            spawnChance: 0.20,          // 20% of star systems have comets
+            countDistribution: {
+                none: 0.80,             // 80% of systems have no comets
+                single: 0.15,           // 15% have 1 comet  
+                multiple: 0.05,         // 5% have 2-3 comets
+            },
+            orbit: {
+                semiMajorAxis: { min: 300, max: 1500 },
+                eccentricity: { min: 0.6, max: 0.95 },
+                period: { min: 5000, max: 20000 },
+                visibilityThreshold: 3.0,
+            },
+            visual: {
+                nucleusSize: { min: 2, max: 4 },
+                maxTailLength: { min: 80, max: 150 },
+                minTailLength: { min: 10, max: 20 },
+            }
         }
     },
     
@@ -190,6 +209,7 @@ export const DiscoveryConfig = {
         moon: 100,
         nebula: 300,
         asteroidGarden: 250,
+        comet: 275,             // Between asteroids (250) and nebulae (300)
         wormhole: 400,
         blackHole: 600,
     },
@@ -201,6 +221,7 @@ export const DiscoveryConfig = {
         moon: 8,
         nebula: 50,          // Rare objects worth more
         asteroidGarden: 25,
+        comet: 35,           // Between asteroids (25) and nebulae (50)
         wormhole: 200,       // Very rare
         blackHole: 500,      // Ultra rare
     },
