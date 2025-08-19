@@ -16,6 +16,7 @@ import { SoundManager } from './audio/soundmanager.js';
 import { GameConfig } from './config/gameConfig.js';
 import { DiscoveryManager } from './services/DiscoveryManager.js';
 import { StateManager } from './services/StateManager.js';
+import { DebugSpawner } from './debug/debug-spawner.js';
 // Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
@@ -26,9 +27,6 @@ import {
     getUniverseResetCount
 } from './utils/random.js';
 // Note: Will add proper types in future phases when we extract celestial classes
-
-// Debug spawner import (development builds only)
-let DebugSpawner: typeof import('./debug/debug-spawner.js').DebugSpawner | null = null;
 
 // Interface definitions
 interface GameStartingPosition {
@@ -537,12 +535,6 @@ export class Game {
     handleDebugInput(): void {
         // Only process debug input if debug mode is enabled
         if (!this.debugModeEnabled) {
-            return;
-        }
-
-        // Lazy load debug spawner only when needed (skip debug if not loaded)
-        if (!DebugSpawner) {
-            // Skip debug functionality if module isn't loaded yet
             return;
         }
 
