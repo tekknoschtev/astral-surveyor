@@ -331,7 +331,7 @@ export class Game {
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.asteroidGardens, discovered.blackHoles);
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);
