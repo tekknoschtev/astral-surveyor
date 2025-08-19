@@ -528,7 +528,7 @@ export class StellarMap {
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -551,11 +551,13 @@ export class StellarMap {
         let closestStar: StarLike | null = null;
         let closestPlanet: PlanetLike | null = null;
         let closestNebula: NebulaLike | null = null;
+        let closestWormhole: WormholeLike | null = null;
         let closestAsteroidGarden: AsteroidGardenLike | null = null;
         let closestBlackHole: BlackHoleLike | null = null;
         let closestStarDistance = Infinity;
         let closestPlanetDistance = Infinity;
         let closestNebulaDistance = Infinity;
+        let closestWormholeDistance = Infinity;
         let closestAsteroidGardenDistance = Infinity;
         let closestBlackHoleDistance = Infinity;
         const hoverThreshold = 15; // Slightly larger than click threshold for better UX
@@ -623,6 +625,26 @@ export class StellarMap {
             }
         }
         
+        // Check for wormhole hover (visible at all zoom levels)
+        if (discoveredWormholes) {
+            for (const wormhole of discoveredWormholes) {
+                const wormholeMapX = mapX + mapWidth/2 + (wormhole.x - this.centerX) * worldToMapScale;
+                const wormholeMapY = mapY + mapHeight/2 + (wormhole.y - this.centerY) * worldToMapScale;
+                
+                // Use larger hover threshold for wormholes due to their vortex effect
+                const wormholeHoverThreshold = Math.max(25, hoverThreshold);
+                if (wormholeMapX >= mapX && wormholeMapX <= mapX + mapWidth && 
+                    wormholeMapY >= mapY && wormholeMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - wormholeMapX)**2 + (mouseY - wormholeMapY)**2);
+                    if (distance <= wormholeHoverThreshold && distance < closestWormholeDistance) {
+                        closestWormhole = wormhole;
+                        closestWormholeDistance = distance;
+                    }
+                }
+            }
+        }
+        
         // Check for asteroid garden hover
         if (discoveredAsteroidGardens) {
             for (const asteroidGarden of discoveredAsteroidGardens) {
@@ -663,17 +685,26 @@ export class StellarMap {
             }
         }
         
-        // Set hover state (prioritize order: planets > nebulae > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+        // Set hover state (prioritize order: planets > nebulae > wormholes > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.hoveredPlanet = closestPlanet;
             this.hoveredStar = null;
             this.hoveredNebula = null;
+            this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.hoveredNebula = closestNebula;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
+            this.hoveredWormhole = null;
+            this.hoveredBlackHole = null;
+            this.hoveredAsteroidGarden = null;
+        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.hoveredWormhole = closestWormhole;
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
+            this.hoveredNebula = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
         } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
@@ -681,23 +712,27 @@ export class StellarMap {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredWormhole = null;
             this.hoveredAsteroidGarden = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.hoveredAsteroidGarden = closestAsteroidGarden;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
         } else if (closestStar) {
             this.hoveredStar = closestStar;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
         } else {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
         }
@@ -1878,13 +1913,15 @@ export class StellarMap {
         const coordWidth = ctx.measureText(coordText).width;
         ctx.fillText(coordText, canvas.width - coordWidth - 20, canvas.height - 50);
         
-        // Information panel for selected star, planet, nebula, black hole, or asteroid garden
+        // Information panel for selected star, planet, nebula, wormhole, black hole, or asteroid garden
         if (this.selectedStar && this.namingService) {
             this.renderStarInfoPanel(ctx, canvas);
         } else if (this.selectedPlanet && this.namingService) {
             this.renderPlanetInfoPanel(ctx, canvas);
         } else if (this.selectedNebula && this.namingService) {
             this.renderNebulaInfoPanel(ctx, canvas);
+        } else if (this.selectedWormhole && this.namingService) {
+            this.renderWormholeInfoPanel(ctx, canvas);
         } else if (this.selectedBlackHole && this.namingService) {
             this.renderBlackHoleInfoPanel(ctx, canvas);
         } else if (this.selectedAsteroidGarden && this.namingService) {
@@ -2167,6 +2204,74 @@ export class StellarMap {
             const dateStr = date.toLocaleDateString();
             ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
         }
+    }
+
+    renderWormholeInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        if (!this.selectedWormhole || !this.namingService) return;
+        
+        // Panel dimensions and position (same as other panels)
+        const panelWidth = 300;
+        const panelHeight = 140; // Slightly taller for wormhole-specific info
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background (same style as other panels)
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel content (same style as other panels)
+        ctx.fillStyle = '#b0c4d4';
+        ctx.font = '12px "Courier New", monospace';
+        
+        let lineY = panelY + 20;
+        const lineHeight = 14;
+        
+        // Wormhole designation
+        const wormholeName = this.generateWormholeDisplayName(this.selectedWormhole);
+        ctx.fillText(`Designation: ${wormholeName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Wormhole type and designation
+        const designation = this.selectedWormhole.designation === 'alpha' ? 'α (Primary)' : 'β (Secondary)';
+        ctx.fillText(`Type: Stable Traversable (${designation})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Twin coordinates
+        ctx.fillText(`Twin Location: (${Math.round(this.selectedWormhole.twinX)}, ${Math.round(this.selectedWormhole.twinY)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Current position
+        ctx.fillText(`Position: (${Math.round(this.selectedWormhole.x)}, ${Math.round(this.selectedWormhole.y)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Wormhole ID (for scientific reference)
+        ctx.fillText(`ID: ${this.selectedWormhole.wormholeId}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Discovery timestamp if available
+        if (this.selectedWormhole.timestamp) {
+            const date = new Date(this.selectedWormhole.timestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
+    }
+
+    generateWormholeDisplayName(wormhole: WormholeLike): string {
+        // Use stored wormhole name from discovery data if available
+        if (wormhole.objectName) {
+            return wormhole.objectName;
+        }
+
+        // Fallback to naming service if no stored name
+        if (!this.namingService) {
+            return `${wormhole.wormholeId}-${wormhole.designation === 'alpha' ? 'α' : 'β'}`;
+        }
+
+        const displayName = this.namingService.generateDisplayName(wormhole);
+        return displayName || `${wormhole.wormholeId}-${wormhole.designation === 'alpha' ? 'α' : 'β'}`;
     }
 
     generateAsteroidGardenDisplayName(asteroidGarden: AsteroidGardenLike): string {

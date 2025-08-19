@@ -260,7 +260,9 @@ export class StateManager {
             
             // CRITICAL FIX: Add beta wormhole to discovery database so it appears on stellar map
             // This ensures wormhole pairs show connection lines on the stellar map
-            chunkManager.markObjectDiscovered(betaWormhole);
+            // Generate proper wormhole name for discovery database
+            const betaWormholeName = `${betaWormhole.wormholeId}-${betaWormhole.designation === 'alpha' ? 'α' : 'β'}`;
+            chunkManager.markObjectDiscovered(betaWormhole, betaWormholeName);
         }
         
         // CRITICAL: Reset animation state to prevent rendering corruption
