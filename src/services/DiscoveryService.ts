@@ -12,7 +12,7 @@ interface CameraInterface {
 interface DiscoverableObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
     discoveryDistance?: number;
     radius?: number;
     discovered: boolean;
@@ -66,9 +66,15 @@ export class DiscoveryService {
      * Check discovery based on distance to camera
      */
     private checkDistanceBasedDiscovery(object: DiscoverableObject, camera: CameraInterface): boolean {
-        const distance = this.distanceToShip(object, camera);
-        const discoveryDistance = object.discoveryDistance || 50; // Default discovery distance
+        // Use default only if discoveryDistance is undefined/null, not if it's 0
+        const discoveryDistance = object.discoveryDistance !== undefined ? object.discoveryDistance : 50;
         
+        // Special case: discoveryDistance = 0 means not discoverable at any distance
+        if (discoveryDistance <= 0) {
+            return false;
+        }
+        
+        const distance = this.distanceToShip(object, camera);
         return distance <= discoveryDistance;
     }
     

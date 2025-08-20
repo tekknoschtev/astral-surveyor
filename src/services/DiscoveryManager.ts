@@ -10,7 +10,7 @@ import { generateShareableURL } from '../utils/random.js';
 
 // Interface for celestial objects in discovery context
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
     x: number;
     y: number;
     id?: string;

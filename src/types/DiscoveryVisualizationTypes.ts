@@ -83,11 +83,32 @@ export const ULTRA_RARE_COLORS: Record<string, string> = {
     'binary-star': '#ffd700'   // Gold for binary systems
 };
 
+// Special discovery effects for specific object types
+export const SPECIAL_DISCOVERY_EFFECTS: Record<string, Partial<DiscoveryVisualizationConfig>> = {
+    'comet': {
+        color: '#87CEEB', // Ice-blue color matching comet tails
+        pulseColor: '#E0FFFF', // Brighter ice-white for pulses
+        hasDiscoveryPulse: true, // Comets get discovery pulses like rare objects
+        hasOngoingPulse: false,  // But no ongoing pulse (they're dynamic enough)
+        dashPattern: [12, 8, 4, 8], // Special dash pattern like a tail
+        lineWidth: 1.8 // Slightly thicker than standard uncommon
+    }
+};
+
 // Default discovery pulse settings
 export const DISCOVERY_PULSE_CONFIG = {
     duration: 2500, // 2.5 seconds
     maxRadiusMultiplier: 2.5, // Pulse expands to 2.5x the base radius
     fadeOutStart: 0.3 // Start fading when pulse is 30% complete
+};
+
+// Special pulse settings for specific object types
+export const SPECIAL_PULSE_CONFIGS: Record<string, Partial<typeof DISCOVERY_PULSE_CONFIG>> = {
+    'comet': {
+        duration: 3000, // Longer pulse duration for comets (like their orbital visibility)
+        maxRadiusMultiplier: 2.8, // Slightly larger pulse to represent tail reach
+        fadeOutStart: 0.2 // Fade out earlier for a more ethereal effect
+    }
 };
 
 export const ONGOING_PULSE_CONFIG = {
@@ -119,6 +140,7 @@ export const OBJECT_RARITY_MAP: Record<string, DiscoveryRarity> = {
     'binary-star': 'rare', // Special case for binary systems
     'asteroid-garden': 'rare',
     'nebula': 'rare',
+    'comet': 'uncommon', // Comets fit between common and rare discoveries
     
     // Ultra-Rare Objects (<1% frequency)
     'NEUTRON_STAR': 'ultra-rare',

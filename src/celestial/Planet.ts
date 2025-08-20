@@ -335,12 +335,16 @@ export class Planet extends CelestialObject {
         ctx.strokeStyle = this.lightenColor(this.color, 0.2);
         ctx.lineWidth = 1;
         
+        // Use deterministic positioning based on planet position
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 7777); // Offset for swirl-specific variation
+        
         // Draw multiple swirl patterns
         for (let i = 0; i < 3; i++) {
             const swirl = {
-                x: centerX + (Math.random() - 0.5) * this.radius,
-                y: centerY + (Math.random() - 0.5) * this.radius,
-                radius: 3 + Math.random() * 5,
+                x: centerX + (rng.next() - 0.5) * this.radius,
+                y: centerY + (rng.next() - 0.5) * this.radius,
+                radius: 3 + rng.next() * 5,
                 rotation: time * (0.1 + i * 0.05)
             };
             
@@ -404,15 +408,19 @@ export class Planet extends CelestialObject {
         ctx.strokeStyle = crystalColor;
         ctx.lineWidth = 1;
         
+        // Use deterministic positioning based on planet position
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 8888); // Offset for crystal-specific variation
+        
         // Draw several crystalline formations
         for (let i = 0; i < 6; i++) {
             const angle = (i / 6) * Math.PI * 2;
-            const distance = Math.random() * this.radius * 0.5;
+            const distance = rng.next() * this.radius * 0.5;
             const crystalX = centerX + Math.cos(angle) * distance;
             const crystalY = centerY + Math.sin(angle) * distance;
             
             // Draw a simple crystal shape (diamond)
-            const crystalSize = 2 + Math.random() * 3;
+            const crystalSize = 2 + rng.next() * 3;
             ctx.beginPath();
             ctx.moveTo(crystalX, crystalY - crystalSize);
             ctx.lineTo(crystalX + crystalSize, crystalY);
@@ -429,6 +437,10 @@ export class Planet extends CelestialObject {
         ctx.strokeStyle = lavaColor;
         ctx.lineWidth = 2;
         
+        // Use deterministic positioning based on planet position
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 9999); // Offset for lava-specific variation
+        
         // Draw flowing lava streams
         for (let i = 0; i < 3; i++) {
             const startAngle = (i / 3) * Math.PI * 2;
@@ -443,8 +455,8 @@ export class Planet extends CelestialObject {
             let currentY = startY;
             
             for (let j = 0; j < 5; j++) {
-                currentX += (Math.random() - 0.5) * 8;
-                currentY += (Math.random() - 0.5) * 8;
+                currentX += (rng.next() - 0.5) * 8;
+                currentY += (rng.next() - 0.5) * 8;
                 
                 // Keep within planet bounds
                 const distFromCenter = Math.sqrt((currentX - centerX) ** 2 + (currentY - centerY) ** 2);

@@ -209,7 +209,7 @@ describe('ServiceOrchestrator', () => {
             expect(rareHandler).toHaveBeenCalledWith(discoveryData, expect.any(Object));
         });
 
-        it('should play additional rare discovery sound for rare objects', (done) => {
+        it('should play additional rare discovery sound for rare objects', async () => {
             const discoveryData = {
                 objectType: 'nebula',
                 objectId: 'nebula_100_200',
@@ -220,11 +220,10 @@ describe('ServiceOrchestrator', () => {
 
             orchestrator.emitDiscovery(discoveryData);
 
-            // Check that rare sound is called after delay
-            setTimeout(() => {
-                expect(mockAudioService.playDiscoverySound).toHaveBeenCalledWith('rare');
-                done();
-            }, 250);
+            // Wait for rare sound to be called after delay
+            await new Promise(resolve => setTimeout(resolve, 250));
+            
+            expect(mockAudioService.playDiscoverySound).toHaveBeenCalledWith('rare');
         });
     });
 

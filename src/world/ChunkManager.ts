@@ -8,6 +8,7 @@ import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
+import { Comet, selectCometType } from '../celestial/comets.js';
 import { GameConfig } from '../config/gameConfig.js';
 
 // Interface definitions
@@ -35,6 +36,7 @@ interface Chunk {
     asteroidGardens: AsteroidGarden[];
     wormholes: Wormhole[];
     blackholes: BlackHole[];
+    comets: Comet[];
 }
 
 interface ActiveObjects {
@@ -46,6 +48,7 @@ interface ActiveObjects {
     asteroidGardens: AsteroidGarden[];
     wormholes: Wormhole[];
     blackholes: BlackHole[];
+    comets: Comet[];
 }
 
 interface NebulaTypeData {
@@ -238,7 +241,8 @@ export class ChunkManager {
             nebulae: [], // Beautiful gas clouds for tranquil exploration
             asteroidGardens: [], // Scattered fields of glittering rocks
             wormholes: [], // Extremely rare spacetime anomalies for FTL travel
-            blackholes: [] // Ultra-rare cosmic phenomena with universe reset
+            blackholes: [], // Ultra-rare cosmic phenomena with universe reset
+            comets: [] // Elliptical orbital objects around stars
         };
 
         // Generate stars for this chunk
@@ -431,6 +435,9 @@ export class ChunkManager {
                 // Generate moons for this planet based on rarity rules
                 this.generateMoonsForPlanet(planet, starSystemRng, chunk);
             }
+            
+            // Generate comets for this star system based on configuration
+            this.generateCometsForStarSystem(star, starSystemRng, chunk);
         }
 
         // Generate nebulae for this chunk (separate from star systems)
@@ -652,7 +659,7 @@ export class ChunkManager {
     }
 
     getAllActiveObjects(): ActiveObjects {
-        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [] };
+        const objects: ActiveObjects = { stars: [], planets: [], moons: [], celestialStars: [], nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: [] };
         
         for (const chunk of this.activeChunks.values()) {
             objects.stars.push(...chunk.stars);
@@ -663,6 +670,7 @@ export class ChunkManager {
             objects.asteroidGardens.push(...chunk.asteroidGardens);
             objects.wormholes.push(...chunk.wormholes);
             objects.blackholes.push(...chunk.blackholes);
+            objects.comets.push(...chunk.comets);
         }
 
         return objects;
@@ -1272,6 +1280,84 @@ export class ChunkManager {
         return score;
     }
     
+    // Generate comets for a star system based on configuration
+    generateCometsForStarSystem(star: Star, rng: SeededRandom, chunk: Chunk): void {
+        const config = GameConfig.world.specialObjects.comets;
+        
+        // Check if this star system should have comets (20% chance)
+        if (rng.nextFloat(0, 1) >= config.spawnChance) {
+            return; // No comets for this star system
+        }
+        
+        // Determine number of comets based on distribution
+        const countRoll = rng.nextFloat(0, 1);
+        let cometCount = 0;
+        
+        if (countRoll < config.countDistribution.none) {
+            cometCount = 0; // 80% - no comets
+        } else if (countRoll < config.countDistribution.none + config.countDistribution.single) {
+            cometCount = 1; // 15% - single comet
+        } else {
+            cometCount = rng.nextInt(2, 3); // 5% - multiple comets (2-3)
+        }
+        
+        if (cometCount === 0) return;
+        
+        for (let i = 0; i < cometCount; i++) {
+            // Generate orbital parameters using configuration ranges
+            const semiMajorAxis = rng.nextFloat(
+                config.orbit.semiMajorAxis.min,
+                config.orbit.semiMajorAxis.max
+            );
+            
+            const eccentricity = rng.nextFloat(
+                config.orbit.eccentricity.min,
+                config.orbit.eccentricity.max
+            );
+            
+            const period = rng.nextFloat(
+                config.orbit.period.min,
+                config.orbit.period.max
+            );
+            
+            // Random argument of periapsis (orientation of ellipse)
+            const argumentOfPeriapsis = rng.nextFloat(0, Math.PI * 2);
+            
+            // Random starting mean anomaly (position in orbit)
+            const meanAnomalyAtEpoch = rng.nextFloat(0, Math.PI * 2);
+            
+            // Calculate derived orbital parameters
+            const perihelionDistance = semiMajorAxis * (1 - eccentricity);
+            const aphelionDistance = semiMajorAxis * (1 + eccentricity);
+            const epoch = 0; // Use 0 as epoch for all comets
+            
+            // Create orbital parameters object
+            const orbit = {
+                semiMajorAxis,
+                eccentricity,
+                perihelionDistance,
+                aphelionDistance,
+                orbitalPeriod: period,
+                argumentOfPerihelion: argumentOfPeriapsis,
+                meanAnomalyAtEpoch,
+                epoch
+            };
+            
+            // Select comet type based on rarity
+            const cometType = selectCometType(rng);
+            
+            // Calculate initial position (start at perihelion for visibility)
+            const initialX = star.x + perihelionDistance * Math.cos(argumentOfPeriapsis);
+            const initialY = star.y + perihelionDistance * Math.sin(argumentOfPeriapsis);
+            
+            // Create the comet
+            const comet = new Comet(initialX, initialY, star, orbit, cometType, i);
+            
+            // Add to chunk
+            chunk.comets.push(comet);
+        }
+    }
+
     // Generate moons for a planet based on rarity rules
     generateMoonsForPlanet(planet: Planet, rng: SeededRandom, chunk: Chunk): void {
         // Determine moon probability based on planet type and size

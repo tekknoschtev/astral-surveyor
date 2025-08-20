@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet';
 }
 
 interface Star extends CelestialObject {
@@ -53,6 +53,18 @@ interface AsteroidGarden extends CelestialObject {
     gardenType?: string;
     gardenTypeData?: {
         name: string;
+    };
+}
+
+interface Comet extends CelestialObject {
+    type: 'comet';
+    parentStar?: Star;
+    cometIndex?: number;
+    cometType?: {
+        name: string;
+        rarity: number;
+        discoveryValue: number;
+        description: string;
     };
 }
 
@@ -424,7 +436,7 @@ export class NamingService {
      * Generate short display name for UI contexts
      * Examples: "ASV-2847", "ASV-2847 b"
      */
-    generateDisplayName(object: Star | Planet | Moon | Nebula | Wormhole | AsteroidGarden | BlackHole): string {
+    generateDisplayName(object: any): string {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || ('starTypeName' in object && object.starTypeName)) {
             const catalogNumber = this.generateStarCatalogNumber(object.x, object.y);
@@ -441,6 +453,8 @@ export class NamingService {
             return this.generateBlackHoleName(object as BlackHole);
         } else if (object.type === 'asteroids') {
             return this.generateAsteroidGardenName(object);
+        } else if (object.type === 'comet') {
+            return this.generateCometName(object);
         }
         
         return 'Unknown Object';
@@ -450,7 +464,7 @@ export class NamingService {
      * Generate full scientific designation with all details
      * Used for detailed information panels and exports
      */
-    generateFullDesignation(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | AsteroidGarden): FullDesignation | null {
+    generateFullDesignation(object: any): FullDesignation | null {
         // Handle both full objects and discovered star data
         if (object.type === 'star' || ('starTypeName' in object && object.starTypeName)) {
             const standardName = this.generateStarName(object as Star);
@@ -513,6 +527,18 @@ export class NamingService {
                 type: garden.gardenTypeData?.name || 'Asteroid Garden',
                 classification: this.getAsteroidGardenClassification(garden.gardenType)
             };
+        } else if (object.type === 'comet') {
+            const comet = object as Comet;
+            const cometName = this.generateCometName(comet);
+            const coordName = this.generateCoordinateDesignation(comet.x, comet.y);
+            const parentStarName = comet.parentStar ? this.generateDisplayName(comet.parentStar) : 'Unknown Star';
+            return {
+                catalog: cometName,
+                coordinate: coordName,
+                type: comet.cometType?.name || 'Comet',
+                classification: this.getCometClassification(comet.cometType?.name),
+                parentStar: parentStarName
+            };
         }
         
         return null;
@@ -521,7 +547,7 @@ export class NamingService {
     /**
      * Check if an object deserves special recognition (rare discoveries)
      */
-    isNotableDiscovery(object: Star | Planet | Moon | Nebula | Wormhole | BlackHole | AsteroidGarden): boolean {
+    isNotableDiscovery(object: any): boolean {
         if (object.type === 'star') {
             const rareStars = ['Neutron Star', 'White Dwarf', 'Blue Giant', 'Red Giant'];
             return rareStars.includes(object.starTypeName);
@@ -541,6 +567,9 @@ export class NamingService {
             // Rare mineral, crystalline, and icy gardens are notable
             const rareGardens = ['rare_minerals', 'crystalline', 'icy'];
             return rareGardens.includes(object.gardenType);
+        } else if (object.type === 'comet') {
+            // Organic comets are rare and notable, others are uncommon but significant
+            return object.cometType?.name === 'Organic Comet';
         }
         
         return false;
@@ -573,5 +602,39 @@ export class NamingService {
         };
         
         return gardenType ? classifications[gardenType] || null : null;
+    }
+
+    /**
+     * Get comet classification for scientific designation
+     */
+    private getCometClassification(cometTypeName?: string): string | null {
+        const classifications: Record<string, string> = {
+            'Ice Comet': 'H2O-Rich (Periodic Visitor)',
+            'Dust Comet': 'Silicate-Rich (Debris Trail)',
+            'Rocky Comet': 'Metal-Rich (Dense Core)',
+            'Organic Comet': 'Carbon-Rich (Primordial Composition)'
+        };
+        
+        return cometTypeName ? classifications[cometTypeName] || null : null;
+    }
+    
+    /**
+     * Generate comet designation following real astronomical conventions
+     * Format: C/YEAR-SNN (e.g., C/2024-S02)
+     */
+    generateCometName(comet: any): string {
+        // Use parent star position and comet index to create consistent designation
+        const starX = comet.parentStar?.x || comet.x;
+        const starY = comet.parentStar?.y || comet.y;
+        const cometIndex = comet.cometIndex || 0;
+        
+        // Generate year from coordinate hash (keeps names consistent)
+        const coordHash = Math.abs(this.hashCoordinate(starX) ^ this.hashCoordinate(starY));
+        const year = 2020 + (coordHash % 10); // Years 2020-2029
+        
+        // Generate sequence number (S01, S02, etc.)
+        const sequenceNumber = (cometIndex + 1).toString().padStart(2, '0');
+        
+        return `C/${year}-S${sequenceNumber}`;
     }
 }

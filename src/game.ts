@@ -36,7 +36,7 @@ interface GameStartingPosition {
 
 // Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
     x: number;
     y: number;
     id?: string;
@@ -73,6 +73,7 @@ interface ActiveObjects {
     wormholes: CelestialObject[];
     blackholes: CelestialObject[];
     asteroidGardens: CelestialObject[];
+    comets: CelestialObject[];
 }
 
 interface TraversalDestination {
@@ -342,7 +343,7 @@ export class Game {
         
         // Get active celestial objects for physics and discovery
         const activeObjects = this.chunkManager.getAllActiveObjects();
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets];
         
         // Update orbital positions and animations for all celestial objects
         this.updateCelestialObjects(activeObjects, deltaTime);
@@ -401,6 +402,16 @@ export class Game {
         for (const moon of activeObjects.moons) {
             if (moon.updatePosition) {
                 moon.updatePosition(deltaTime);
+            }
+        }
+        
+        // Update comet orbital positions and visual properties
+        for (const comet of activeObjects.comets) {
+            if (comet.updatePosition) {
+                comet.updatePosition(deltaTime);
+            }
+            if (comet.update) {
+                comet.update(deltaTime);
             }
         }
         

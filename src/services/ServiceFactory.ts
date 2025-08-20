@@ -4,6 +4,8 @@
 import { DIContainer } from './DIContainer.js';
 import { ConfigService } from '../config/ConfigService.js';
 import { DiscoveryService } from './DiscoveryService.js';
+import { WorldService } from './WorldService.js';
+import { CelestialService } from './CelestialService.js';
 
 export class ServiceFactory {
     private static instance: ServiceFactory | null = null;
@@ -80,10 +82,15 @@ export class ServiceFactory {
             return new DiscoveryService();
         });
 
-        // Example of a service with dependencies (for future use)
-        // this.container.registerSingleton('world', (deps) => {
-        //     return new WorldService(deps.config, deps.discovery);
-        // }, ['config', 'discovery']);
+        // World Service (depends on config and discovery)
+        this.container.registerSingleton('world', (deps) => {
+            return new WorldService(deps.config, deps.discovery);
+        }, ['config', 'discovery']);
+
+        // Celestial Service (depends on config, discovery, and world)
+        this.container.registerSingleton('celestial', (deps) => {
+            return new CelestialService(deps.config, deps.discovery, deps.world);
+        }, ['config', 'discovery', 'world']);
     }
 
     /**

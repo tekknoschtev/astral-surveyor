@@ -77,8 +77,22 @@ interface BlackHoleLike {
     timestamp?: number;
 }
 
+interface CometLike {
+    x: number;
+    y: number;
+    cometType?: {
+        name: string;
+        tailColors?: string[];
+        nucleusColor?: string;
+    };
+    parentStarX?: number;
+    parentStarY?: number;
+    objectName?: string;
+    timestamp?: number;
+}
+
 // Union type for all discoverable objects
-type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | AsteroidGardenLike | BlackHoleLike;
+type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | AsteroidGardenLike | BlackHoleLike | CometLike;
 
 interface NamingService {
     generateDisplayName(object: DiscoverableObject): string;
