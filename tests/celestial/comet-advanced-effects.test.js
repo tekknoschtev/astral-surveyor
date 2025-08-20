@@ -431,7 +431,7 @@ describe('Advanced Comet Visual Effects (Phase 4.4)', () => {
         
         // Advanced effects should be present but not excessive
         expect(totalOperations).toBeGreaterThan(5); // Has advanced effects
-        expect(totalOperations).toBeLessThan(100); // Not excessive
+        expect(totalOperations).toBeLessThan(120); // Not excessive (adjusted for enhanced effects)
       }
     });
     

@@ -183,6 +183,16 @@ describe('Comet Visibility-Based Discovery Tests', () => {
         expect(perihelionComet.tailLength).toBeGreaterThan(aphelionComet.tailLength);
         expect(perihelionComet.discoveryDistance).toBeGreaterThan(aphelionComet.discoveryDistance);
         expect(perihelionComet.nucleusBrightness).toBeGreaterThan(aphelionComet.nucleusBrightness);
+      } else {
+        // If one isn't visible, at least verify the visible one has properties within expected ranges
+        if (perihelionComet.isVisible) {
+          expect(perihelionComet.tailLength).toBeGreaterThanOrEqual(30);
+          expect(perihelionComet.nucleusBrightness).toBeGreaterThan(0.5);
+        }
+        if (aphelionComet.isVisible) {
+          expect(aphelionComet.tailLength).toBeGreaterThanOrEqual(30);
+          expect(aphelionComet.nucleusBrightness).toBeGreaterThan(0);
+        }
       }
     });
   });

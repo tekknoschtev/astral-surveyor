@@ -342,7 +342,7 @@ export class Comet extends CelestialObject {
         
         // Determine visibility based on distance threshold
         // Use configured visibility threshold from gameConfig
-        const visibilityThreshold = this.orbit.perihelionDistance * DiscoveryConfig.distances.comet / 50; // Dynamic based on orbit
+        const visibilityThreshold = this.orbit.perihelionDistance * DiscoveryConfig.distances.comet / 40; // More generous visibility (was /50)
         this.isVisible = this.currentDistance <= visibilityThreshold;
         
         if (!this.isVisible) {
@@ -358,17 +358,17 @@ export class Comet extends CelestialObject {
         
         // Update tail length (longer when closer to star)
         const baseTailLength = 30; // Minimum tail length when visible
-        const maxTailLength = 120; // Maximum tail length at perihelion
-        // Ensure brightnessFactor >= 1 before subtracting 1 to prevent negative values
-        const scaledBrightness = Math.max(0, Math.min(brightnessFactor - 1, 2));
+        const maxTailLength = 150; // Maximum tail length at perihelion (increased for more drama)
+        // Scale from 0 to 1 based on how much closer the comet is than baseline
+        const scaledBrightness = Math.max(0, Math.min((brightnessFactor - 0.8) / 1.2, 1));
         this.tailLength = baseTailLength + (maxTailLength - baseTailLength) * scaledBrightness;
         
         // Update nucleus brightness
         this.nucleusBrightness = Math.min(brightnessFactor, 2.0);
         
         // Update coma radius (fuzzy glow around nucleus)
-        const scaledComaFactor = Math.max(0, Math.min(brightnessFactor - 1, 1));
-        this.comaRadius = 3 + 7 * scaledComaFactor;
+        const scaledComaFactor = Math.max(0, Math.min((brightnessFactor - 0.8) / 1.2, 1));
+        this.comaRadius = 3 + 10 * scaledComaFactor; // Increased from 7 to 10 for more dramatic coma
         
         // Set discovery distance based on visibility
         this.discoveryDistance = this.isVisible ? Math.max(30, this.tailLength + 20) : 0;

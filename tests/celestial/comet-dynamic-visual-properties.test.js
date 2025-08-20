@@ -284,10 +284,10 @@ describe('Dynamic Comet Visual Properties (Phase 4.2)', () => {
       comet.updateVisualProperties();
       
       if (comet.isVisible) {
-        // Coma radius calculation: 3 + 7 * scaledComaFactor
+        // Coma radius calculation: 3 + 10 * scaledComaFactor (updated scaling)
         const brightnessFactor = testOrbit.perihelionDistance / comet.currentDistance;
-        const scaledComaFactor = Math.max(0, Math.min(brightnessFactor - 1, 1));
-        const expectedComaRadius = 3 + 7 * scaledComaFactor;
+        const scaledComaFactor = Math.max(0, Math.min((brightnessFactor - 0.8) / 1.2, 1));
+        const expectedComaRadius = 3 + 10 * scaledComaFactor;
         
         expect(comet.comaRadius).toBeCloseTo(expectedComaRadius, 1);
         expect(comet.comaRadius).toBeGreaterThan(0);
