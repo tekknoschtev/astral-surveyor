@@ -397,13 +397,28 @@ export class CommandRegistry {
                     break;
                     
                 case 'star':
+                    DebugSpawner.spawnStar(context.camera, context.chunkManager, variant, true);
+                    console.log(`⭐ Spawned ${variant || 'random'} star for testing`);
+                    break;
+                    
                 case 'planet':
+                    DebugSpawner.spawnPlanet(context.camera, context.chunkManager, variant, true);
+                    console.log(`🪐 Spawned ${variant || 'random'} planet for testing`);
+                    break;
+                    
                 case 'nebula':
+                    DebugSpawner.spawnNebula(context.camera, context.chunkManager, variant, true);
+                    console.log(`🌌 Spawned ${variant || 'random'} nebula for testing`);
+                    break;
+                    
                 case 'asteroid':
+                    DebugSpawner.spawnAsteroidGarden(context.camera, context.chunkManager, variant, true);
+                    console.log(`🪨 Spawned ${variant || 'random'} asteroid garden for testing`);
+                    break;
+                    
                 case 'comet':
-                    // Enhanced spawning will be implemented in Phase 2 enhancement
-                    console.log(`📋 Enhanced spawning for ${objectType} not yet implemented`);
-                    console.log(`   Use existing debug hotkeys: Shift+W (wormhole), Shift+B (blackhole)`);
+                    DebugSpawner.spawnComet(context.camera, context.chunkManager, variant, true);
+                    console.log(`☄️ Spawned ${variant || 'random'} comet for testing`);
                     break;
                     
                 default:
