@@ -17,6 +17,8 @@ import { GameConfig } from './config/gameConfig.js';
 import { DiscoveryManager } from './services/DiscoveryManager.js';
 import { StateManager } from './services/StateManager.js';
 import { DebugSpawner } from './debug/debug-spawner.js';
+import { DeveloperConsole } from './debug/DeveloperConsole.js';
+import { CommandRegistry } from './debug/CommandRegistry.js';
 // Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
@@ -102,6 +104,8 @@ export class Game {
     soundManager: SoundManager;
     discoveryManager: DiscoveryManager;
     stateManager: StateManager;
+    commandRegistry: CommandRegistry;
+    developerConsole: DeveloperConsole;
     
     // Expose properties for backward compatibility with tests
     get lastBlackHoleWarnings() {
@@ -159,6 +163,14 @@ export class Game {
             this.discoveryDisplay,
             this.discoveryLogbook,
             this.namingService
+        );
+        
+        // Initialize developer console
+        this.commandRegistry = new CommandRegistry();
+        this.developerConsole = new DeveloperConsole(
+            this.commandRegistry,
+            this.camera,
+            this.chunkManager
         );
         
         // Connect naming service to stellar map
@@ -271,6 +283,19 @@ export class Game {
         // Handle coordinate copying (C key)
         if (this.input.wasJustPressed('KeyC')) {
             this.copyCurrentCoordinates();
+        }
+        
+        // Handle developer console toggle (tilde key)
+        if (this.input.isConsoleTogglePressed()) {
+            this.developerConsole.toggle();
+            // Route keyboard input to console when active
+            if (this.developerConsole.isActive()) {
+                this.input.setConsoleInputHandler((event: KeyboardEvent) => 
+                    this.developerConsole.handleKeyInput(event)
+                );
+            } else {
+                this.input.setConsoleInputHandler(null);
+            }
         }
         
         // Handle map toggle (M key)
@@ -711,6 +736,9 @@ export class Game {
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
+        
+        // Render developer console (on top of everything else)
+        this.developerConsole.render(this.renderer);
         
         // Render transition fade effects (on top of everything)
         if (fadeAlpha > 0) {
