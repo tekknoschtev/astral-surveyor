@@ -252,13 +252,13 @@ export class DeveloperConsole {
         for (const message of visibleMessages) {
             switch (message.type) {
                 case 'command':
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = '#e8f4fd'; // Bright blue-white for commands (matches stellar map)
                     break;
                 case 'output':
-                    ctx.fillStyle = '#00ff00';
+                    ctx.fillStyle = '#b0c4d4'; // Soft blue-white for output (matches main UI)
                     break;
                 case 'error':
-                    ctx.fillStyle = '#ff4444';
+                    ctx.fillStyle = '#ff6b6b'; // Softer red for errors (less jarring)
                     break;
             }
             
@@ -275,20 +275,20 @@ export class DeveloperConsole {
         ctx.stroke();
         
         // Input prompt and text
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#e8f4fd'; // Bright blue-white for prompt (matches commands)
         ctx.font = '14px Consolas, Monaco, monospace';
         const promptText = '> ';
         const promptWidth = ctx.measureText(promptText).width;
         ctx.fillText(promptText, padding, inputY + 14);
         
         // Input text
-        ctx.fillStyle = '#cccccc';
+        ctx.fillStyle = '#b0c4d4'; // Soft blue-white for input text (matches main UI)
         ctx.fillText(this.inputText, padding + promptWidth, inputY + 14);
         
         // Cursor
         const cursorX = padding + promptWidth + ctx.measureText(this.inputText).width;
         if (Math.floor(Date.now() / 500) % 2) { // Blinking cursor
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#e8f4fd'; // Bright blue-white for cursor
             ctx.fillRect(cursorX, inputY + 2, 1, 12);
         }
         
@@ -336,7 +336,7 @@ export class DeveloperConsole {
             }
             
             // Suggestion text
-            ctx.fillStyle = i === this.suggestionIndex ? '#ffffff' : '#cccccc';
+            ctx.fillStyle = i === this.suggestionIndex ? '#e8f4fd' : '#b0c4d4'; // Match game UI colors
             ctx.fillText(suggestion, x + 5, itemY + 14);
         }
     }
