@@ -1,6 +1,8 @@
 // Command registry system for developer console
 // Provides extensible command infrastructure with parameter validation and auto-completion
 
+import { DebugSpawner } from './debug-spawner.js';
+
 interface ParameterDefinition {
     name: string;
     type: 'string' | 'number' | 'enum';
@@ -323,7 +325,6 @@ export class CommandRegistry {
         // Import DebugSpawner functionality
         if (context.camera && context.chunkManager) {
             // Use existing inspect functionality from DebugSpawner
-            const DebugSpawner = require('./debug-spawner.js').DebugSpawner;
             DebugSpawner.inspectCurrentChunk(context.camera, context.chunkManager);
         } else {
             console.log('❌ Camera or ChunkManager not available');
@@ -381,8 +382,7 @@ export class CommandRegistry {
         const variant = params[1] || null;
         const distance = params[2] ? parseFloat(params[2]) : null;
         
-        // Import DebugSpawner dynamically
-        const DebugSpawner = require('./debug-spawner.js').DebugSpawner;
+        // Use imported DebugSpawner
         
         try {
             switch (objectType) {
