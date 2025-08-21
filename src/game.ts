@@ -587,7 +587,7 @@ export class Game {
 
         // Handle black hole spawning (Shift + B)
         if (this.input.isDebugBlackHoleSpawn()) {
-            DebugSpawner.spawnBlackHole(this.camera, this.chunkManager, this.debugModeEnabled);
+            DebugSpawner.spawnBlackHole(this.camera, this.chunkManager, undefined, this.debugModeEnabled);
             this.discoveryDisplay.addNotification('🕳️ DEBUG: Black hole spawned nearby - use caution!');
         }
 

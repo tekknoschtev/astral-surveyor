@@ -392,8 +392,8 @@ export class CommandRegistry {
                     break;
                     
                 case 'blackhole':
-                    DebugSpawner.spawnBlackHole(context.camera, context.chunkManager, true);
-                    console.log('🕳️ Spawned black hole for testing');
+                    DebugSpawner.spawnBlackHole(context.camera, context.chunkManager, variant, true);
+                    console.log(`🕳️ Spawned ${variant || 'random'} black hole for testing`);
                     break;
                     
                 case 'star':
@@ -432,12 +432,12 @@ export class CommandRegistry {
     
     private getVariantsForType(objectType: string): string[] {
         const variants = {
-            star: ['red-giant', 'blue-giant', 'white-dwarf', 'yellow-dwarf', 'orange-dwarf', 'red-dwarf'],
+            star: ['red-giant', 'blue-giant', 'white-dwarf', 'yellow-dwarf', 'orange-dwarf', 'red-dwarf', 'neutron-star'],
             planet: ['rocky', 'gas-giant', 'ocean', 'desert', 'volcanic', 'frozen', 'exotic'],
             nebula: ['emission', 'reflection', 'planetary', 'dark'],
-            asteroid: ['metallic', 'carbonaceous', 'ice', 'mixed'],
-            blackhole: ['stellar', 'intermediate', 'supermassive'],
-            comet: ['short-period', 'long-period', 'non-periodic'],
+            asteroid: ['metallic', 'crystalline', 'carbonaceous', 'icy'],
+            blackhole: ['stellar-mass', 'supermassive'],
+            comet: ['ice', 'dust', 'rocky', 'organic'],
             wormhole: []
         };
         

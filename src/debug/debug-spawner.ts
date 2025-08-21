@@ -3,11 +3,11 @@
 
 import { SeededRandom } from '../utils/random.js';
 import { generateWormholePair, Wormhole } from '../celestial/wormholes.js';
-import { generateBlackHole, BlackHole } from '../celestial/blackholes.js';
+import { generateBlackHole, BlackHole, BlackHoleTypes } from '../celestial/blackholes.js';
 import { Star, Planet, StarTypes, PlanetTypes } from '../celestial/celestial.js';
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
-import { Comet, selectCometType } from '../celestial/comets.js';
+import { Comet, selectCometType, CometTypes } from '../celestial/comets.js';
 import { NamingService } from '../naming/naming.js';
 import type { Camera } from '../camera/camera.js';
 import type { ChunkManager } from '../world/world.js';
@@ -129,7 +129,7 @@ export class DebugSpawner {
     /**
      * Spawn a black hole near the player for testing gravitational effects
      */
-    static spawnBlackHole(camera: Camera, chunkManager: ChunkManager, debugModeEnabled: boolean = true): void {
+    static spawnBlackHole(camera: Camera, chunkManager: ChunkManager, blackHoleType?: string, debugModeEnabled: boolean = true): void {
         // Only allow when debug mode is enabled
         if (!debugModeEnabled) {
             console.warn('Debug spawning requires debug mode to be enabled');
@@ -147,9 +147,30 @@ export class DebugSpawner {
             const blackHoleX = playerX + Math.cos(angle) * distance;
             const blackHoleY = playerY + Math.sin(angle) * distance;
             
-            // Generate black hole using existing system
+            // Generate black hole with optional type specification
             const debugRng = new SeededRandom(Date.now());
-            const blackHole = generateBlackHole(blackHoleX, blackHoleY, debugRng);
+            let blackHole;
+            
+            if (blackHoleType) {
+                // Map console-friendly names to BlackHoleTypes keys
+                const blackHoleTypeMapping = {
+                    'stellar-mass': 'STELLAR_MASS',
+                    'supermassive': 'SUPERMASSIVE'
+                };
+                
+                const mappedType = blackHoleTypeMapping[blackHoleType];
+                if (mappedType && BlackHoleTypes[mappedType]) {
+                    const selectedBlackHoleType = BlackHoleTypes[mappedType];
+                    blackHole = new BlackHole(blackHoleX, blackHoleY, selectedBlackHoleType);
+                    blackHole.initWithSeed(debugRng, selectedBlackHoleType);
+                } else {
+                    console.log(`❌ Unknown black hole type: ${blackHoleType}. Use 'list blackhole' to see valid types.`);
+                    return;
+                }
+            } else {
+                // Random black hole type (existing behavior)
+                blackHole = generateBlackHole(blackHoleX, blackHoleY, debugRng);
+            }
             
             // Auto-discover for immediate testing
             blackHole.discovered = true;
@@ -517,8 +538,29 @@ export class DebugSpawner {
             const dummyStarType = StarTypes.G_TYPE; // Yellow dwarf for comet testing
             const dummyStar = new Star(cometX, cometY, dummyStarType);
             
-            // Select comet type
-            const selectedCometType = selectCometType(debugRng);
+            // Select comet type with optional mapping
+            let selectedCometType;
+            
+            if (cometType) {
+                // Map console-friendly names to CometTypes keys
+                const cometTypeMapping = {
+                    'ice': 'ICE',
+                    'dust': 'DUST', 
+                    'rocky': 'ROCKY',
+                    'organic': 'ORGANIC'
+                };
+                
+                const mappedType = cometTypeMapping[cometType];
+                if (mappedType && CometTypes[mappedType]) {
+                    selectedCometType = CometTypes[mappedType];
+                } else {
+                    console.log(`❌ Unknown comet type: ${cometType}. Use 'list comet' to see valid types.`);
+                    return;
+                }
+            } else {
+                // Random comet type
+                selectedCometType = selectCometType(debugRng);
+            }
             
             // Create simple orbit for testing
             const semiMajorAxis = 200 + Math.random() * 300;
