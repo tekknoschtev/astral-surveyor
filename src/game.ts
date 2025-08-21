@@ -690,6 +690,11 @@ export class Game {
             obj.render(this.renderer, this.camera);
         }
         
+        // Render comets (intermediate layer - after background, before stars)
+        for (const obj of activeObjects.comets) {
+            obj.render(this.renderer, this.camera);
+        }
+        
         // Then render stars, planets, and moons (foreground layers)
         for (const obj of activeObjects.planets) {
             obj.render(this.renderer, this.camera);

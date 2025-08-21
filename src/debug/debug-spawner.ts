@@ -536,7 +536,13 @@ export class DebugSpawner {
             // Create a dummy parent star for orbital mechanics
             const debugRng = new SeededRandom(Date.now());
             const dummyStarType = StarTypes.G_TYPE; // Yellow dwarf for comet testing
-            const dummyStar = new Star(cometX, cometY, dummyStarType);
+            
+            // Place dummy star offset from comet position for realistic orbital mechanics
+            const starOffset = 300; // Star distance from comet
+            const starAngle = Math.random() * Math.PI * 2;
+            const starX = cometX + Math.cos(starAngle) * starOffset;
+            const starY = cometY + Math.sin(starAngle) * starOffset;
+            const dummyStar = new Star(starX, starY, dummyStarType);
             
             // Select comet type with optional mapping
             let selectedCometType;
@@ -562,13 +568,17 @@ export class DebugSpawner {
                 selectedCometType = selectCometType(debugRng);
             }
             
-            // Create simple orbit for testing
-            const semiMajorAxis = 200 + Math.random() * 300;
-            const eccentricity = 0.3 + Math.random() * 0.4;
+            // Create simple orbit for testing - match actual positioning for visibility
+            // Since comet is 300px from star, set perihelion to be closer to guarantee visibility
+            const actualDistance = starOffset; // 300px
+            const perihelionDistance = actualDistance * 0.8; // Closer perihelion for visibility
+            const semiMajorAxis = actualDistance * 1.2; // Slightly larger orbit
+            const eccentricity = (semiMajorAxis - perihelionDistance) / semiMajorAxis;
+            
             const orbit = {
                 semiMajorAxis: semiMajorAxis,
                 eccentricity: eccentricity,
-                perihelionDistance: semiMajorAxis * (1 - eccentricity),
+                perihelionDistance: perihelionDistance,
                 aphelionDistance: semiMajorAxis * (1 + eccentricity),
                 orbitalPeriod: 1000 + Math.random() * 2000,
                 argumentOfPerihelion: Math.random() * Math.PI * 2,
@@ -579,9 +589,12 @@ export class DebugSpawner {
             const comet = new Comet(cometX, cometY, dummyStar, orbit, selectedCometType, 0);
             comet.discovered = true;
             
+            // Add both the dummy star and comet to chunks
+            this.addObjectToChunk(chunkManager, 'star', dummyStar, starX, starY);
             this.addObjectToChunk(chunkManager, 'comet', comet, cometX, cometY);
             
             console.log(`☄️ DEBUG: Spawned ${selectedCometType.name} comet at (${Math.round(cometX)}, ${Math.round(cometY)})`);
+            console.log(`  ⭐ DEBUG: Spawned dummy ${dummyStarType.name} star at (${Math.round(starX)}, ${Math.round(starY)})`);
             console.log(`  Distance from player: ${Math.round(distance)} pixels`);
             
         } catch (error) {
@@ -635,6 +648,12 @@ export class DebugSpawner {
                     break;
                 case 'comet':
                     chunk.comets.push(object);
+                    break;
+                case 'blackhole':
+                    chunk.blackholes.push(object);
+                    break;
+                case 'wormhole':
+                    chunk.wormholes.push(object);
                     break;
             }
         }
