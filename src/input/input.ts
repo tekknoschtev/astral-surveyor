@@ -39,6 +39,9 @@ export class Input {
     
     // Debug input safety - track modifier key states
     private shiftPressedFirst = false;
+    
+    // Developer console input routing
+    private consoleInputHandler: ((event: KeyboardEvent) => boolean) | null = null;
 
     constructor() {
         this.setupEventListeners();
@@ -47,6 +50,14 @@ export class Input {
     private setupEventListeners(): void {
         // Keyboard events
         window.addEventListener('keydown', (e: KeyboardEvent) => {
+            // Route to console if active (except for tilde key which toggles console)
+            if (this.consoleInputHandler && e.code !== 'Backquote') {
+                const handled = this.consoleInputHandler(e);
+                if (handled) {
+                    return; // Console handled the input
+                }
+            }
+            
             if (!this.keys.has(e.code)) {
                 this.keys.add(e.code);
                 this.keyHoldTimes.set(e.code, 0); // Start tracking hold time
@@ -420,6 +431,16 @@ export class Input {
         // Always available in development builds (this code won't exist in production)
         // Require Shift to be pressed BEFORE I to prevent accidental activation
         return this.shiftPressedFirst && this.isShiftPressed() && this.wasJustPressed('KeyI');
+    }
+
+    // Developer console toggle (tilde key)
+    isConsoleTogglePressed(): boolean {
+        return this.wasJustPressed('Backquote'); // Tilde/backtick key
+    }
+    
+    // Set console input handler for routing keyboard events
+    setConsoleInputHandler(handler: ((event: KeyboardEvent) => boolean) | null): void {
+        this.consoleInputHandler = handler;
     }
 
     // Mouse/touch input for movement

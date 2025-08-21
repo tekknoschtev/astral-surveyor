@@ -1098,7 +1098,7 @@ export class ChunkManager {
                         };
                         
                         discoveredAsteroidGardens.push(fallbackGardenData);
-                        console.log(`[ChunkManager] Using fallback data for asteroid garden at (${gardenX}, ${gardenY}) - chunk not active`);
+                        // Using fallback data for asteroid garden in inactive chunk (normal behavior)
                     }
                 }
             }

@@ -3,7 +3,11 @@
 
 import { SeededRandom } from '../utils/random.js';
 import { generateWormholePair, Wormhole } from '../celestial/wormholes.js';
-import { generateBlackHole, BlackHole } from '../celestial/blackholes.js';
+import { generateBlackHole, BlackHole, BlackHoleTypes } from '../celestial/blackholes.js';
+import { Star, Planet, StarTypes, PlanetTypes } from '../celestial/celestial.js';
+import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
+import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
+import { Comet, selectCometType, CometTypes } from '../celestial/comets.js';
 import { NamingService } from '../naming/naming.js';
 import type { Camera } from '../camera/camera.js';
 import type { ChunkManager } from '../world/world.js';
@@ -125,7 +129,7 @@ export class DebugSpawner {
     /**
      * Spawn a black hole near the player for testing gravitational effects
      */
-    static spawnBlackHole(camera: Camera, chunkManager: ChunkManager, debugModeEnabled: boolean = true): void {
+    static spawnBlackHole(camera: Camera, chunkManager: ChunkManager, blackHoleType?: string, debugModeEnabled: boolean = true): void {
         // Only allow when debug mode is enabled
         if (!debugModeEnabled) {
             console.warn('Debug spawning requires debug mode to be enabled');
@@ -143,9 +147,30 @@ export class DebugSpawner {
             const blackHoleX = playerX + Math.cos(angle) * distance;
             const blackHoleY = playerY + Math.sin(angle) * distance;
             
-            // Generate black hole using existing system
+            // Generate black hole with optional type specification
             const debugRng = new SeededRandom(Date.now());
-            const blackHole = generateBlackHole(blackHoleX, blackHoleY, debugRng);
+            let blackHole;
+            
+            if (blackHoleType) {
+                // Map console-friendly names to BlackHoleTypes keys
+                const blackHoleTypeMapping = {
+                    'stellar-mass': 'STELLAR_MASS',
+                    'supermassive': 'SUPERMASSIVE'
+                };
+                
+                const mappedType = blackHoleTypeMapping[blackHoleType];
+                if (mappedType && BlackHoleTypes[mappedType]) {
+                    const selectedBlackHoleType = BlackHoleTypes[mappedType];
+                    blackHole = new BlackHole(blackHoleX, blackHoleY, selectedBlackHoleType);
+                    blackHole.initWithSeed(debugRng, selectedBlackHoleType);
+                } else {
+                    console.log(`❌ Unknown black hole type: ${blackHoleType}. Use 'list blackhole' to see valid types.`);
+                    return;
+                }
+            } else {
+                // Random black hole type (existing behavior)
+                blackHole = generateBlackHole(blackHoleX, blackHoleY, debugRng);
+            }
             
             // Auto-discover for immediate testing
             blackHole.discovered = true;
@@ -284,5 +309,334 @@ export class DebugSpawner {
         }
         console.log(`  Total wormholes in all active chunks: ${totalWormholes}`);
         console.log(`  Total black holes in all active chunks: ${totalBlackHoles}`);
+    }
+
+    /**
+     * Spawn a star near the player for testing
+     */
+    static spawnStar(camera: Camera, chunkManager: ChunkManager, starType?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Spawn at moderate distance 
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 800 + Math.random() * 400; // 800-1200 pixels
+            const starX = playerX + Math.cos(angle) * distance;
+            const starY = playerY + Math.sin(angle) * distance;
+            
+            // Select star type with proper mapping from console names to StarTypes keys
+            const debugRng = new SeededRandom(Date.now());
+            let selectedStarType;
+            
+            if (starType) {
+                // Map console-friendly names to StarTypes keys
+                const starTypeMapping = {
+                    'red-giant': 'RED_GIANT',
+                    'blue-giant': 'BLUE_GIANT',
+                    'white-dwarf': 'WHITE_DWARF',
+                    'yellow-dwarf': 'G_TYPE',
+                    'orange-dwarf': 'K_TYPE', 
+                    'red-dwarf': 'M_TYPE',
+                    'neutron-star': 'NEUTRON_STAR'
+                };
+                
+                const mappedType = starTypeMapping[starType];
+                if (mappedType && StarTypes[mappedType]) {
+                    selectedStarType = StarTypes[mappedType];
+                } else {
+                    console.log(`❌ Unknown star type: ${starType}. Use 'list star' to see valid types.`);
+                    return;
+                }
+            } else {
+                // Random star type
+                const starTypeNames = Object.keys(StarTypes);
+                const randomTypeName = starTypeNames[Math.floor(debugRng.next() * starTypeNames.length)];
+                selectedStarType = StarTypes[randomTypeName];
+            }
+            
+            const star = new Star(starX, starY, selectedStarType);
+            star.discovered = true;
+            
+            this.addObjectToChunk(chunkManager, 'star', star, starX, starY);
+            
+            console.log(`⭐ DEBUG: Spawned ${selectedStarType.name} at (${Math.round(starX)}, ${Math.round(starY)})`);
+            console.log(`  Distance from player: ${Math.round(distance)} pixels`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning star:', error);
+        }
+    }
+
+    /**
+     * Spawn a planet near the player for testing
+     */
+    static spawnPlanet(camera: Camera, chunkManager: ChunkManager, planetType?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Spawn at close distance for planet testing
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 400 + Math.random() * 300; // 400-700 pixels
+            const planetX = playerX + Math.cos(angle) * distance;
+            const planetY = playerY + Math.sin(angle) * distance;
+            
+            // Create a dummy parent star for orbital mechanics
+            const debugRng = new SeededRandom(Date.now());
+            const dummyStarType = StarTypes.G_TYPE; // Yellow dwarf for planet testing
+            const dummyStar = new Star(planetX, planetY, dummyStarType);
+            
+            // Select planet type with proper mapping
+            let selectedPlanetType;
+            
+            if (planetType) {
+                // Map console-friendly names to PlanetTypes keys
+                const planetTypeMapping = {
+                    'rocky': 'ROCKY',
+                    'gas-giant': 'GAS_GIANT',
+                    'ocean': 'OCEAN',
+                    'desert': 'DESERT',
+                    'volcanic': 'VOLCANIC',
+                    'frozen': 'FROZEN',
+                    'exotic': 'EXOTIC'
+                };
+                
+                const mappedType = planetTypeMapping[planetType];
+                if (mappedType && PlanetTypes[mappedType]) {
+                    selectedPlanetType = PlanetTypes[mappedType];
+                } else {
+                    console.log(`❌ Unknown planet type: ${planetType}. Use 'list planet' to see valid types.`);
+                    return;
+                }
+            } else {
+                // Random planet type
+                const planetTypeNames = Object.keys(PlanetTypes);
+                const randomTypeName = planetTypeNames[Math.floor(debugRng.next() * planetTypeNames.length)];
+                selectedPlanetType = PlanetTypes[randomTypeName];
+            }
+            
+            // Create planet with basic orbital parameters
+            const orbitalDistance = 50 + Math.random() * 100; // Small orbit for testing
+            const orbitalAngle = Math.random() * Math.PI * 2;
+            const orbitalSpeed = 0.001 + Math.random() * 0.002;
+            
+            const planet = new Planet(planetX, planetY, dummyStar, orbitalDistance, orbitalAngle, orbitalSpeed, selectedPlanetType);
+            planet.discovered = true;
+            
+            this.addObjectToChunk(chunkManager, 'planet', planet, planetX, planetY);
+            
+            console.log(`🪐 DEBUG: Spawned ${selectedPlanetType.name} at (${Math.round(planetX)}, ${Math.round(planetY)})`);
+            console.log(`  Distance from player: ${Math.round(distance)} pixels`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning planet:', error);
+        }
+    }
+
+    /**
+     * Spawn a nebula near the player for testing
+     */
+    static spawnNebula(camera: Camera, chunkManager: ChunkManager, nebulaType?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Spawn at good viewing distance
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 600 + Math.random() * 500; // 600-1100 pixels
+            const nebulaX = playerX + Math.cos(angle) * distance;
+            const nebulaY = playerY + Math.sin(angle) * distance;
+            
+            const debugRng = new SeededRandom(Date.now());
+            const selectedNebulaType = nebulaType || selectNebulaType(debugRng);
+            
+            const nebula = new Nebula(nebulaX, nebulaY, selectedNebulaType, debugRng);
+            nebula.discovered = true;
+            
+            this.addObjectToChunk(chunkManager, 'nebula', nebula, nebulaX, nebulaY);
+            
+            console.log(`🌌 DEBUG: Spawned ${selectedNebulaType} nebula at (${Math.round(nebulaX)}, ${Math.round(nebulaY)})`);
+            console.log(`  Distance from player: ${Math.round(distance)} pixels`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning nebula:', error);
+        }
+    }
+
+    /**
+     * Spawn an asteroid garden near the player for testing
+     */
+    static spawnAsteroidGarden(camera: Camera, chunkManager: ChunkManager, asteroidType?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Spawn at close distance for detailed viewing
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 300 + Math.random() * 400; // 300-700 pixels
+            const asteroidX = playerX + Math.cos(angle) * distance;
+            const asteroidY = playerY + Math.sin(angle) * distance;
+            
+            const debugRng = new SeededRandom(Date.now());
+            const selectedAsteroidType = asteroidType || selectAsteroidGardenType(debugRng);
+            
+            const asteroidGarden = new AsteroidGarden(asteroidX, asteroidY, selectedAsteroidType, debugRng);
+            asteroidGarden.discovered = true;
+            
+            this.addObjectToChunk(chunkManager, 'asteroidGarden', asteroidGarden, asteroidX, asteroidY);
+            
+            console.log(`🪨 DEBUG: Spawned ${selectedAsteroidType} asteroid garden at (${Math.round(asteroidX)}, ${Math.round(asteroidY)})`);
+            console.log(`  Distance from player: ${Math.round(distance)} pixels`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning asteroid garden:', error);
+        }
+    }
+
+    /**
+     * Spawn a comet near the player for testing
+     */
+    static spawnComet(camera: Camera, chunkManager: ChunkManager, cometType?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Spawn at medium distance
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 500 + Math.random() * 400; // 500-900 pixels
+            const cometX = playerX + Math.cos(angle) * distance;
+            const cometY = playerY + Math.sin(angle) * distance;
+            
+            // Create a dummy parent star for orbital mechanics
+            const debugRng = new SeededRandom(Date.now());
+            const dummyStarType = StarTypes.G_TYPE; // Yellow dwarf for comet testing
+            const dummyStar = new Star(cometX, cometY, dummyStarType);
+            
+            // Select comet type with optional mapping
+            let selectedCometType;
+            
+            if (cometType) {
+                // Map console-friendly names to CometTypes keys
+                const cometTypeMapping = {
+                    'ice': 'ICE',
+                    'dust': 'DUST', 
+                    'rocky': 'ROCKY',
+                    'organic': 'ORGANIC'
+                };
+                
+                const mappedType = cometTypeMapping[cometType];
+                if (mappedType && CometTypes[mappedType]) {
+                    selectedCometType = CometTypes[mappedType];
+                } else {
+                    console.log(`❌ Unknown comet type: ${cometType}. Use 'list comet' to see valid types.`);
+                    return;
+                }
+            } else {
+                // Random comet type
+                selectedCometType = selectCometType(debugRng);
+            }
+            
+            // Create simple orbit for testing
+            const semiMajorAxis = 200 + Math.random() * 300;
+            const eccentricity = 0.3 + Math.random() * 0.4;
+            const orbit = {
+                semiMajorAxis: semiMajorAxis,
+                eccentricity: eccentricity,
+                perihelionDistance: semiMajorAxis * (1 - eccentricity),
+                aphelionDistance: semiMajorAxis * (1 + eccentricity),
+                orbitalPeriod: 1000 + Math.random() * 2000,
+                argumentOfPerihelion: Math.random() * Math.PI * 2,
+                meanAnomalyAtEpoch: Math.random() * Math.PI * 2,
+                epoch: Date.now()
+            };
+            
+            const comet = new Comet(cometX, cometY, dummyStar, orbit, selectedCometType, 0);
+            comet.discovered = true;
+            
+            this.addObjectToChunk(chunkManager, 'comet', comet, cometX, cometY);
+            
+            console.log(`☄️ DEBUG: Spawned ${selectedCometType.name} comet at (${Math.round(cometX)}, ${Math.round(cometY)})`);
+            console.log(`  Distance from player: ${Math.round(distance)} pixels`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning comet:', error);
+        }
+    }
+
+    /**
+     * Helper method to add objects to the appropriate chunk
+     */
+    private static addObjectToChunk(chunkManager: ChunkManager, objectType: string, object: any, x: number, y: number): void {
+        // Store in debug registry
+        if (!chunkManager.debugObjects) {
+            chunkManager.debugObjects = [];
+        }
+        chunkManager.debugObjects.push({
+            type: objectType,
+            object: object,
+            x: x,
+            y: y
+        });
+        
+        // Add to discovery state
+        const objectId = chunkManager.getObjectId(x, y, objectType, object);
+        chunkManager.discoveredObjects.set(objectId, {
+            discovered: true,
+            timestamp: Date.now()
+        });
+        
+        // Add to appropriate chunk
+        const chunkCoords = chunkManager.getChunkCoords(x, y);
+        const chunkKey = chunkManager.getChunkKey(chunkCoords.x, chunkCoords.y);
+        
+        let chunk = chunkManager.activeChunks.get(chunkKey);
+        if (!chunk) {
+            chunk = chunkManager.generateChunk(chunkCoords.x, chunkCoords.y);
+        } else {
+            // Add to existing chunk
+            switch (objectType) {
+                case 'star':
+                    chunk.celestialStars.push(object);
+                    break;
+                case 'planet':
+                    chunk.planets.push(object);
+                    break;
+                case 'nebula':
+                    chunk.nebulae.push(object);
+                    break;
+                case 'asteroidGarden':
+                    chunk.asteroidGardens.push(object);
+                    break;
+                case 'comet':
+                    chunk.comets.push(object);
+                    break;
+            }
+        }
     }
 }
