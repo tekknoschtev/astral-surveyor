@@ -308,7 +308,7 @@ export class CommandRegistry {
             nebula: ['emission', 'reflection', 'planetary', 'dark'],
             asteroid: ['metallic', 'carbonaceous', 'ice', 'mixed'],
             blackhole: ['stellar', 'intermediate', 'supermassive'],
-            comet: ['short-period', 'long-period', 'non-periodic'],
+            comet: ['ice', 'dust', 'rocky', 'organic'],
             wormhole: ['(no variants - generates linked pair)']
         };
         
