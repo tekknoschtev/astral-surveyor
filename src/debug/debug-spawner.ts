@@ -309,11 +309,29 @@ export class DebugSpawner {
             const starX = playerX + Math.cos(angle) * distance;
             const starY = playerY + Math.sin(angle) * distance;
             
-            // Select star type
+            // Select star type with proper mapping from console names to StarTypes keys
             const debugRng = new SeededRandom(Date.now());
             let selectedStarType;
-            if (starType && StarTypes[starType]) {
-                selectedStarType = StarTypes[starType];
+            
+            if (starType) {
+                // Map console-friendly names to StarTypes keys
+                const starTypeMapping = {
+                    'red-giant': 'RED_GIANT',
+                    'blue-giant': 'BLUE_GIANT',
+                    'white-dwarf': 'WHITE_DWARF',
+                    'yellow-dwarf': 'G_TYPE',
+                    'orange-dwarf': 'K_TYPE', 
+                    'red-dwarf': 'M_TYPE',
+                    'neutron-star': 'NEUTRON_STAR'
+                };
+                
+                const mappedType = starTypeMapping[starType];
+                if (mappedType && StarTypes[mappedType]) {
+                    selectedStarType = StarTypes[mappedType];
+                } else {
+                    console.log(`❌ Unknown star type: ${starType}. Use 'list star' to see valid types.`);
+                    return;
+                }
             } else {
                 // Random star type
                 const starTypeNames = Object.keys(StarTypes);
@@ -355,13 +373,31 @@ export class DebugSpawner {
             
             // Create a dummy parent star for orbital mechanics
             const debugRng = new SeededRandom(Date.now());
-            const dummyStarType = StarTypes['yellow-dwarf'];
+            const dummyStarType = StarTypes.G_TYPE; // Yellow dwarf for planet testing
             const dummyStar = new Star(planetX, planetY, dummyStarType);
             
-            // Select planet type
+            // Select planet type with proper mapping
             let selectedPlanetType;
-            if (planetType && PlanetTypes[planetType]) {
-                selectedPlanetType = PlanetTypes[planetType];
+            
+            if (planetType) {
+                // Map console-friendly names to PlanetTypes keys
+                const planetTypeMapping = {
+                    'rocky': 'ROCKY',
+                    'gas-giant': 'GAS_GIANT',
+                    'ocean': 'OCEAN',
+                    'desert': 'DESERT',
+                    'volcanic': 'VOLCANIC',
+                    'frozen': 'FROZEN',
+                    'exotic': 'EXOTIC'
+                };
+                
+                const mappedType = planetTypeMapping[planetType];
+                if (mappedType && PlanetTypes[mappedType]) {
+                    selectedPlanetType = PlanetTypes[mappedType];
+                } else {
+                    console.log(`❌ Unknown planet type: ${planetType}. Use 'list planet' to see valid types.`);
+                    return;
+                }
             } else {
                 // Random planet type
                 const planetTypeNames = Object.keys(PlanetTypes);
@@ -478,7 +514,7 @@ export class DebugSpawner {
             
             // Create a dummy parent star for orbital mechanics
             const debugRng = new SeededRandom(Date.now());
-            const dummyStarType = StarTypes['yellow-dwarf'];
+            const dummyStarType = StarTypes.G_TYPE; // Yellow dwarf for comet testing
             const dummyStar = new Star(cometX, cometY, dummyStarType);
             
             // Select comet type
