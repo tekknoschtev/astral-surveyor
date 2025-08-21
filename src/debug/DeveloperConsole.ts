@@ -57,11 +57,11 @@ export class DeveloperConsole {
                 return true;
                 
             case 'ArrowUp':
-                this.navigateHistory(-1);
+                this.navigateHistory(1); // Go to previous (older) commands
                 return true;
                 
             case 'ArrowDown':
-                this.navigateHistory(1);
+                this.navigateHistory(-1); // Go to newer commands
                 return true;
                 
             case 'Tab':
