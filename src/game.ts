@@ -729,6 +729,11 @@ export class Game {
             obj.render(this.renderer, this.camera);
         }
         
+        // Render chunk boundaries (debug visualization)
+        if (GameConfig.debug.enabled && GameConfig.debug.chunkBoundaries.enabled) {
+            this.renderChunkBoundaries();
+        }
+        
         this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars);
@@ -914,6 +919,131 @@ export class Game {
         return destinationObjects
             .sort((a, b) => a.distance - b.distance)
             .slice(0, 8); // Limit to 8 objects for performance
+    }
+
+    renderChunkBoundaries(): void {
+        const config = GameConfig.debug.chunkBoundaries;
+        const chunkSize = this.chunkManager.chunkSize;
+        
+        // Get viewport bounds in world coordinates
+        const viewLeft = this.camera.x - this.renderer.canvas.width / 2;
+        const viewRight = this.camera.x + this.renderer.canvas.width / 2;
+        const viewTop = this.camera.y - this.renderer.canvas.height / 2;
+        const viewBottom = this.camera.y + this.renderer.canvas.height / 2;
+        
+        // Find chunk coordinates that intersect with the viewport
+        const leftChunk = Math.floor(viewLeft / chunkSize);
+        const rightChunk = Math.floor(viewRight / chunkSize);
+        const topChunk = Math.floor(viewTop / chunkSize);
+        const bottomChunk = Math.floor(viewBottom / chunkSize);
+        
+        // Draw chunk boundaries and crosshairs
+        for (let chunkX = leftChunk; chunkX <= rightChunk + 1; chunkX++) {
+            for (let chunkY = topChunk; chunkY <= bottomChunk + 1; chunkY++) {
+                // Calculate chunk corner position in world coordinates
+                const worldX = chunkX * chunkSize;
+                const worldY = chunkY * chunkSize;
+                
+                // Convert to screen coordinates
+                const screenX = worldX - this.camera.x + this.renderer.canvas.width / 2;
+                const screenY = worldY - this.camera.y + this.renderer.canvas.height / 2;
+                
+                // Only draw if on screen
+                if (screenX >= -config.crosshairSize && screenX <= this.renderer.canvas.width + config.crosshairSize &&
+                    screenY >= -config.crosshairSize && screenY <= this.renderer.canvas.height + config.crosshairSize) {
+                    
+                    // Draw crosshair at chunk corner
+                    this.renderer.drawCrosshair(
+                        screenX, screenY, 
+                        config.crosshairSize, 
+                        config.color, 
+                        config.lineWidth, 
+                        config.opacity
+                    );
+                }
+            }
+        }
+        
+        // Draw subdivision markers along chunk edges if enabled
+        if (config.subdivisions.enabled) {
+            const subdivisionCount = Math.floor(1 / config.subdivisions.interval) - 1; // 9 marks for 10% intervals
+            
+            // Vertical chunk boundaries with subdivisions
+            for (let chunkX = leftChunk; chunkX <= rightChunk + 1; chunkX++) {
+                const worldX = chunkX * chunkSize;
+                const screenX = worldX - this.camera.x + this.renderer.canvas.width / 2;
+                
+                if (screenX >= -config.subdivisions.dashLength && screenX <= this.renderer.canvas.width + config.subdivisions.dashLength) {
+                    // Calculate the viewport range for this vertical line
+                    const viewTopWorldY = this.camera.y - this.renderer.canvas.height / 2;
+                    const viewBottomWorldY = this.camera.y + this.renderer.canvas.height / 2;
+                    
+                    // Find the range of chunks this vertical line intersects with in the viewport
+                    const topVisibleChunk = Math.floor(viewTopWorldY / chunkSize);
+                    const bottomVisibleChunk = Math.floor(viewBottomWorldY / chunkSize);
+                    
+                    // Draw subdivision marks only within the visible chunk range
+                    for (let chunkY = topVisibleChunk; chunkY <= bottomVisibleChunk; chunkY++) {
+                        const chunkTopY = chunkY * chunkSize;
+                        
+                        for (let i = 1; i <= subdivisionCount; i++) {
+                            const subdivisionY = chunkTopY + (chunkSize * i * config.subdivisions.interval);
+                            const screenY = subdivisionY - this.camera.y + this.renderer.canvas.height / 2;
+                            
+                            // Only draw if the subdivision mark is actually visible
+                            if (screenY >= -config.subdivisions.dashLength && screenY <= this.renderer.canvas.height + config.subdivisions.dashLength) {
+                                this.renderer.drawDash(
+                                    screenX, screenY,
+                                    config.subdivisions.dashLength,
+                                    config.subdivisions.color,
+                                    0, // Horizontal dash (perpendicular to vertical boundary)
+                                    config.subdivisions.lineWidth,
+                                    config.subdivisions.opacity
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Horizontal chunk boundaries with subdivisions
+            for (let chunkY = topChunk; chunkY <= bottomChunk + 1; chunkY++) {
+                const worldY = chunkY * chunkSize;
+                const screenY = worldY - this.camera.y + this.renderer.canvas.height / 2;
+                
+                if (screenY >= -config.subdivisions.dashLength && screenY <= this.renderer.canvas.height + config.subdivisions.dashLength) {
+                    // Calculate the viewport range for this horizontal line
+                    const viewLeftWorldX = this.camera.x - this.renderer.canvas.width / 2;
+                    const viewRightWorldX = this.camera.x + this.renderer.canvas.width / 2;
+                    
+                    // Find the range of chunks this horizontal line intersects with in the viewport
+                    const leftVisibleChunk = Math.floor(viewLeftWorldX / chunkSize);
+                    const rightVisibleChunk = Math.floor(viewRightWorldX / chunkSize);
+                    
+                    // Draw subdivision marks only within the visible chunk range
+                    for (let chunkX = leftVisibleChunk; chunkX <= rightVisibleChunk; chunkX++) {
+                        const chunkLeftX = chunkX * chunkSize;
+                        
+                        for (let i = 1; i <= subdivisionCount; i++) {
+                            const subdivisionX = chunkLeftX + (chunkSize * i * config.subdivisions.interval);
+                            const screenX = subdivisionX - this.camera.x + this.renderer.canvas.width / 2;
+                            
+                            // Only draw if the subdivision mark is actually visible
+                            if (screenX >= -config.subdivisions.dashLength && screenX <= this.renderer.canvas.width + config.subdivisions.dashLength) {
+                                this.renderer.drawDash(
+                                    screenX, screenY,
+                                    config.subdivisions.dashLength,
+                                    config.subdivisions.color,
+                                    Math.PI / 2, // Vertical dash (perpendicular to horizontal boundary)
+                                    config.subdivisions.lineWidth,
+                                    config.subdivisions.opacity
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

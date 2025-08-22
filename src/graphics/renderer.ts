@@ -82,14 +82,21 @@ export class Renderer {
         this.ctx.lineCap = 'round';
         
         const halfSize = size / 2;
+        const gapSize = 3; // Small gap in the center to prevent continuous lines
         
         this.ctx.beginPath();
-        // Horizontal line
+        // Horizontal line segments (left and right of center)
         this.ctx.moveTo(Math.floor(x - halfSize), Math.floor(y));
+        this.ctx.lineTo(Math.floor(x - gapSize), Math.floor(y));
+        this.ctx.moveTo(Math.floor(x + gapSize), Math.floor(y));
         this.ctx.lineTo(Math.floor(x + halfSize), Math.floor(y));
-        // Vertical line
+        
+        // Vertical line segments (top and bottom of center)
         this.ctx.moveTo(Math.floor(x), Math.floor(y - halfSize));
+        this.ctx.lineTo(Math.floor(x), Math.floor(y - gapSize));
+        this.ctx.moveTo(Math.floor(x), Math.floor(y + gapSize));
         this.ctx.lineTo(Math.floor(x), Math.floor(y + halfSize));
+        
         this.ctx.stroke();
         
         this.ctx.restore();

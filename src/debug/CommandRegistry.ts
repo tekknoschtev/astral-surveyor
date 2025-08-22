@@ -262,6 +262,36 @@ export class CommandRegistry {
                 return [];
             }
         });
+        
+        // Set command for toggling debug settings
+        this.register({
+            name: 'set',
+            description: 'Set debug configuration values (usage: set chunkBoundaries true)',
+            parameters: [
+                { name: 'setting', type: 'enum', optional: false,
+                  values: ['chunkBoundaries'],
+                  description: 'Setting to modify' },
+                { name: 'value', type: 'enum', optional: false,
+                  values: ['true', 'false'],
+                  description: 'Value to set (true/false)' }
+            ],
+            execute: (params: string[], context: CommandContext) => {
+                this.setSetting(params[0], params[1]);
+            },
+            autocomplete: (partial: string) => {
+                const words = partial.split(' ');
+                if (words.length === 1) {
+                    // Complete setting name
+                    const settings = ['chunkBoundaries'];
+                    return settings.filter(setting => setting.startsWith(words[0]));
+                } else if (words.length === 2) {
+                    // Complete value
+                    const values = ['true', 'false'];
+                    return values.filter(value => value.startsWith(words[1]));
+                }
+                return [];
+            }
+        });
     }
     
     private showGeneralHelp(): void {
@@ -442,5 +472,34 @@ export class CommandRegistry {
         };
         
         return variants[objectType] || [];
+    }
+    
+    private setSetting(setting: string, value: string): void {
+        // Import GameConfig dynamically to avoid circular dependencies
+        import('../config/gameConfig.js').then(({ GameConfig }) => {
+            const boolValue = value.toLowerCase() === 'true';
+            
+            switch (setting) {
+                case 'chunkBoundaries':
+                    // Enable debug mode when enabling chunk boundaries
+                    if (boolValue && !GameConfig.debug.enabled) {
+                        GameConfig.debug.enabled = true;
+                        console.log(`🔧 Debug mode enabled for chunk boundaries`);
+                    }
+                    
+                    GameConfig.debug.chunkBoundaries.enabled = boolValue;
+                    console.log(`🔧 Chunk boundaries ${boolValue ? 'enabled' : 'disabled'}`);
+                    
+                    if (boolValue) {
+                        console.log(`   Crosshairs: ${GameConfig.debug.chunkBoundaries.crosshairSize}px, Color: ${GameConfig.debug.chunkBoundaries.color}`);
+                        console.log(`   Subdivisions: ${GameConfig.debug.chunkBoundaries.subdivisions.enabled ? 'enabled' : 'disabled'} (${(GameConfig.debug.chunkBoundaries.subdivisions.interval * 100)}% intervals)`);
+                        console.log(`   Use 'set chunkBoundaries false' to disable`);
+                    }
+                    break;
+                default:
+                    console.log(`❌ Unknown setting: ${setting}`);
+                    break;
+            }
+        });
     }
 }
