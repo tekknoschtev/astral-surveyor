@@ -120,9 +120,11 @@ export class InfiniteStarField {
         this.renderChunkStars(renderer, camera);
         
         // Render debug chunk boundaries if enabled
-        if (GameConfig.debug.enabled && GameConfig.debug.chunkBoundaries.enabled) {
-            this.renderChunkBoundaries(renderer, camera);
-        }
+        // NOTE: Chunk boundary rendering is now handled by the Game class renderChunkBoundaries method
+        // which provides crosshairs and subdivision marks instead of solid lines
+        // if (GameConfig.debug.enabled && GameConfig.debug.chunkBoundaries.enabled) {
+        //     this.renderChunkBoundaries(renderer, camera);
+        // }
         
         // Update camera tracking
         this.lastCameraX = camera.x;
