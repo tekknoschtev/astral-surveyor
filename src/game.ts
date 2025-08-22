@@ -342,7 +342,7 @@ export class Game {
             } else if (this.stellarMap.isVisible() && !this.input.isTouchConsumed()) {
                 // Handle stellar map interactions (simplified) - only if not panning
                 const discovered = this.getDiscoveredObjects();
-                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
+                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
             }
         }
         
@@ -355,7 +355,7 @@ export class Game {
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);
@@ -508,7 +508,8 @@ export class Game {
             nebulae: this.chunkManager.getDiscoveredNebulae(),
             wormholes: this.chunkManager.getDiscoveredWormholes(),
             asteroidGardens: this.chunkManager.getDiscoveredAsteroidGardens(),
-            blackHoles: this.chunkManager.getDiscoveredBlackHoles()
+            blackHoles: this.chunkManager.getDiscoveredBlackHoles(),
+            comets: this.chunkManager.getDiscoveredComets()
         };
     }
 
@@ -742,7 +743,7 @@ export class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discovered = this.getDiscoveredObjects();
-        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles);
+        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);

@@ -89,6 +89,9 @@ interface DiscoveryData {
     // Black hole properties
     blackHoleTypeName?: string;
     
+    // Comet properties
+    cometTypeName?: string;
+    
     // Object name for display
     objectName?: string;
 }
@@ -164,6 +167,28 @@ interface DiscoveredBlackHole {
     timestamp: number;
 }
 
+interface DiscoveredComet {
+    x: number;
+    y: number;
+    parentStarX: number;
+    parentStarY: number;
+    cometTypeName: string;
+    cometType?: {
+        name: string;
+        tailColors?: string[];
+        nucleusColor?: string;
+    };
+    orbit?: {
+        semiMajorAxis: number;
+        eccentricity: number;
+        perihelionDistance: number;
+        aphelionDistance: number;
+        argumentOfPerihelion: number;
+    };
+    objectName?: string;
+    timestamp: number;
+}
+
 interface CompanionWeight {
     type: typeof StarTypes[keyof typeof StarTypes];
     weight: number;
@@ -201,7 +226,7 @@ export class ChunkManager {
         return `${chunkX},${chunkY}`;
     }
 
-    getObjectId(x: number, y: number, type: string, object?: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole): string {
+    getObjectId(x: number, y: number, type: string, object?: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole | any): string {
         // For orbiting planets, use parent star position plus planet index for stable unique ID
         if (object && object.type === 'planet' && 'parentStar' in object && 'planetIndex' in object && object.parentStar && object.planetIndex !== undefined) {
             const starX = Math.floor(object.parentStar.x);
@@ -219,6 +244,11 @@ export class ChunkManager {
         // For wormholes, include designation for proper stellar map discovery parsing
         if (type === 'wormhole' && object && 'designation' in object && object.designation) {
             return `${type}_${Math.floor(x)}_${Math.floor(y)}_${object.designation}`;
+        }
+        
+        // For comets, include comet index for proper identification
+        if (type === 'comet' && object && 'cometIndex' in object && object.cometIndex !== undefined) {
+            return `${type}_${Math.floor(x)}_${Math.floor(y)}_${object.cometIndex}`;
         }
         
         // For regular objects, use their position
@@ -676,7 +706,7 @@ export class ChunkManager {
         return objects;
     }
 
-    markObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole, objectName?: string): void {
+    markObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole | any, objectName?: string): void {
         const objId = this.getObjectId(object.x, object.y, object.type, object);
         const discoveryData: DiscoveryData = {
             discovered: true,
@@ -703,6 +733,8 @@ export class ChunkManager {
             if ('gardenTypeData' in object) {
                 discoveryData.gardenTypeData = object.gardenTypeData;
             }
+        } else if (object.type === 'comet' && 'cometType' in object && object.cometType && object.cometType.name) {
+            discoveryData.cometTypeName = object.cometType.name;
         }
         
         // Store the generated name if provided
@@ -714,7 +746,7 @@ export class ChunkManager {
         object.discovered = true;
     }
 
-    isObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole): boolean {
+    isObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole | any): boolean {
         const objId = this.getObjectId(object.x, object.y, object.type, object);
         return this.discoveredObjects.has(objId);
     }
@@ -1928,7 +1960,97 @@ export class ChunkManager {
         
         return colorSchemes[nebulaType] || colorSchemes['emission'];
     }
+
+    getDiscoveredComets(): DiscoveredComet[] {
+        const discoveredComets: DiscoveredComet[] = [];
+        
+        // Get all discovered objects that are comets
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('comet_')) {
+                // Extract coordinates from comet ID
+                // Format: comet_x_y_index (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 4) {
+                    const cometX = parseInt(parts[1]);
+                    const cometY = parseInt(parts[2]);
+                    const cometIndex = parseInt(parts[3]);
+                    
+                    // Try to find comet in active chunks first
+                    const comet = this.findCometByIdentifier(cometIndex, cometX, cometY);
+                    
+                    if (comet) {
+                        // Use live comet data if available
+                        const cometData: DiscoveredComet = {
+                            x: comet.x,
+                            y: comet.y,
+                            parentStarX: comet.parentStar.x,
+                            parentStarY: comet.parentStar.y,
+                            cometTypeName: comet.cometType.name,
+                            cometType: {
+                                name: comet.cometType.name,
+                                tailColors: comet.cometType.tailColors,
+                                nucleusColor: comet.cometType.nucleusColor
+                            },
+                            orbit: {
+                                semiMajorAxis: comet.orbit.semiMajorAxis,
+                                eccentricity: comet.orbit.eccentricity,
+                                perihelionDistance: comet.orbit.perihelionDistance,
+                                aphelionDistance: comet.orbit.aphelionDistance,
+                                argumentOfPerihelion: comet.orbit.argumentOfPerihelion
+                            },
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                        
+                        discoveredComets.push(cometData);
+                    } else {
+                        // Use stored discovery data if comet is not in active chunks
+                        // This happens when the comet was discovered but its chunk is no longer loaded
+                        const storedCometData: DiscoveredComet = {
+                            x: cometX,
+                            y: cometY,
+                            parentStarX: 0, // Will need to reconstruct or store this
+                            parentStarY: 0,
+                            cometTypeName: discoveryData.cometTypeName || 'Unknown Comet',
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp
+                        };
+                        
+                        discoveredComets.push(storedCometData);
+                    }
+                }
+            }
+        }
+        
+        return discoveredComets;
+    }
+
+    // Helper method to find a comet by identifier in active chunks
+    private findCometByIdentifier(cometIndex: number, originalCometX: number, originalCometY: number): any | null {
+        for (const chunk of this.activeChunks.values()) {
+            for (const comet of chunk.comets) {
+                // Match by comet index first (most reliable identifier)
+                if (comet.cometIndex === cometIndex) {
+                    // Additional verification: check if this comet could have been at the original position
+                    // We'll be more lenient here since comets move significantly
+                    const distanceFromOriginal = Math.sqrt(
+                        (comet.x - originalCometX) ** 2 + (comet.y - originalCometY) ** 2
+                    );
+                    
+                    // If the comet is within a reasonable orbital distance of the original position,
+                    // or if the cometIndex matches (which should be unique per star system),
+                    // consider it a match
+                    const maxOrbitalDistance = comet.orbit?.semiMajorAxis ? comet.orbit.semiMajorAxis * 2 : 1000;
+                    
+                    if (distanceFromOriginal <= maxOrbitalDistance) {
+                        return comet;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }
 
 // Export interfaces for use by other modules
-export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole };
+export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet };

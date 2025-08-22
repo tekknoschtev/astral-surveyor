@@ -87,6 +87,13 @@ interface CometLike {
     };
     parentStarX?: number;
     parentStarY?: number;
+    orbit?: {
+        semiMajorAxis: number;
+        eccentricity: number;
+        perihelionDistance: number;
+        aphelionDistance: number;
+        argumentOfPerihelion: number;
+    };
     objectName?: string;
     timestamp?: number;
 }
@@ -134,6 +141,8 @@ export class StellarMap {
     hoveredAsteroidGarden: AsteroidGardenLike | null;
     selectedBlackHole: BlackHoleLike | null;
     hoveredBlackHole: BlackHoleLike | null;
+    selectedComet: CometLike | null;
+    hoveredComet: CometLike | null;
     namingService: NamingService | null;
     
     // Interactive panning state
@@ -170,6 +179,8 @@ export class StellarMap {
         this.hoveredAsteroidGarden = null;
         this.selectedBlackHole = null;
         this.hoveredBlackHole = null;
+        this.selectedComet = null;
+        this.hoveredComet = null;
         this.namingService = null; // Will be injected
         
         // Interactive panning state
@@ -323,7 +334,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -335,7 +346,10 @@ export class StellarMap {
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
+            this.selectedWormhole = null;
             this.selectedAsteroidGarden = null;
+            this.selectedBlackHole = null;
+            this.selectedComet = null;
             return false;
         }
         
@@ -478,26 +492,60 @@ export class StellarMap {
                 }
             }
         }
+
+        // Check for comet clicks
+        let closestComet: CometLike | null = null;
+        let closestCometDistance = Infinity;
+
+        if (discoveredComets) {
+            for (const comet of discoveredComets) {
+                const cometMapX = mapX + mapWidth/2 + (comet.x - this.centerX) * worldToMapScale;
+                const cometMapY = mapY + mapHeight/2 + (comet.y - this.centerY) * worldToMapScale;
+
+                // Use slightly larger click threshold for comets due to their tail
+                const cometClickThreshold = Math.max(15, clickThreshold);
+                if (cometMapX >= mapX && cometMapX <= mapX + mapWidth && 
+                    cometMapY >= mapY && cometMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - cometMapX)**2 + (mouseY - cometMapY)**2);
+                    if (distance <= cometClickThreshold && distance < closestCometDistance) {
+                        closestComet = comet;
+                        closestCometDistance = distance;
+                    }
+                }
+            }
+        }
         
-        // Select the closest object (prioritize order: planets > wormholes > nebulae > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+        // Select the closest object (prioritize order: planets > wormholes > nebulae > comets > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
             this.selectedNebula = null;
             this.selectedWormhole = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
-        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.selectedComet = null;
+        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedWormhole = closestWormhole;
             this.selectedStar = null;
             this.selectedPlanet = null;
             this.selectedNebula = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.selectedComet = null;
+        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedNebula = closestNebula;
             this.selectedStar = null;
             this.selectedPlanet = null;
+            this.selectedWormhole = null;
+            this.selectedBlackHole = null;
+            this.selectedAsteroidGarden = null;
+            this.selectedComet = null;
+        } else if (closestComet && closestCometDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.selectedComet = closestComet;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
+            this.selectedNebula = null;
             this.selectedWormhole = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
@@ -508,6 +556,7 @@ export class StellarMap {
             this.selectedNebula = null;
             this.selectedWormhole = null;
             this.selectedAsteroidGarden = null;
+            this.selectedComet = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.selectedAsteroidGarden = closestAsteroidGarden;
             this.selectedStar = null;
@@ -515,6 +564,7 @@ export class StellarMap {
             this.selectedNebula = null;
             this.selectedWormhole = null;
             this.selectedBlackHole = null;
+            this.selectedComet = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
             this.selectedPlanet = null;
@@ -522,6 +572,7 @@ export class StellarMap {
             this.selectedWormhole = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
+            this.selectedComet = null;
         } else {
             this.selectedStar = null;
             this.selectedPlanet = null;
@@ -529,6 +580,7 @@ export class StellarMap {
             this.selectedNebula = null;
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
+            this.selectedComet = null;
         }
         
         return true; // Consumed the event
@@ -550,7 +602,7 @@ export class StellarMap {
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -565,6 +617,7 @@ export class StellarMap {
             this.hoveredWormhole = null;
             this.hoveredAsteroidGarden = null;
             this.hoveredBlackHole = null;
+            this.hoveredComet = null;
             this.updateCursor(canvas);
             return;
         }
@@ -706,27 +759,61 @@ export class StellarMap {
                 }
             }
         }
+
+        // Check for comet hover
+        let closestComet: CometLike | null = null;
+        let closestCometDistance = Infinity;
+
+        if (discoveredComets) {
+            for (const comet of discoveredComets) {
+                const cometMapX = mapX + mapWidth/2 + (comet.x - this.centerX) * worldToMapScale;
+                const cometMapY = mapY + mapHeight/2 + (comet.y - this.centerY) * worldToMapScale;
+
+                // Use slightly larger hover threshold for comets due to their tail
+                const cometHoverThreshold = Math.max(18, hoverThreshold);
+                if (cometMapX >= mapX && cometMapX <= mapX + mapWidth && 
+                    cometMapY >= mapY && cometMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - cometMapX)**2 + (mouseY - cometMapY)**2);
+                    if (distance <= cometHoverThreshold && distance < closestCometDistance) {
+                        closestComet = comet;
+                        closestCometDistance = distance;
+                    }
+                }
+            }
+        }
         
-        // Set hover state (prioritize order: planets > nebulae > wormholes > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+        // Set hover state (prioritize order: planets > nebulae > wormholes > comets > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.hoveredPlanet = closestPlanet;
             this.hoveredStar = null;
             this.hoveredNebula = null;
             this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.hoveredComet = null;
+        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.hoveredNebula = closestNebula;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
-        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.hoveredComet = null;
+        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.hoveredWormhole = closestWormhole;
             this.hoveredStar = null;
             this.hoveredPlanet = null;
             this.hoveredNebula = null;
+            this.hoveredBlackHole = null;
+            this.hoveredAsteroidGarden = null;
+            this.hoveredComet = null;
+        } else if (closestComet && closestCometDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
+            this.hoveredComet = closestComet;
+            this.hoveredStar = null;
+            this.hoveredPlanet = null;
+            this.hoveredNebula = null;
+            this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
         } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
@@ -736,6 +823,7 @@ export class StellarMap {
             this.hoveredNebula = null;
             this.hoveredWormhole = null;
             this.hoveredAsteroidGarden = null;
+            this.hoveredComet = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.hoveredAsteroidGarden = closestAsteroidGarden;
             this.hoveredStar = null;
@@ -743,6 +831,7 @@ export class StellarMap {
             this.hoveredNebula = null;
             this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
+            this.hoveredComet = null;
         } else if (closestStar) {
             this.hoveredStar = closestStar;
             this.hoveredPlanet = null;
@@ -750,6 +839,7 @@ export class StellarMap {
             this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
+            this.hoveredComet = null;
         } else {
             this.hoveredStar = null;
             this.hoveredPlanet = null;
@@ -757,6 +847,7 @@ export class StellarMap {
             this.hoveredWormhole = null;
             this.hoveredBlackHole = null;
             this.hoveredAsteroidGarden = null;
+            this.hoveredComet = null;
         }
         
         // Update cursor based on hover state
@@ -764,7 +855,7 @@ export class StellarMap {
     }
     
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole) {
+        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet) {
             canvas.style.cursor = 'pointer';
         } else if (this.visible) {
             // Use crosshair for map navigation when visible
@@ -824,7 +915,7 @@ export class StellarMap {
         this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.01);
     }
 
-    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null): void {
+    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -891,6 +982,11 @@ export class StellarMap {
         // Draw discovered black holes (gravitational anomalies with accretion discs)
         if (discoveredBlackHoles && discoveredBlackHoles.length > 0) {
             this.renderDiscoveredBlackHoles(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredBlackHoles);
+        }
+
+        // Draw discovered comets (elliptical orbital objects with visible tails)
+        if (discoveredComets && discoveredComets.length > 0) {
+            this.renderDiscoveredComets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredComets);
         }
         
         // Draw origin (0,0) marker
@@ -2025,6 +2121,8 @@ export class StellarMap {
             this.renderWormholeInfoPanel(ctx, canvas);
         } else if (this.selectedBlackHole && this.namingService) {
             this.renderBlackHoleInfoPanel(ctx, canvas);
+        } else if (this.selectedComet && this.namingService) {
+            this.renderCometInfoPanel(ctx, canvas);
         } else if (this.selectedAsteroidGarden && this.namingService) {
             this.renderAsteroidGardenInfoPanel(ctx, canvas);
         }
@@ -2259,6 +2357,72 @@ export class StellarMap {
         } catch (error) {
             console.warn('Failed to generate nebula name:', error);
             return `Nebula`;
+        }
+    }
+
+    renderCometInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        if (!this.selectedComet || !this.namingService) return;
+        
+        // Panel dimensions and position (consistent with other panels)
+        const panelWidth = 320;
+        const panelHeight = 140;
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel content
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '12px "Courier New", monospace';
+        
+        let lineY = panelY + 20;
+        const lineHeight = 18;
+        
+        // Comet designation
+        const cometName = this.generateCometDisplayName(this.selectedComet);
+        ctx.fillText(`Designation: ${cometName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Comet type
+        const cometTypeName = this.selectedComet.cometType?.name || 'Unknown Comet';
+        ctx.fillText(`Type: ${cometTypeName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Orbital characteristics if available
+        if (this.selectedComet.parentStarX !== undefined && this.selectedComet.parentStarY !== undefined) {
+            const distance = Math.sqrt(
+                (this.selectedComet.x - this.selectedComet.parentStarX) ** 2 + 
+                (this.selectedComet.y - this.selectedComet.parentStarY) ** 2
+            );
+            ctx.fillText(`Current Distance: ${distance.toFixed(1)} AU`, panelX + 10, lineY);
+            lineY += lineHeight;
+            
+            // Show orbital data if available
+            if ((this.selectedComet as any).orbit) {
+                const orbit = (this.selectedComet as any).orbit;
+                ctx.fillText(`Eccentricity: ${orbit.eccentricity.toFixed(3)}`, panelX + 10, lineY);
+                lineY += lineHeight;
+            }
+        }
+        
+        // Composition note
+        ctx.fillText(`Composition: Ice and Rock`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Comet position
+        ctx.fillText(`Position: (${Math.round(this.selectedComet.x)}, ${Math.round(this.selectedComet.y)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Discovery timestamp if available
+        if (this.selectedComet.timestamp) {
+            const date = new Date(this.selectedComet.timestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
         }
     }
 
@@ -2515,6 +2679,229 @@ export class StellarMap {
         // Reset text alignment and baseline
         ctx.textBaseline = 'alphabetic';
         ctx.restore();
+    }
+
+    renderDiscoveredComets(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredComets: CometLike[]): void {
+        if (!discoveredComets) return;
+
+        for (const comet of discoveredComets) {
+            // Calculate comet position on map
+            const cometMapX = mapX + ((comet.x - this.centerX) * scale) + mapWidth / 2;
+            const cometMapY = mapY + ((comet.y - this.centerY) * scale) + mapHeight / 2;
+
+            // Check if comet is visible on the map
+            if (cometMapX < mapX - 30 || cometMapX > mapX + mapWidth + 30 ||
+                cometMapY < mapY - 30 || cometMapY > mapY + mapHeight + 30) {
+                continue;
+            }
+
+            ctx.save();
+
+            // Calculate comet size based on zoom level
+            const baseSize = 3;
+            const cometSize = Math.max(1.5, baseSize * Math.sqrt(this.zoomLevel));
+            
+            // Render elliptical orbit if zoom level is high enough and we have orbit data
+            if (this.zoomLevel > 1.5 && comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
+                this.renderCometOrbit(ctx, mapX, mapY, mapWidth, mapHeight, scale, comet);
+            }
+
+            // Render comet nucleus
+            const nucleusColor = comet.cometType?.nucleusColor || '#E0FFFF';
+            ctx.fillStyle = nucleusColor;
+            ctx.beginPath();
+            ctx.arc(cometMapX, cometMapY, cometSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Add bright center
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(cometMapX, cometMapY, cometSize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Render stylized tail pointing away from parent star (if we have parent star data)
+            if (comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
+                this.renderCometTail(ctx, cometMapX, cometMapY, scale, comet);
+            }
+
+            // Add hover highlight if this comet is hovered (but not selected)
+            if (this.hoveredComet === comet && this.selectedComet !== comet) {
+                ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent amber
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                const hoverRadius = cometSize + 3;
+                ctx.arc(cometMapX, cometMapY, hoverRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // Add selection highlight if this comet is selected (takes precedence over hover)
+            if (this.selectedComet === comet) {
+                ctx.strokeStyle = this.currentPositionColor; // Full amber
+                ctx.lineWidth = 2;
+                const selectionRadius = cometSize + 4;
+                ctx.beginPath();
+                ctx.arc(cometMapX, cometMapY, selectionRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            // Render comet label if zoomed in enough or selected
+            if (this.zoomLevel > 2.0 || this.selectedComet === comet) {
+                this.renderCometLabel(ctx, comet, cometMapX, cometMapY);
+            }
+        }
+    }
+
+    renderCometOrbit(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, comet: CometLike): void {
+        if (!comet.parentStarX || !comet.parentStarY) return;
+
+        // Calculate parent star position on map
+        const starMapX = mapX + ((comet.parentStarX - this.centerX) * scale) + mapWidth / 2;
+        const starMapY = mapY + ((comet.parentStarY - this.centerY) * scale) + mapHeight / 2;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // Semi-transparent white
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]); // Dashed line for orbit
+
+        // If we have orbit data, render actual ellipse
+        if (comet.orbit) {
+            const orbit = comet.orbit;
+            
+            // Calculate ellipse parameters for map display
+            const semiMajorAxis = orbit.semiMajorAxis * scale;
+            const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - orbit.eccentricity * orbit.eccentricity);
+            
+            // Calculate ellipse center (offset from star due to eccentricity)
+            const focalDistance = orbit.eccentricity * semiMajorAxis;
+            const ellipseCenterX = starMapX - focalDistance * Math.cos(orbit.argumentOfPerihelion || 0);
+            const ellipseCenterY = starMapY - focalDistance * Math.sin(orbit.argumentOfPerihelion || 0);
+
+            // Draw elliptical orbit
+            ctx.beginPath();
+            ctx.ellipse(
+                ellipseCenterX, 
+                ellipseCenterY, 
+                semiMajorAxis, 
+                semiMinorAxis, 
+                orbit.argumentOfPerihelion || 0, 
+                0, 
+                Math.PI * 2
+            );
+            ctx.stroke();
+        } else {
+            // Fallback: draw circular orbit based on current distance
+            const currentDistance = Math.sqrt(
+                (comet.x - comet.parentStarX) ** 2 + 
+                (comet.y - comet.parentStarY) ** 2
+            );
+            const orbitRadius = currentDistance * scale;
+
+            ctx.beginPath();
+            ctx.arc(starMapX, starMapY, orbitRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    renderCometTail(ctx: CanvasRenderingContext2D, cometMapX: number, cometMapY: number, scale: number, comet: CometLike): void {
+        if (!comet.parentStarX || !comet.parentStarY) return;
+
+        // Calculate direction from parent star to comet (tail points away from star)
+        const dx = comet.x - comet.parentStarX;
+        const dy = comet.y - comet.parentStarY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance === 0) return;
+
+        const tailDirection = { x: dx / distance, y: dy / distance };
+        const tailLength = Math.min(20 * Math.sqrt(this.zoomLevel), 30); // Scale with zoom
+
+        // Calculate tail end position
+        const tailEndX = cometMapX + tailDirection.x * tailLength;
+        const tailEndY = cometMapY + tailDirection.y * tailLength;
+
+        ctx.save();
+        
+        // Create gradient for tail
+        const gradient = ctx.createLinearGradient(cometMapX, cometMapY, tailEndX, tailEndY);
+        const tailColors = comet.cometType?.tailColors || ['#87CEEB', '#B0E0E6', '#E0FFFF'];
+        
+        gradient.addColorStop(0, tailColors[0] + 'CC'); // 80% opacity at base
+        gradient.addColorStop(0.5, tailColors[1] + '80'); // 50% opacity at middle
+        gradient.addColorStop(1, tailColors[2] + '33'); // 20% opacity at tip
+
+        // Draw tail as thick line
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = Math.max(2, 4 * Math.sqrt(this.zoomLevel));
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(cometMapX, cometMapY);
+        ctx.lineTo(tailEndX, tailEndY);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    renderCometLabel(ctx: CanvasRenderingContext2D, comet: CometLike, mapX: number, mapY: number): void {
+        ctx.save();
+        
+        const displayName = this.generateCometDisplayName(comet);
+        
+        // Calculate offset position for scientific diagram style  
+        const offsetDistance = 20; // Distance from comet center
+        const offsetAngle = Math.PI / 4; // 45 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = mapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = mapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from comet edge to text
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of comet (approximate size)
+        const cometSize = 3; // Approximate comet visual size
+        const lineStartX = mapX + Math.cos(offsetAngle) * (cometSize + 2);
+        const lineStartY = mapY + Math.sin(offsetAngle) * (cometSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
+        ctx.font = this.getLabelFont();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        
+        // Draw text outline and fill
+        ctx.strokeText(displayName, labelX, labelY);
+        ctx.fillText(displayName, labelX, labelY);
+        
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
+        ctx.restore();
+    }
+
+    generateCometDisplayName(comet: CometLike): string {
+        // Use stored comet name from discovery data if available
+        if (comet.objectName) {
+            return comet.objectName;
+        }
+
+        // Fallback based on comet type
+        if (comet.cometType?.name) {
+            return comet.cometType.name;
+        } else {
+            return 'Comet';
+        }
     }
 
     generateBlackHoleDisplayName(blackHole: BlackHoleLike): string {
