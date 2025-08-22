@@ -1,4 +1,4 @@
-# Astral Surveyor - Developer Guide
+a# Astral Surveyor - Developer Guide
 
 ## 🏗️ Architecture Overview
 
@@ -18,15 +18,21 @@ Astral Surveyor uses a **TypeScript + ES6 modules** architecture with a build pi
 ```
 src/                    # TypeScript source files
 ├── services/           # Service-oriented architecture
-│   ├── AudioService.ts       # Audio management service
-│   ├── CelestialService.ts   # Celestial object management
-│   ├── DiscoveryService.ts   # Discovery logic service
-│   ├── EventSystem.ts       # Event-driven communication
-│   ├── PerformanceMonitor.ts # Performance tracking
-│   ├── PluginManager.ts     # Plugin system management
-│   ├── ServiceOrchestrator.ts # Service coordination
-│   ├── StateManager.ts      # Game state management
-│   └── WorldService.ts      # World generation service
+│   ├── AudioService.ts           # Audio management service
+│   ├── CelestialFactory.ts       # Factory for celestial object creation
+│   ├── CelestialService.ts       # Celestial object management
+│   ├── DIContainer.ts            # Dependency injection container
+│   ├── DiscoveryManager.ts       # Discovery management service
+│   ├── DiscoveryService.ts       # Discovery logic service
+│   ├── DiscoveryVisualizationService.ts # Enhanced discovery feedback
+│   ├── ErrorBoundary.ts          # Error handling and recovery
+│   ├── EventSystem.ts            # Event-driven communication
+│   ├── PerformanceMonitor.ts     # Performance tracking and optimization
+│   ├── PluginManager.ts          # Plugin system management
+│   ├── ServiceFactory.ts         # Service factory pattern
+│   ├── ServiceOrchestrator.ts    # Service coordination and lifecycle
+│   ├── StateManager.ts           # Game state management
+│   └── WorldService.ts           # World generation service
 ├── types/              # Comprehensive type definitions
 │   ├── CelestialTypes.ts    # Celestial object interfaces
 │   ├── GameState.ts         # Game state types
@@ -38,15 +44,26 @@ src/                    # TypeScript source files
 │   ├── Star.ts             # Star class and types
 │   ├── Planet.ts           # Planet class and types
 │   ├── Moon.ts             # Moon class with orbital mechanics
-│   ├── CelestialFactory.ts # Factory for object creation
+│   ├── asteroids.ts        # Asteroid garden systems
+│   ├── blackholes.ts       # Black hole celestial objects
+│   ├── comets.ts           # Comet system with advanced visual effects
+│   ├── nebulae.ts          # Nebula generation and types
+│   ├── wormholes.ts        # Wormhole discovery objects
+│   ├── CelestialTypes.ts   # Type definitions for all celestial objects
 │   └── celestial.ts        # Barrel export file
 ├── world/              # World generation domain
 │   ├── ChunkManager.ts     # Chunk-based world management
 │   ├── InfiniteStarField.ts # Star field generation
 │   └── world.ts            # Barrel export file
 ├── config/             # Configuration management
+│   ├── ConfigService.ts    # Configuration service management
 │   ├── GameConstants.ts    # Game configuration constants
-│   └── VisualConfig.ts     # Visual configuration settings
+│   ├── VisualConfig.ts     # Visual configuration settings
+│   └── gameConfig.ts       # Game configuration utilities
+├── debug/              # Developer tools and debugging
+│   ├── CommandRegistry.ts  # Debug command registration system
+│   ├── DeveloperConsole.ts # In-game developer console
+│   └── debug-spawner.ts    # Debug spawning system (Shift+W, Shift+B)
 ├── utils/
 │   └── random.ts      # Seeded RNG & universe coordinates
 ├── graphics/
@@ -101,11 +118,20 @@ npm run dev           # TypeScript watch mode
 npm run clean         # Remove dist/ directory  
 npm run rebuild       # Clean + build
 
+# Code Quality
+npm run lint          # Check for code quality issues
+npm run lint:fix      # Auto-fix linting problems
+npm run format        # Format code with Prettier
+npm run format:check  # Verify formatting compliance
+
 # Testing
 npm test              # Build + run all tests
 npm run test:watch    # Build + watch mode testing
 npm run test:coverage # Build + coverage report
 npm run test:ui       # Build + visual test interface
+
+# Local Development Server
+npm run serve         # Start local development server on port 3000
 ```
 
 ## 🧪 Testing Strategy
@@ -113,7 +139,8 @@ npm run test:ui       # Build + visual test interface
 ### **Test Architecture**
 - Tests import from compiled JavaScript in `dist/`
 - **Coverage targets**: 80%+ on critical systems
-- **Current coverage**: 88.54% naming, 93.54% random utilities
+- **Current test count**: 2,400+ comprehensive tests covering all major systems
+- **Coverage**: High coverage on core logic (naming, random utilities, services)
 
 ### **Test Organization**
 ```
@@ -132,7 +159,12 @@ tests/
 ├── config/                     # Configuration management tests
 │   └── configservice.test.js         # Configuration validation
 ├── celestial/                  # Celestial object tests
-│   └── celestial.test.js             # Discovery logic & physics
+│   ├── asteroids.test.js            # Asteroid garden testing
+│   ├── celestial.test.js            # Core celestial discovery logic & physics
+│   ├── comets.test.js               # Comet system comprehensive testing
+│   ├── comet-*.test.js              # Specialized comet feature tests
+│   ├── nebulae.test.js              # Nebula generation testing
+│   └── wormholes.test.js            # Wormhole system testing
 ├── utils/random.test.js        # Seeded RNG & coordinate systems
 ├── naming/naming.test.js       # Astronomical naming conventions
 ├── naming/planet-moon-naming.test.js # Planet/moon designations
@@ -151,13 +183,21 @@ tests/
 
 ## 🎯 Core Systems
 
+### **Developer Tools and Debugging** (`src/debug/`)
+- **Developer Console**: In-game console accessible during development
+- **Command Registry**: Extensible system for registering debug commands
+- **Debug Spawning**: Quick object spawning with Shift+W (wormholes) and Shift+B (black holes)
+- **Error Boundary**: Production-ready error handling with graceful recovery
+- **Performance Monitor**: Real-time performance tracking and optimization alerts
+
 ### **Service Architecture** (`src/services/`)
-- **Dependency Injection**: Constructor-based service injection for testability
+- **Dependency Injection**: Constructor-based service injection for testability (DIContainer)
 - **Event System**: Loose coupling through publish/subscribe patterns
 - **Service Orchestration**: Centralized coordination of cross-service interactions
 - **Plugin Management**: Extensible architecture for community contributions
 - **Performance Monitoring**: Real-time tracking and optimization
 - **Error Handling**: Comprehensive recovery strategies and graceful degradation
+- **Discovery Visualization**: Enhanced user feedback for celestial discoveries
 
 ### **Plugin System** (`src/services/PluginManager.ts`)
 - **Multiple Plugin Types**: Celestial, discovery, audio, visual, gameplay, data
@@ -182,11 +222,18 @@ tests/
 - Realistic star type distributions via InfiniteStarField
 - Orbital mechanics following Kepler's laws
 
+### **Celestial Object System** (`src/celestial/`)
+- **Complete Object Types**: Stars, planets, moons, comets, nebulae, wormholes, black holes, asteroid gardens
+- **Comet System**: Advanced visual effects with dynamic tails and specialized discovery mechanics
+- **Procedural Generation**: Realistic distributions and physical plausibility
+- **Orbital Mechanics**: Following Kepler's laws for planets and moons
+
 ### **Discovery System** (`src/services/DiscoveryService.ts`, `src/celestial/`)
-- Centralized discovery logic service
+- Centralized discovery logic service with enhanced visualization
 - Tiered discovery ranges (stars: 500px, planets: 40px, moons: 30px)
 - Visual-based star discovery for navigation
 - Distance-based planet/moon discovery for exploration
+- Specialized discovery mechanics for comets and rare celestial objects
 - Extensible through plugin system
 
 ## 📋 Development Guidelines
@@ -219,7 +266,8 @@ tests/
 1. Create feature branch from main
 2. Make changes in `src/` directory only (follow service architecture)
 3. Write tests first for new services or architectural changes (TDD)
-4. Run `npm run build && npm test` before committing (all 1,157+ tests must pass)
+4. Run `npm run build && npm test` before committing (all 2,400+ tests must pass)
+4a. Run `npm run lint` to ensure code quality standards are met
 5. Exclude `dist/` from commits (it's auto-generated)
 6. Create PR - GitHub Actions will verify build + tests
 7. Consider performance impact and update documentation if needed
