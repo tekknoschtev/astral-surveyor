@@ -49,6 +49,23 @@ export class SoundManager {
     }> = [];
     private ambientMasterGain: GainNode | null = null;
     private ambientUpdateInterval: number | null = null;
+    
+    // Melodic progression system
+    private melodicState: {
+        nextSequenceTime: number;
+        currentSequence: Array<{
+            oscillator: OscillatorNode;
+            gain: GainNode;
+            frequency: number;
+            startTime: number;
+            duration: number;
+        }> | null;
+        isPlaying: boolean;
+    } = {
+        nextSequenceTime: 0,
+        currentSequence: null,
+        isPlaying: false
+    };
     private initialized: boolean = false;
     private muted: boolean = false;
     
@@ -639,10 +656,15 @@ export class SoundManager {
                 this.ambientLayers.push(layer);
             }
             
-            // Start the evolution update loop
+            // Initialize melodic system
+            this.melodicState.nextSequenceTime = now + 15 + Math.random() * 15; // First sequence in 15-30 seconds
+            this.melodicState.currentSequence = null;
+            this.melodicState.isPlaying = false;
+            
+            // Start the evolution update loop (handles both ambient and melodic)
             this.startAmbientEvolution();
             
-            console.log('Space drone started - atmospheric background audio');
+            console.log('Space drone started - atmospheric background audio with melodic progressions');
             
         } catch (error) {
             console.warn('Failed to start space drone:', error);
@@ -672,6 +694,9 @@ export class SoundManager {
                 // Gradually adjust volume towards target
                 this.updateLayerVolume(layer, now);
             }
+            
+            // Handle melodic progressions
+            this.updateMelodicSequences(now);
         };
         
         // Update every 100ms for smooth evolution
@@ -721,6 +746,129 @@ export class SoundManager {
     }
 
     /**
+     * Update melodic sequences - handles SATRN-inspired rising progressions
+     */
+    private updateMelodicSequences(currentTime: number): void {
+        if (!this.context || !this.ambientMasterGain) return;
+        
+        // Check if it's time to start a new melodic sequence
+        if (currentTime >= this.melodicState.nextSequenceTime && !this.melodicState.isPlaying) {
+            this.startMelodicSequence(currentTime);
+        }
+        
+        // Clean up finished sequences
+        if (this.melodicState.currentSequence) {
+            const activeNotes = this.melodicState.currentSequence.filter(note => 
+                currentTime < note.startTime + note.duration + 0.5 // 0.5s fade buffer
+            );
+            
+            if (activeNotes.length === 0) {
+                this.melodicState.currentSequence = null;
+                this.melodicState.isPlaying = false;
+                // Schedule next sequence in 15-30 seconds
+                this.melodicState.nextSequenceTime = currentTime + 15 + Math.random() * 15;
+            }
+        }
+    }
+
+    /**
+     * Start a new melodic sequence - creates rising note progression
+     */
+    private startMelodicSequence(currentTime: number): void {
+        if (!this.context || !this.ambientMasterGain) return;
+        
+        // Define melodic progressions (frequencies in Hz) - lowered highest notes
+        const progressions = [
+            // Simple ascent: C4→D4→E4→F4
+            [261.6, 293.7, 329.6, 349.2],
+            // Pentatonic rise: C4→D4→G4→A4  
+            [261.6, 293.7, 392.0, 440.0],
+            // Mid ethereal: C4→D4→G4→C5 (lowered from C6 to C5)
+            [261.6, 293.7, 392.0, 523.3],
+            // Gentle rise: G3→C4→E4→G4
+            [196.0, 261.6, 329.6, 392.0],
+            // Warm ascent: F3→G3→C4→D4 (new, stays in comfortable range)
+            [174.6, 196.0, 261.6, 293.7]
+        ];
+        
+        // Randomly select a progression
+        const selectedProgression = progressions[Math.floor(Math.random() * progressions.length)];
+        
+        // Create sequence with staggered timing
+        const sequence = [];
+        let noteStartTime = currentTime + 0.2; // Small initial delay
+        
+        for (let i = 0; i < selectedProgression.length; i++) {
+            const frequency = selectedProgression[i];
+            const duration = 3 + Math.random() * 3; // 3-6 seconds per note - longer for more droning
+            const fadeInTime = 1.2 + Math.random() * 0.8; // 1.2-2 second gentle fade in
+            const fadeOutTime = 1.5 + Math.random() * 1; // 1.5-2.5 second gentle fade out
+            
+            try {
+                const oscillator = this.context.createOscillator();
+                const gain = this.context.createGain();
+                
+                // Configure oscillator for more ethereal quality
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, noteStartTime);
+                
+                // Add subtle frequency drift for organic droning feel
+                const driftAmount = frequency * 0.002; // Very subtle drift (0.2%)
+                oscillator.frequency.linearRampToValueAtTime(
+                    frequency + driftAmount * (Math.random() - 0.5) * 2, 
+                    noteStartTime + duration
+                );
+                
+                // Configure envelope with much longer, more gradual fades
+                const peakVolume = 0.25 + Math.random() * 0.15; // 0.25-0.4 with variation
+                gain.gain.setValueAtTime(0, noteStartTime);
+                gain.gain.linearRampToValueAtTime(peakVolume, noteStartTime + fadeInTime); // Slow fade in
+                
+                // Sustain phase with slight volume breathing
+                const sustainStart = noteStartTime + fadeInTime;
+                const sustainEnd = noteStartTime + duration - fadeOutTime;
+                gain.gain.setValueAtTime(peakVolume, sustainStart);
+                
+                // Add subtle volume breathing during sustain
+                if (sustainEnd > sustainStart) {
+                    const midSustain = sustainStart + (sustainEnd - sustainStart) * 0.5;
+                    const breatheVolume = peakVolume * (0.85 + Math.random() * 0.1); // Subtle variation
+                    gain.gain.linearRampToValueAtTime(breatheVolume, midSustain);
+                    gain.gain.linearRampToValueAtTime(peakVolume, sustainEnd);
+                }
+                
+                // Very gradual fade out - no sharp cutoff
+                gain.gain.linearRampToValueAtTime(0, noteStartTime + duration);
+                
+                // Connect and start
+                oscillator.connect(gain);
+                gain.connect(this.ambientMasterGain);
+                oscillator.start(noteStartTime);
+                oscillator.stop(noteStartTime + duration + 0.1); // Small buffer to avoid clicks
+                
+                sequence.push({
+                    oscillator,
+                    gain,
+                    frequency,
+                    startTime: noteStartTime,
+                    duration: duration + 0.1
+                });
+                
+                // Next note starts with more substantial overlap for droning blend
+                noteStartTime += duration * 0.5; // 50% overlap between notes for more droning effect
+                
+            } catch (error) {
+                console.warn('Failed to create melodic note:', error);
+            }
+        }
+        
+        this.melodicState.currentSequence = sequence;
+        this.melodicState.isPlaying = true;
+        
+        console.log(`Started melodic sequence with ${sequence.length} notes`);
+    }
+
+    /**
      * Stop the atmospheric space drone and all layers
      */
     stopSpaceDrone(): void {
@@ -740,8 +888,22 @@ export class SoundManager {
                 }
             }
             
-            // Clear layer array
+            // Stop any active melodic sequences
+            if (this.melodicState.currentSequence) {
+                for (const note of this.melodicState.currentSequence) {
+                    try {
+                        note.oscillator.stop();
+                    } catch (error) {
+                        // Oscillator might already be stopped, ignore error
+                    }
+                }
+            }
+            
+            // Clear arrays and reset state
             this.ambientLayers = [];
+            this.melodicState.currentSequence = null;
+            this.melodicState.isPlaying = false;
+            this.melodicState.nextSequenceTime = 0;
             
             // Clean up master gain
             this.ambientMasterGain = null;
