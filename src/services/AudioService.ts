@@ -28,6 +28,9 @@ interface ISoundManager {
     playNebulaDiscovery(nebulaType: string): void;
     setVolume?(channel: string, volume: number): void;
     stopAmbient?(): void;
+    startSpaceDrone?(): void;
+    stopSpaceDrone?(): void;
+    isSpaceDronePlaying?(): boolean;
 }
 
 export interface IAudioService {
@@ -54,6 +57,11 @@ export interface IAudioService {
     startAmbient(trackName: string): void;
     stopAmbient(): void;
     isAmbientPlaying(): boolean;
+    
+    // Atmospheric space drone
+    startSpaceDrone(): void;
+    stopSpaceDrone(): void;
+    isSpaceDronePlaying(): boolean;
     
     // Audio system management
     isAudioSupported(): boolean;
@@ -296,6 +304,8 @@ export class AudioService implements IAudioService {
             if (this.soundManager.stopAmbient) {
                 this.soundManager.stopAmbient();
             }
+            // Also stop space drone as part of ambient audio
+            this.stopSpaceDrone();
             this.ambientPlaying = false;
         } catch (error) {
             console.warn('Failed to stop ambient audio:', error);
@@ -307,6 +317,50 @@ export class AudioService implements IAudioService {
      */
     isAmbientPlaying(): boolean {
         return this.ambientPlaying;
+    }
+
+    /**
+     * Start atmospheric space drone
+     * Creates a low, vacant droning sound with ebb and flow modulation inspired by SATRN
+     */
+    startSpaceDrone(): void {
+        this.ensureNotDisposed();
+        
+        if (!this.shouldPlaySound()) return;
+
+        try {
+            if (this.soundManager.startSpaceDrone) {
+                this.soundManager.startSpaceDrone();
+                console.log('Atmospheric space drone started');
+            }
+        } catch (error) {
+            console.warn('Failed to start space drone:', error);
+        }
+    }
+
+    /**
+     * Stop atmospheric space drone
+     */
+    stopSpaceDrone(): void {
+        this.ensureNotDisposed();
+        
+        try {
+            if (this.soundManager.stopSpaceDrone) {
+                this.soundManager.stopSpaceDrone();
+            }
+        } catch (error) {
+            console.warn('Failed to stop space drone:', error);
+        }
+    }
+
+    /**
+     * Check if space drone is currently playing
+     */
+    isSpaceDronePlaying(): boolean {
+        if (this.soundManager.isSpaceDronePlaying) {
+            return this.soundManager.isSpaceDronePlaying();
+        }
+        return false;
     }
 
     /**
@@ -390,8 +444,9 @@ export class AudioService implements IAudioService {
     dispose(): void {
         if (this.disposed) return;
         
-        // Stop any playing ambient audio
+        // Stop any playing ambient audio and space drone
         this.stopAmbient();
+        this.stopSpaceDrone();
         
         // Close audio context
         if (this.audioContext && this.audioContext.state !== 'closed') {

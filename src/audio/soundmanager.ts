@@ -36,6 +36,36 @@ export class SoundManager {
     private effectsGain: GainNode | null = null;
     private sounds: Map<string, SoundConfig> = new Map();
     private currentAmbient: AudioBufferSourceNode | null = null;
+    private ambientLayers: Array<{
+        oscillator: OscillatorNode;
+        gain: GainNode;
+        frequency: number;
+        cycleTime: number;
+        phase: number;
+        targetVolume: number;
+        currentVolume: number;
+        fadeDirection: 'in' | 'out' | 'sustain';
+        nextPhaseTime: number;
+    }> = [];
+    private ambientMasterGain: GainNode | null = null;
+    private ambientUpdateInterval: number | null = null;
+    
+    // Melodic progression system
+    private melodicState: {
+        nextSequenceTime: number;
+        currentSequence: Array<{
+            oscillator: OscillatorNode;
+            gain: GainNode;
+            frequency: number;
+            startTime: number;
+            duration: number;
+        }> | null;
+        isPlaying: boolean;
+    } = {
+        nextSequenceTime: 0,
+        currentSequence: null,
+        isPlaying: false
+    };
     private initialized: boolean = false;
     private muted: boolean = false;
     
@@ -552,11 +582,378 @@ export class SoundManager {
         if (config) this.playOscillatorSound(config);
     }
 
+    /**
+     * Start ethereal space ambient - inspired by SATRN's layered soundscape
+     * Creates multiple evolving tonal layers that fade in and out over time
+     */
+    async startSpaceDrone(): Promise<void> {
+        if (!this.context || !this.ambientGain || this.muted) return;
+        
+        // Resume audio context if suspended (browser autoplay policy)
+        if (this.context.state === 'suspended') {
+            try {
+                await this.context.resume();
+                console.log('Audio context resumed for space drone');
+            } catch (error) {
+                console.warn('Failed to resume audio context:', error);
+                return;
+            }
+        }
+        
+        // Stop any existing ambient layers first
+        this.stopSpaceDrone();
+        
+        try {
+            const now = this.context.currentTime;
+            
+            // Create master gain for all ambient layers
+            this.ambientMasterGain = this.context.createGain();
+            this.ambientMasterGain.gain.setValueAtTime(0.6, now); // Overall ambient volume - moderate level
+            this.ambientMasterGain.connect(this.ambientGain);
+            
+            // Define ethereal frequency layers (harmonically related for pleasant sound)
+            const frequencies = [
+                { freq: 65.4, cycle: 45, phase: 0 },      // C2 - deep foundation
+                { freq: 130.8, cycle: 38, phase: 12 },   // C3 - mid foundation  
+                { freq: 196.0, cycle: 52, phase: 25 },   // G3 - perfect fifth harmony
+                { freq: 261.6, cycle: 41, phase: 38 },   // C4 - octave brightness
+                { freq: 392.0, cycle: 47, phase: 8 },    // G4 - higher harmonic
+                { freq: 523.3, cycle: 55, phase: 31 }    // C5 - ethereal brightness
+            ];
+            
+            // Create each ambient layer
+            for (let i = 0; i < frequencies.length; i++) {
+                const config = frequencies[i];
+                const oscillator = this.context.createOscillator();
+                const gain = this.context.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(config.freq, now);
+                
+                // Start with silence, will fade in/out organically
+                gain.gain.setValueAtTime(0, now);
+                
+                // Connect audio path
+                oscillator.connect(gain);
+                gain.connect(this.ambientMasterGain);
+                
+                // Start oscillator
+                oscillator.start(now);
+                
+                // Create layer data for evolution
+                const layer = {
+                    oscillator,
+                    gain,
+                    frequency: config.freq,
+                    cycleTime: config.cycle,
+                    phase: config.phase,
+                    targetVolume: 0.15 - (i * 0.02), // Higher layers quieter
+                    currentVolume: 0,
+                    fadeDirection: 'in' as 'in' | 'out' | 'sustain',
+                    nextPhaseTime: now + config.phase
+                };
+                
+                this.ambientLayers.push(layer);
+            }
+            
+            // Initialize melodic system
+            this.melodicState.nextSequenceTime = now + 15 + Math.random() * 15; // First sequence in 15-30 seconds
+            this.melodicState.currentSequence = null;
+            this.melodicState.isPlaying = false;
+            
+            // Start the evolution update loop (handles both ambient and melodic)
+            this.startAmbientEvolution();
+            
+            console.log('Space drone started - atmospheric background audio with melodic progressions');
+            
+        } catch (error) {
+            console.warn('Failed to start space drone:', error);
+            this.stopSpaceDrone();
+        }
+    }
+
+    /**
+     * Start the ambient evolution system - handles organic fade in/out of layers
+     */
+    private startAmbientEvolution(): void {
+        if (this.ambientUpdateInterval) {
+            clearInterval(this.ambientUpdateInterval);
+        }
+        
+        const updateEvolution = () => {
+            if (!this.context || this.ambientLayers.length === 0) return;
+            
+            const now = this.context.currentTime;
+            
+            for (const layer of this.ambientLayers) {
+                // Check if it's time for this layer to change phase
+                if (now >= layer.nextPhaseTime) {
+                    this.evolveLayer(layer, now);
+                }
+                
+                // Gradually adjust volume towards target
+                this.updateLayerVolume(layer, now);
+            }
+            
+            // Handle melodic progressions
+            this.updateMelodicSequences(now);
+        };
+        
+        // Update every 100ms for smooth evolution
+        this.ambientUpdateInterval = window.setInterval(updateEvolution, 100);
+    }
+
+    /**
+     * Evolve a layer to its next phase (fade in, sustain, fade out)
+     */
+    private evolveLayer(layer: any, currentTime: number): void {
+        const fadeTime = 8 + Math.random() * 12; // 8-20 second fades for organic feel
+        const sustainTime = 15 + Math.random() * 25; // 15-40 second sustains
+        const silenceTime = 5 + Math.random() * 15; // 5-20 second silence
+        
+        switch (layer.fadeDirection) {
+            case 'in':
+                // Start fading in
+                const fadeInTarget = layer.targetVolume * (0.7 + Math.random() * 0.6); // Vary intensity
+                layer.currentVolume = fadeInTarget;
+                layer.gain.gain.linearRampToValueAtTime(fadeInTarget, currentTime + fadeTime);
+                layer.fadeDirection = 'sustain';
+                layer.nextPhaseTime = currentTime + fadeTime + sustainTime;
+                break;
+                
+            case 'sustain':
+                // Start fading out
+                layer.gain.gain.linearRampToValueAtTime(0, currentTime + fadeTime);
+                layer.currentVolume = 0;
+                layer.fadeDirection = 'out';
+                layer.nextPhaseTime = currentTime + fadeTime + silenceTime;
+                break;
+                
+            case 'out':
+                // Start fading in again
+                layer.fadeDirection = 'in';
+                layer.nextPhaseTime = currentTime + (Math.random() * 3); // Small random delay
+                break;
+        }
+    }
+
+    /**
+     * Smooth volume updates for organic evolution
+     */
+    private updateLayerVolume(layer: any, currentTime: number): void {
+        // This method can add micro-variations or smooth interpolation if needed
+        // Currently the linearRampToValueAtTime handles the volume changes
+    }
+
+    /**
+     * Update melodic sequences - handles SATRN-inspired rising progressions
+     */
+    private updateMelodicSequences(currentTime: number): void {
+        if (!this.context || !this.ambientMasterGain) return;
+        
+        // Check if it's time to start a new melodic sequence
+        if (currentTime >= this.melodicState.nextSequenceTime && !this.melodicState.isPlaying) {
+            this.startMelodicSequence(currentTime);
+        }
+        
+        // Clean up finished sequences
+        if (this.melodicState.currentSequence) {
+            const activeNotes = this.melodicState.currentSequence.filter(note => 
+                currentTime < note.startTime + note.duration + 0.5 // 0.5s fade buffer
+            );
+            
+            if (activeNotes.length === 0) {
+                this.melodicState.currentSequence = null;
+                this.melodicState.isPlaying = false;
+                // Schedule next sequence in 15-30 seconds
+                this.melodicState.nextSequenceTime = currentTime + 15 + Math.random() * 15;
+            }
+        }
+    }
+
+    /**
+     * Start a new melodic sequence - creates rising note progression
+     */
+    private startMelodicSequence(currentTime: number): void {
+        if (!this.context || !this.ambientMasterGain) return;
+        
+        // Define melodic progressions (frequencies in Hz) - lowered highest notes
+        const progressions = [
+            // Simple ascent: C4→D4→E4→F4
+            [261.6, 293.7, 329.6, 349.2],
+            // Pentatonic rise: C4→D4→G4→A4  
+            [261.6, 293.7, 392.0, 440.0],
+            // Mid ethereal: C4→D4→G4→C5 (lowered from C6 to C5)
+            [261.6, 293.7, 392.0, 523.3],
+            // Gentle rise: G3→C4→E4→G4
+            [196.0, 261.6, 329.6, 392.0],
+            // Warm ascent: F3→G3→C4→D4 (new, stays in comfortable range)
+            [174.6, 196.0, 261.6, 293.7]
+        ];
+        
+        // Randomly select a progression
+        const selectedProgression = progressions[Math.floor(Math.random() * progressions.length)];
+        
+        // Create sequence with staggered timing
+        const sequence = [];
+        let noteStartTime = currentTime + 0.2; // Small initial delay
+        
+        for (let i = 0; i < selectedProgression.length; i++) {
+            const frequency = selectedProgression[i];
+            const duration = 3 + Math.random() * 3; // 3-6 seconds per note - longer for more droning
+            const fadeInTime = 1.2 + Math.random() * 0.8; // 1.2-2 second gentle fade in
+            const fadeOutTime = 1.5 + Math.random() * 1; // 1.5-2.5 second gentle fade out
+            
+            try {
+                const oscillator = this.context.createOscillator();
+                const gain = this.context.createGain();
+                
+                // Configure oscillator for more ethereal quality
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, noteStartTime);
+                
+                // Add subtle frequency drift for organic droning feel
+                const driftAmount = frequency * 0.002; // Very subtle drift (0.2%)
+                oscillator.frequency.linearRampToValueAtTime(
+                    frequency + driftAmount * (Math.random() - 0.5) * 2, 
+                    noteStartTime + duration
+                );
+                
+                // Configure envelope with much longer, more gradual fades
+                const peakVolume = 0.25 + Math.random() * 0.15; // 0.25-0.4 with variation
+                gain.gain.setValueAtTime(0, noteStartTime);
+                gain.gain.linearRampToValueAtTime(peakVolume, noteStartTime + fadeInTime); // Slow fade in
+                
+                // Sustain phase with slight volume breathing
+                const sustainStart = noteStartTime + fadeInTime;
+                const sustainEnd = noteStartTime + duration - fadeOutTime;
+                gain.gain.setValueAtTime(peakVolume, sustainStart);
+                
+                // Add subtle volume breathing during sustain
+                if (sustainEnd > sustainStart) {
+                    const midSustain = sustainStart + (sustainEnd - sustainStart) * 0.5;
+                    const breatheVolume = peakVolume * (0.85 + Math.random() * 0.1); // Subtle variation
+                    gain.gain.linearRampToValueAtTime(breatheVolume, midSustain);
+                    gain.gain.linearRampToValueAtTime(peakVolume, sustainEnd);
+                }
+                
+                // Very gradual fade out - no sharp cutoff
+                gain.gain.linearRampToValueAtTime(0, noteStartTime + duration);
+                
+                // Connect and start
+                oscillator.connect(gain);
+                gain.connect(this.ambientMasterGain);
+                oscillator.start(noteStartTime);
+                oscillator.stop(noteStartTime + duration + 0.1); // Small buffer to avoid clicks
+                
+                sequence.push({
+                    oscillator,
+                    gain,
+                    frequency,
+                    startTime: noteStartTime,
+                    duration: duration + 0.1
+                });
+                
+                // Next note starts with more substantial overlap for droning blend
+                noteStartTime += duration * 0.5; // 50% overlap between notes for more droning effect
+                
+            } catch (error) {
+                console.warn('Failed to create melodic note:', error);
+            }
+        }
+        
+        this.melodicState.currentSequence = sequence;
+        this.melodicState.isPlaying = true;
+        
+        console.log(`Started melodic sequence with ${sequence.length} notes`);
+    }
+
+    /**
+     * Stop the atmospheric space drone and all layers
+     */
+    stopSpaceDrone(): void {
+        try {
+            // Stop evolution update loop
+            if (this.ambientUpdateInterval) {
+                clearInterval(this.ambientUpdateInterval);
+                this.ambientUpdateInterval = null;
+            }
+            
+            // Stop all ambient layers
+            for (const layer of this.ambientLayers) {
+                try {
+                    layer.oscillator.stop();
+                } catch (error) {
+                    // Oscillator might already be stopped, ignore error
+                }
+            }
+            
+            // Stop any active melodic sequences
+            if (this.melodicState.currentSequence) {
+                for (const note of this.melodicState.currentSequence) {
+                    try {
+                        note.oscillator.stop();
+                    } catch (error) {
+                        // Oscillator might already be stopped, ignore error
+                    }
+                }
+            }
+            
+            // Clear arrays and reset state
+            this.ambientLayers = [];
+            this.melodicState.currentSequence = null;
+            this.melodicState.isPlaying = false;
+            this.melodicState.nextSequenceTime = 0;
+            
+            // Clean up master gain
+            this.ambientMasterGain = null;
+            
+        } catch (error) {
+            console.warn('Error stopping space drone:', error);
+        }
+    }
+
+    /**
+     * Check if space drone is currently playing
+     */
+    isSpaceDronePlaying(): boolean {
+        return this.ambientLayers.length > 0 && this.ambientUpdateInterval !== null;
+    }
+
+    /**
+     * Resume audio context if suspended - call on user interaction
+     */
+    async resumeAudioContext(): Promise<boolean> {
+        if (!this.context) return false;
+        
+        if (this.context.state === 'suspended') {
+            try {
+                await this.context.resume();
+                console.log('Audio context resumed after user interaction');
+                return true;
+            } catch (error) {
+                console.warn('Failed to resume audio context:', error);
+                return false;
+            }
+        }
+        return true; // Already running
+    }
+
+    /**
+     * Get audio context state for debugging
+     */
+    getAudioContextState(): string {
+        return this.context?.state || 'no-context';
+    }
+
     dispose(): void {
         if (this.currentAmbient) {
             this.currentAmbient.stop();
             this.currentAmbient = null;
         }
+        
+        // Clean up space drone
+        this.stopSpaceDrone();
         
         if (this.context) {
             this.context.close();

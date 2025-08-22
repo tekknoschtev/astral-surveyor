@@ -158,6 +158,9 @@ export class Game {
         this.stellarMap.setNamingService(this.namingService);
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
+        
+        // Space drone will be started on first user interaction due to browser autoplay policies
+        
         this.discoveryManager = new DiscoveryManager(
             this.soundManager,
             this.discoveryDisplay,
@@ -269,16 +272,8 @@ export class Game {
             return; // Skip normal updates during cosmic transition
         }
         
-        // Resume audio context on first user interaction (required by browsers)
-        // Note: This functionality is temporarily disabled to fix TypeScript compilation
-        // TODO: Add public methods to SoundManager and Input classes for context access
-        /*
-        if (this.soundManager.context && this.soundManager.context.state === 'suspended') {
-            if (this.input.keys.size > 0 || this.input.isMousePressed() || this.input.wasClicked()) {
-                this.soundManager.context.resume();
-            }
-        }
-        */
+        // Resume audio context and start space drone on first user interaction (required by browsers)
+        this.handleAudioContextActivation();
         
         // Handle coordinate copying (C key)
         if (this.input.wasJustPressed('KeyC')) {
@@ -667,7 +662,22 @@ export class Game {
         console.log(`🌀 Starting wormhole traversal: ${wormhole.pairId} → destination ${destinationDesignation}`);
     }
 
-
+    private async handleAudioContextActivation(): Promise<void> {
+        // Check for user interaction and resume audio context if needed
+        const hasUserInteraction = this.input.keys.size > 0 || 
+                                  this.input.isMousePressed() || 
+                                  this.input.wasClicked() ||
+                                  this.input.getTouchCount() > 0;
+        
+        if (hasUserInteraction && this.soundManager.getAudioContextState() === 'suspended') {
+            const resumed = await this.soundManager.resumeAudioContext();
+            if (resumed && !this.soundManager.isSpaceDronePlaying()) {
+                // Start space drone after successful audio context resume
+                this.soundManager.startSpaceDrone();
+                this.discoveryDisplay.addNotification('🌌 Atmospheric audio enabled');
+            }
+        }
+    }
 
     render(): void {
         this.renderer.clear();
