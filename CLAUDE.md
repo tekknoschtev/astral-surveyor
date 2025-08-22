@@ -50,13 +50,32 @@ Avoid relying on side effects or global state - keep behavior predictable.
 - **Plugin system** enables community extensibility for celestial objects, discovery types, and audio content
 - **Error resilience** with comprehensive error handling and graceful degradation
 - **Performance monitoring** for optimization and regression detection
+- **Developer tooling** with in-game console, debug commands, and quality assurance systems
 - Core values: testability, simplicity, emergent wonder, extensibility
+
+## Current Service Architecture
+* **ServiceOrchestrator** coordinates cross-service interactions and lifecycle management
+* **EventSystem** enables loose coupling between components with pub/sub patterns
+* **PerformanceMonitor** tracks optimization opportunities and performance regressions
+* **ErrorBoundary** provides graceful error handling and recovery mechanisms
+* **DiscoveryVisualizationService** enhances user feedback for celestial discoveries
+* **CelestialFactory** and **CelestialService** manage procedural object generation
+* **AudioService** provides immersive soundscapes and discovery audio feedback
+* **WorldService** handles infinite world generation with chunk-based loading
 
 # Not Yet Prioritized 
 Some things that **are not** priorities right now:
 * Multiplayer or networking
 * Backend services or logins
 * Real-time simulation or physics 
+
+# Code Quality Standards
+**Linting and Formatting**
+* Use `npm run lint` to check for code quality issues
+* Use `npm run lint:fix` to auto-fix linting problems
+* Use `npm run format` to format code with Prettier
+* Use `npm run format:check` to verify formatting compliance
+* All code must pass linting before merge - enforced by CI
 
 # Testing Strategy
 **Automated Unit Testing with Vitest**
@@ -85,6 +104,18 @@ npm run test:coverage # Build + generate coverage report
 npm run test:ui       # Build + open Vitest UI in browser
 npm run dev           # TypeScript watch mode for development
 ```
+
+# Developer Tools and Debugging
+**Developer Console**
+* Built-in developer console accessible in-game
+* Command registry system for extensible debug commands
+* Debug spawning system (Shift+W, Shift+B) for testing celestial objects
+* Error boundary and performance monitoring for production resilience
+
+**Quality Assurance**
+* PerformanceMonitor tracks optimization opportunities and regression detection
+* ErrorBoundary provides graceful error handling without crashes
+* Comprehensive logging for debugging complex procedural generation issues
 
 # TypeScript Development Workflow
 
