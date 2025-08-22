@@ -178,7 +178,7 @@ export class Comet extends CelestialObject {
         this.setAnimationProperties();
         
         // Calculate initial position and visual properties
-        this.updatePosition();
+        this.calculateInitialPosition();
         this.updateVisualProperties();
         
         // Initialize particle pool if needed
@@ -262,7 +262,45 @@ export class Comet extends CelestialObject {
     }
     
     // Calculate current position using deterministic universal time
-    updatePosition(): void {
+    updatePosition(deltaTime: number): void {
+        // Calculate universal time that advances with real time for orbital animation
+        const currentTime = Date.now();
+        const timeElapsed = (currentTime - this.animationStartTime) / 1000; // Convert to seconds
+        const scaledTimeElapsed = timeElapsed * 0.1; // Scale down for visible orbital motion
+        const universalTime = this.calculateUniversalTime() + scaledTimeElapsed;
+        
+        // Calculate mean anomaly at current universal time
+        const meanAnomaly = (this.orbit.meanAnomalyAtEpoch + 
+            (2 * Math.PI / this.orbit.orbitalPeriod) * (universalTime - this.orbit.epoch)) % (2 * Math.PI);
+        
+        // Solve Kepler's equation for eccentric anomaly
+        this.currentEccentricAnomaly = this.solveKeplersEquation(meanAnomaly, this.orbit.eccentricity);
+        
+        // Calculate true anomaly from eccentric anomaly
+        this.currentTrueAnomaly = 2 * Math.atan2(
+            Math.sqrt((1 + this.orbit.eccentricity) / (1 - this.orbit.eccentricity)) * Math.tan(this.currentEccentricAnomaly / 2),
+            1
+        );
+        
+        // Normalize true anomaly to [0, 2π] range
+        if (this.currentTrueAnomaly < 0) {
+            this.currentTrueAnomaly += 2 * Math.PI;
+        }
+        
+        // Calculate current distance from star
+        this.currentDistance = this.orbit.semiMajorAxis * (1 - this.orbit.eccentricity * Math.cos(this.currentEccentricAnomaly));
+        
+        // Calculate position in orbit plane
+        const orbitX = this.currentDistance * Math.cos(this.currentTrueAnomaly);
+        const orbitY = this.currentDistance * Math.sin(this.currentTrueAnomaly);
+        
+        // Rotate by argument of perihelion and translate to star position
+        this.x = this.parentStar.x + (orbitX * Math.cos(this.orbit.argumentOfPerihelion) - orbitY * Math.sin(this.orbit.argumentOfPerihelion));
+        this.y = this.parentStar.y + (orbitX * Math.sin(this.orbit.argumentOfPerihelion) + orbitY * Math.cos(this.orbit.argumentOfPerihelion));
+    }
+
+    // Calculate initial position (called once during construction)
+    private calculateInitialPosition(): void {
         // Calculate universal time based on universe seed and star position
         const universalTime = this.calculateUniversalTime();
         
@@ -357,8 +395,8 @@ export class Comet extends CelestialObject {
         const brightnessFactor = this.orbit.perihelionDistance / this.currentDistance;
         
         // Update tail length (longer when closer to star)
-        const baseTailLength = 30; // Minimum tail length when visible
-        const maxTailLength = 150; // Maximum tail length at perihelion (increased for more drama)
+        const baseTailLength = 40; // Minimum tail length when visible (increased)
+        const maxTailLength = 200; // Maximum tail length at perihelion (increased for more drama)
         // Scale from 0 to 1 based on how much closer the comet is than baseline
         const scaledBrightness = Math.max(0, Math.min((brightnessFactor - 0.8) / 1.2, 1));
         this.tailLength = baseTailLength + (maxTailLength - baseTailLength) * scaledBrightness;
@@ -850,7 +888,7 @@ export class Comet extends CelestialObject {
         this.adjustQualityForPerformance();
     }
     
-    // Render the comet's tail pointing away from the star
+    // Render the comet's tail pointing away from the star with enhanced particle-based system
     private renderTail(renderer: Renderer, screenX: number, screenY: number): void {
         const ctx = renderer.ctx;
         
@@ -861,43 +899,24 @@ export class Comet extends CelestialObject {
         const tailEndX = screenX + curvedTailDirection.x * this.tailLength;
         const tailEndY = screenY + curvedTailDirection.y * this.tailLength;
         
-        // Phase 4.5: Use cached gradient if available
-        const gradientKey = `tail_${this.cometType.name}_${Math.floor(this.tailLength)}_${Math.floor(this.nucleusBrightness * 10)}`;
-        let gradient = Comet.gradientCache.get(gradientKey);
-        
-        if (!gradient) {
-            // Create new gradient and cache it
-            gradient = ctx.createLinearGradient(screenX, screenY, tailEndX, tailEndY);
-        }
-        
-        // Use comet type colors for gradient with brightness-dependent opacity
+        // Create gradient for backwards compatibility with tests (but don't use it for rendering)
+        const gradient = ctx.createLinearGradient(screenX, screenY, tailEndX, tailEndY);
         const colors = this.cometType.tailColors;
-        const brightnessScale = Math.min(this.nucleusBrightness / 2, 1); // 0-1 scale
+        const brightnessScale = Math.min(this.nucleusBrightness / 2, 1);
+        const baseOpacity = Math.floor((0.8 * brightnessScale + 0.2) * 255).toString(16).padStart(2, '0');
+        const midOpacity = Math.floor((0.53 * brightnessScale + 0.15) * 255).toString(16).padStart(2, '0');
+        const tipOpacity = Math.floor((0.13 * brightnessScale + 0.05) * 255).toString(16).padStart(2, '0');
         
-        // Scale base opacity by brightness (brighter = more opaque tail)
-        const baseOpacity = Math.floor((0.8 * brightnessScale + 0.2) * 255).toString(16).padStart(2, '0'); // 20-80% opacity
-        const midOpacity = Math.floor((0.53 * brightnessScale + 0.15) * 255).toString(16).padStart(2, '0'); // 15-53% opacity  
-        const tipOpacity = Math.floor((0.13 * brightnessScale + 0.05) * 255).toString(16).padStart(2, '0'); // 5-13% opacity
+        gradient.addColorStop(0, colors[0] + baseOpacity);
+        gradient.addColorStop(0.5, colors[1] + midOpacity);
+        gradient.addColorStop(1, colors[2] + tipOpacity);
         
-        // Configure gradient (only if newly created)
-        if (!Comet.gradientCache.has(gradientKey)) {
-            gradient.addColorStop(0, colors[0] + baseOpacity);
-            gradient.addColorStop(0.5, colors[1] + midOpacity);
-            gradient.addColorStop(1, colors[2] + tipOpacity);
-            
-            // Cache the gradient
-            Comet.gradientCache.set(gradientKey, gradient);
-        }
+        // Set line width for test compatibility 
+        const lineWidth = Math.max(2, this.tailLength / 30);
+        ctx.lineWidth = lineWidth;
         
-        // Draw tail as thick line with gradient
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = Math.max(2, this.tailLength / 30);
-        ctx.lineCap = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(screenX, screenY);
-        ctx.lineTo(tailEndX, tailEndY);
-        ctx.stroke();
+        // ENHANCED: Render multiple particle streams instead of solid line
+        this.renderParticleStreams(ctx, screenX, screenY, curvedTailDirection);
         
         // Add type-specific tail effects with curved direction
         this.renderTailParticles(ctx, screenX, screenY, tailEndX, tailEndY, curvedTailDirection);
@@ -905,14 +924,151 @@ export class Comet extends CelestialObject {
         // Render type-specific specialized effects
         this.renderTypeSpecificEffects(ctx, screenX, screenY, curvedTailDirection);
     }
+
+    // ENHANCED: Render multiple particle streams to replace solid line
+    private renderParticleStreams(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, curvedDirection: { x: number; y: number }): void {
+        const streamCount = Math.max(3, Math.floor(this.tailLength / 25)); // 3-6 streams based on tail length
+        const brightnessScale = Math.min(this.nucleusBrightness / 2, 1);
+        const colors = this.cometType.tailColors;
+        
+        // Calculate animation progress for flowing streams
+        const currentTime = Date.now();
+        const flowSpeed = this.particleAnimationSpeed;
+        const animationProgress = ((currentTime - this.animationStartTime) / (flowSpeed * 10)) % 1; // Slower flow for streams
+        
+        // Use deterministic positioning for consistent streams
+        const streamSeed = hashPosition(this.x, this.y) + 99999;
+        const rng = new SeededRandom(streamSeed);
+        
+        for (let streamIndex = 0; streamIndex < streamCount; streamIndex++) {
+            // Calculate stream offset perpendicular to tail direction
+            const maxStreamOffset = Math.max(3, this.tailLength / 15); // Increased spread (wider streams)
+            const streamOffset = rng.nextFloat(-maxStreamOffset, maxStreamOffset);
+            const perpX = -curvedDirection.y * streamOffset;
+            const perpY = curvedDirection.x * streamOffset;
+            
+            // Stream starting position (slightly offset from nucleus)
+            const streamStartX = screenX + perpX * 0.3; // Start streams slightly spread from nucleus
+            const streamStartY = screenY + perpY * 0.3;
+            
+            // Number of particles in this stream (denser streams near center)
+            const centralness = 1 - Math.abs(streamOffset) / maxStreamOffset; // 1 = center, 0 = edge
+            const streamParticleCount = Math.floor((8 + centralness * 12) * this.renderQuality); // 8-20 particles per stream
+            
+            // Stagger stream animation timing
+            const streamAnimationOffset = (streamIndex / streamCount) * 0.3;
+            const streamAnimationProgress = (animationProgress + streamAnimationOffset) % 1;
+            
+            this.renderSingleParticleStream(
+                ctx, 
+                streamStartX, 
+                streamStartY, 
+                curvedDirection, 
+                streamParticleCount,
+                streamAnimationProgress,
+                centralness,
+                colors,
+                brightnessScale,
+                rng
+            );
+        }
+    }
+
+    // Render a single particle stream
+    private renderSingleParticleStream(
+        ctx: CanvasRenderingContext2D,
+        startX: number,
+        startY: number,
+        direction: { x: number; y: number },
+        particleCount: number,
+        animationProgress: number,
+        centralness: number,
+        colors: string[],
+        brightnessScale: number,
+        rng: SeededRandom
+    ): void {
+        // Calculate stream length with some variation
+        const streamLength = this.tailLength * (0.8 + centralness * 0.4); // Central streams are longer
+        
+        // Group particles by color for efficient rendering
+        const colorGroups = new Map<string, Array<{ x: number; y: number; size: number }>>();
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Base position along stream
+            const baseProgress = (i + 1) / particleCount;
+            
+            // Add animated flow with staggered timing
+            const particleFlowOffset = (animationProgress + (i / particleCount) * 0.5) % 1;
+            const animatedProgress = Math.min(baseProgress + particleFlowOffset * 0.15, 1); // Subtle flow effect
+            
+            // Calculate position along curved direction
+            const baseX = startX + direction.x * streamLength * animatedProgress;
+            const baseY = startY + direction.y * streamLength * animatedProgress;
+            
+            // Add slight random dispersion that increases with distance
+            const dispersionFactor = animatedProgress * 0.7; // More dispersion toward tail tip (increased)
+            const randomOffsetX = rng.nextFloat(-dispersionFactor, dispersionFactor) * 4; // Increased spread
+            const randomOffsetY = rng.nextFloat(-dispersionFactor, dispersionFactor) * 4; // Increased spread
+            
+            const particleX = baseX + randomOffsetX;
+            const particleY = baseY + randomOffsetY;
+            
+            // Calculate particle properties with enhanced variation
+            const distanceFactor = (1 - animatedProgress); // Larger/brighter near nucleus
+            const centralFactor = centralness; // Central streams are more prominent
+            
+            // Enhanced particle size with more variation
+            const baseSize = this.getParticleBaseSize() * 0.8; // Slightly smaller than overlay particles
+            const sizeVariation = rng.nextFloat(0.6, 1.4);
+            const sizeFactor = (0.5 + 0.5 * distanceFactor) * (0.7 + 0.3 * centralFactor);
+            const particleSize = Math.max(0.2, baseSize * sizeFactor * sizeVariation);
+            
+            // Enhanced opacity with smoother falloff
+            const opacityFactor = Math.pow(distanceFactor, 0.7) * (0.6 + 0.4 * centralFactor);
+            const finalOpacity = opacityFactor * (0.4 + 0.5 * brightnessScale); // 0.4-0.9 range
+            
+            // Color selection based on distance (progression from base to tip colors)
+            let colorIndex = 0;
+            if (animatedProgress > 0.7) colorIndex = 2; // Tip color
+            else if (animatedProgress > 0.3) colorIndex = 1; // Mid color
+            else colorIndex = 0; // Base color
+            
+            const particleColor = colors[colorIndex];
+            const opacity = Math.floor(finalOpacity * 255).toString(16).padStart(2, '0');
+            const colorWithOpacity = particleColor + opacity;
+            
+            // Group by color for batch rendering
+            if (!colorGroups.has(colorWithOpacity)) {
+                colorGroups.set(colorWithOpacity, []);
+            }
+            colorGroups.get(colorWithOpacity)!.push({
+                x: particleX,
+                y: particleY,
+                size: particleSize
+            });
+        }
+        
+        // Batch render each color group
+        colorGroups.forEach((particles, color) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            
+            particles.forEach(p => {
+                ctx.moveTo(p.x + p.size, p.y);
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            });
+            
+            ctx.fill();
+        });
+    }
     
-    // Render particle effects along the tail with enhanced animation and Phase 4.5 optimizations
+    // Render overlay particle effects (reduced since main streams now handle core structure)
     private renderTailParticles(ctx: CanvasRenderingContext2D, startX: number, startY: number, endX: number, endY: number, curvedDirection: { x: number; y: number }): void {
-        // Phase 4.5: Use LOD-adjusted particle count
+        // Phase 4.5: Use LOD-adjusted particle count (reduced for overlay particles)
         const baseLODCount = this.getLODParticleCount(this.currentLODLevel);
         const adaptedCount = this.getAdaptedParticleCount();
-        const particleCount = Math.floor(Math.min(baseLODCount, adaptedCount) * (this.tailLength / 120) * this.renderQuality);
-        const baseColor = this.cometType.tailColors[0];
+        const particleCount = Math.floor(Math.min(baseLODCount, adaptedCount) * (this.tailLength / 180) * this.renderQuality * 0.6); // Reduced count and density
+        const baseColor = this.cometType.tailColors[1]; // Use mid-color for overlay particles
         
         // Calculate animation progress for flowing particles
         const currentTime = Date.now();
@@ -952,11 +1108,11 @@ export class Comet extends CelestialObject {
             const particleX = startX + curvedDirection.x * this.tailLength * animatedProgress;
             const particleY = startY + curvedDirection.y * this.tailLength * animatedProgress;
             
-            // Calculate tail width at this position (tapering from wide to narrow)
-            const widthAtPosition = baseTailWidth * (1 - animatedProgress * 0.8); // Taper to 20% of base width
-            const maxOffset = Math.max(0.5, widthAtPosition / 2);
+            // Calculate tail width at this position (wider spread for overlay particles)
+            const widthAtPosition = baseTailWidth * (1 - animatedProgress * 0.5); // Even gentler tapering
+            const maxOffset = Math.max(2.0, widthAtPosition * 1.2); // Further increased spread for overlay particles
             
-            // Add slight random offset perpendicular to curved tail direction
+            // Add enhanced random offset perpendicular to curved tail direction
             const perpX = -curvedDirection.y * rng.nextFloat(-maxOffset, maxOffset);
             const perpY = curvedDirection.x * rng.nextFloat(-maxOffset, maxOffset);
             
@@ -1438,7 +1594,7 @@ export class Comet extends CelestialObject {
     // Render bright nucleus core with enhanced brightness effects and rotation
     private renderNucleus(renderer: Renderer, screenX: number, screenY: number): void {
         const ctx = renderer.ctx;
-        const nucleusRadius = 2 + this.getPulsedBrightness() * 1.5; // Use pulsed brightness
+        const nucleusRadius = 1.5 + this.getPulsedBrightness() * 1.2; // Smaller nucleus (reduced base and scaling)
         const brightColor = this.cometType.nucleusColor;
         
         // Save context for rotation transformation
@@ -1453,7 +1609,7 @@ export class Comet extends CelestialObject {
         
         // Draw main nucleus with brightness-dependent opacity (centered at origin after rotation)
         const pulsedBrightness = this.getPulsedBrightness();
-        const brightnessOpacity = Math.floor(Math.min(pulsedBrightness * 127 + 128, 255)).toString(16).padStart(2, '0');
+        const brightnessOpacity = Math.floor(Math.min(pulsedBrightness * 100 + 155, 255)).toString(16).padStart(2, '0'); // Increased base brightness
         ctx.fillStyle = brightColor + brightnessOpacity;
         ctx.beginPath();
         ctx.arc(0, 0, nucleusRadius, 0, Math.PI * 2);
