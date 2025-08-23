@@ -19,6 +19,9 @@ import { StateManager } from './services/StateManager.js';
 import { DebugSpawner } from './debug/debug-spawner.js';
 import { DeveloperConsole } from './debug/DeveloperConsole.js';
 import { CommandRegistry } from './debug/CommandRegistry.js';
+import { AudioService } from './services/AudioService.js';
+import { SettingsService } from './services/SettingsService.js';
+import { SettingsMenu } from './ui/SettingsMenu.js';
 // Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
@@ -106,6 +109,9 @@ export class Game {
     stateManager: StateManager;
     commandRegistry: CommandRegistry;
     developerConsole: DeveloperConsole;
+    audioService: AudioService;
+    settingsService: SettingsService;
+    settingsMenu: SettingsMenu;
     
     // Expose properties for backward compatibility with tests
     get lastBlackHoleWarnings() {
@@ -158,6 +164,27 @@ export class Game {
         this.stellarMap.setNamingService(this.namingService);
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
+        
+        // Initialize audio service wrapper and settings
+        this.audioService = this.createAudioServiceWrapper();
+        this.settingsService = new SettingsService(this.audioService);
+        this.settingsMenu = new SettingsMenu(this.settingsService);
+        
+        // Skip audio sync for now to avoid initialization issues
+        
+        // Set up callbacks for data management features
+        this.settingsService.onDistanceReset = () => {
+            // TODO: Implement resetLifetimeDistance on Camera class
+            // this.camera.resetLifetimeDistance();
+            this.discoveryDisplay.addNotification('Distance traveled reset feature coming soon');
+        };
+        
+        this.settingsService.onDiscoveryHistoryClear = () => {
+            // TODO: Implement clearHistory on DiscoveryLogbook and ChunkManager
+            // this.discoveryLogbook.clearHistory();
+            // this.chunkManager.clearDiscoveryHistory();
+            this.discoveryDisplay.addNotification('Discovery history clear feature coming soon');
+        };
         
         // Space drone will be started on first user interaction due to browser autoplay policies
         
@@ -303,46 +330,67 @@ export class Game {
             this.discoveryLogbook.toggle();
         }
         
-        // Handle audio mute toggle (H key for "Hush")
-        if (this.input.wasJustPressed('KeyH')) {
-            const isMuted = this.soundManager.toggleMute();
-            this.discoveryDisplay.addNotification(isMuted ? 'Audio muted' : 'Audio unmuted');
-        }
+        // H key mute removed - use settings menu instead
         
         // Handle debug commands (development builds only)
         this.handleDebugInput();
         
-        // Handle map/logbook close (Escape key)
+        // Handle settings menu keyboard shortcuts
+        if (this.settingsMenu.isVisible()) {
+            // Check for number key tab switches (1, 2, 3)
+            if (this.input.wasJustPressed('Digit1')) {
+                this.settingsMenu.handleKeyPress('Digit1');
+            } else if (this.input.wasJustPressed('Digit2')) {
+                this.settingsMenu.handleKeyPress('Digit2');
+            } else if (this.input.wasJustPressed('Digit3')) {
+                this.settingsMenu.handleKeyPress('Digit3');
+            }
+        }
+        
+        // Handle settings menu toggle and close (Escape key)
         if (this.input.wasJustPressed('Escape')) {
-            if (this.stellarMap.isVisible()) {
+            if (this.settingsMenu.isVisible()) {
+                this.settingsMenu.handleKeyPress('Escape');
+            } else if (this.stellarMap.isVisible()) {
                 this.stellarMap.toggle();
             } else if (this.discoveryLogbook.isVisible()) {
                 this.discoveryLogbook.toggle();
+            } else {
+                // If no UI is open, show settings menu
+                this.settingsMenu.show();
             }
         }
         
         // Handle mouse clicks/touch
         if (this.input.wasClicked()) {
-            // Reset stellar map pan state on click release
-            if (this.stellarMap.isVisible()) {
-                this.stellarMap.resetPanState();
-            }
-            
-            // Check if touch hit any TouchUI buttons first
-            const touchAction = this.touchUI.handleTouch(this.input.getMouseX(), this.input.getMouseY());
-            if (touchAction) {
-                this.handleTouchAction(touchAction);
-                // Prevent the touch from affecting ship movement
-                this.input.consumeTouch();
-            } else if (this.stellarMap.isVisible() && !this.input.isTouchConsumed()) {
-                // Handle stellar map interactions (simplified) - only if not panning
-                const discovered = this.getDiscoveredObjects();
-                this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+            // Check if settings menu handled the input first
+            if (this.settingsMenu.isVisible()) {
+                this.settingsMenu.handleInput(this.input);
+            } else {
+                // Reset stellar map pan state on click release
+                if (this.stellarMap.isVisible()) {
+                    this.stellarMap.resetPanState();
+                }
+                
+                // Check if touch hit any TouchUI buttons first
+                const touchAction = this.touchUI.handleTouch(this.input.getMouseX(), this.input.getMouseY());
+                if (touchAction) {
+                    this.handleTouchAction(touchAction);
+                    // Prevent the touch from affecting ship movement
+                    this.input.consumeTouch();
+                } else if (this.stellarMap.isVisible() && !this.input.isTouchConsumed()) {
+                    // Handle stellar map interactions (simplified) - only if not panning
+                    const discovered = this.getDiscoveredObjects();
+                    this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+                }
             }
         }
         
-        // Handle continuous mouse/touch input for map panning
-        if (this.stellarMap.isVisible() && this.input.isMousePressed()) {
+        // Handle continuous mouse/touch input for settings menu and map panning
+        if (this.settingsMenu.isVisible() && (this.input.isMousePressed() || this.input.wasClicked())) {
+            // Handle settings menu input (including slider dragging)
+            this.settingsMenu.handleInput(this.input);
+        } else if (this.stellarMap.isVisible() && this.input.isMousePressed()) {
             // Handle mouse movement for map panning
             this.stellarMap.handleMouseMove(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, this.input);
         }
@@ -758,6 +806,11 @@ export class Game {
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
         
+        // Render settings menu (on top of touch UI)
+        if (this.settingsMenu.isVisible()) {
+            this.settingsMenu.render(this.renderer.ctx, this.renderer.canvas);
+        }
+        
         // Render developer console (on top of everything else)
         this.developerConsole.render(this.renderer);
         
@@ -1056,6 +1109,63 @@ export class Game {
             }
         }
     }
+
+    private createAudioServiceWrapper(): any {
+        // Real audio wrapper that uses SoundManager's granular controls
+        return {
+            setMasterVolume: (volume: number) => {
+                // SettingsService already converts from 0-100 to 0-1 range, so use directly
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setMasterVolume called with:', volume);
+                this.soundManager.setMasterVolume(volume);
+            },
+            setAmbientVolume: (volume: number) => {
+                // SettingsService already converts from 0-100 to 0-1 range, so use directly
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setAmbientVolume called with:', volume);
+                this.soundManager.setAmbientVolume(volume);
+            },
+            setDiscoveryVolume: (volume: number) => {
+                // SettingsService already converts from 0-100 to 0-1 range, so use directly
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setDiscoveryVolume called with:', volume);
+                this.soundManager.setDiscoveryVolume(volume);
+            },
+            setEffectsVolume: (volume: number) => {
+                // SettingsService already converts from 0-100 to 0-1 range, so use directly
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setEffectsVolume called with:', volume);
+                this.soundManager.setDiscoveryVolume(volume);
+            },
+            setMuted: (muted: boolean) => {
+                // Use the existing working toggle method
+                const currentlyMuted = this.soundManager.isMuted();
+                if (muted !== currentlyMuted) {
+                    this.soundManager.toggleMute();
+                }
+            },
+            setMasterMuted: (muted: boolean) => {
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setMasterMuted called with:', muted);
+                this.soundManager.setMasterMuted(muted);
+            },
+            setAmbientMuted: (muted: boolean) => {
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setAmbientMuted called with:', muted);
+                this.soundManager.setAmbientMuted(muted);
+            },
+            setDiscoveryMuted: (muted: boolean) => {
+                console.log('🔊 AUDIO DEBUG: Audio wrapper setDiscoveryMuted called with:', muted);
+                this.soundManager.setDiscoveryMuted(muted);
+            },
+            // Return actual values from SoundManager (converted back to 0-100 range)
+            getMasterVolume: () => Math.round(this.soundManager.getMasterVolume() * 100),
+            getAmbientVolume: () => Math.round(this.soundManager.getAmbientVolume() * 100),
+            getDiscoveryVolume: () => Math.round(this.soundManager.getDiscoveryVolume() * 100),
+            getEffectsVolume: () => Math.round(this.soundManager.getDiscoveryVolume() * 100),
+            isMuted: () => this.soundManager.isMuted(),
+            // Individual mute state getters
+            isMasterMuted: () => this.soundManager.isMasterMuted(),
+            isAmbientMuted: () => this.soundManager.isAmbientMuted(),
+            isDiscoveryMuted: () => this.soundManager.isDiscoveryMuted()
+        };
+    }
+
+    // Removed syncInitialAudioSettings to avoid audio issues
 }
 
 // Initialize the game
