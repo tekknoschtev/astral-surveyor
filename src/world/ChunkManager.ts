@@ -1948,6 +1948,11 @@ export class ChunkManager {
         this.discoveredObjects.clear();
         console.log('🌌 All chunks cleared for universe regeneration');
     }
+
+    // Clear only discovery history (preserves chunks)
+    clearDiscoveryHistory(): void {
+        this.discoveredObjects.clear();
+    }
     
     // Helper method to get basic nebula colors for fallback reconstruction
     private getBasicNebulaColors(nebulaType: string): string[] {

@@ -343,6 +343,12 @@ export class DiscoveryLogbook {
         // Sort by timestamp (most recent first)
         this.discoveries.sort((a, b) => b.timestamp - a.timestamp);
     }
+
+    // Clear all discovery history
+    clearHistory(): void {
+        this.discoveries = [];
+        this.scrollOffset = 0;
+    }
 }
 
 // Export for use in other modules (maintain global compatibility)

@@ -163,16 +163,14 @@ export class Game {
         
         // Set up callbacks for data management features
         this.settingsService.onDistanceReset = () => {
-            // TODO: Implement resetLifetimeDistance on Camera class
-            // this.camera.resetLifetimeDistance();
-            this.discoveryDisplay.addNotification('Distance traveled reset feature coming soon');
+            this.camera.resetLifetimeDistance();
+            this.discoveryDisplay.addNotification('Distance traveled has been reset');
         };
         
         this.settingsService.onDiscoveryHistoryClear = () => {
-            // TODO: Implement clearHistory on DiscoveryLogbook and ChunkManager
-            // this.discoveryLogbook.clearHistory();
-            // this.chunkManager.clearDiscoveryHistory();
-            this.discoveryDisplay.addNotification('Discovery history clear feature coming soon');
+            this.discoveryLogbook.clearHistory();
+            this.chunkManager.clearDiscoveryHistory();
+            this.discoveryDisplay.addNotification('Discovery history has been cleared');
         };
         
         // Space drone will be started on first user interaction due to browser autoplay policies
@@ -193,8 +191,7 @@ export class Game {
         );
         
         // Connect naming service to stellar map
-        // TODO: Fix interface mismatch between StellarMap and NamingService in Phase 2
-        // this.stellarMap.setNamingService(this.namingService);
+        this.stellarMap.setNamingService(this.namingService);
         
         this.setupCanvas();
         
@@ -576,9 +573,6 @@ export class Game {
     }
 
     updateShipAudio(): void {
-        // Note: This functionality is temporarily disabled to fix TypeScript compilation
-        // TODO: Add public methods to Camera class for thruster state access
-        /*
         const isThrusting = this.camera.isThrusting && !this.camera.isBraking;
         const isBraking = this.camera.isBraking;
         
@@ -595,7 +589,6 @@ export class Game {
         // Update previous states
         this.previousThrustState = isThrusting;
         this.previousBrakeState = isBraking;
-        */
     }
 
 

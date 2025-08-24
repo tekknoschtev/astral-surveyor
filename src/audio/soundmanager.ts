@@ -379,6 +379,23 @@ export class SoundManager {
                 reverbDecay: 4.0,     // Ultra-slow decay for cosmic mystery
                 reverbWetness: 0.7    // High reverb for otherworldly effect
             },
+            'blackhole_discovery': {
+                type: 'oscillator',
+                frequency: 32,        // Ultra-deep, ominous frequency
+                frequency2: 64,       // Octave relationship for harmonic depth
+                duration: 4.0,        // Extended for cosmic grandeur
+                attack: 0.8,          // Very slow, building emergence
+                decay: 0.8,           // Long decay for gravitational pull effect
+                sustain: 0.2,         // Low sustain for ominous presence
+                release: 2.0,         // Extremely long fade for cosmic void
+                volume: 0.7,          // Slightly louder for impact
+                waveform: 'sawtooth', // Harsher waveform for ominous effect
+                filterFreq: 100,      // Very low filter for deep, dark tone
+                filterQ: 1.5,         // More resonant for gravitational effect
+                reverbTime: 5.0,      // Longest reverb for infinite depth
+                reverbDecay: 5.0,     // Ultra-slow decay for void effect
+                reverbWetness: 0.8    // Maximum reverb for cosmic enormity
+            },
             'wormhole_traversal': {
                 type: 'oscillator',
                 frequency: 72,        // Lower for softer dimensional shift
@@ -687,6 +704,11 @@ export class SoundManager {
 
     playWormholeDiscovery(): void {
         const config = this.getSoundConfig('wormhole_discovery');
+        if (config) this.playOscillatorSound(config);
+    }
+
+    playBlackHoleDiscovery(): void {
+        const config = this.getSoundConfig('blackhole_discovery');
         if (config) this.playOscillatorSound(config);
     }
 

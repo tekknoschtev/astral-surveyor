@@ -5,6 +5,7 @@
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 import type { Input } from '../input/input.js';
+import { NamingService } from '../naming/naming.js';
 
 // Interface definitions
 interface StarLike {
@@ -101,18 +102,6 @@ interface CometLike {
 // Union type for all discoverable objects
 type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | AsteroidGardenLike | BlackHoleLike | CometLike;
 
-interface NamingService {
-    generateDisplayName(object: DiscoverableObject): string;
-    generateFullDesignation(object: DiscoverableObject): {
-        catalog?: string;
-        coordinate?: string;
-        designation?: string;
-        type: string;
-        classification?: string | null;
-        parentStar?: string;
-        orbitalIndex?: number;
-    } | null;
-}
 
 interface GameStartingPosition {
     x: number;

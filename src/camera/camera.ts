@@ -331,6 +331,12 @@ export class Camera {
         this.sessionDistanceTraveled = 0;
     }
 
+    // Reset lifetime distance (called from settings)
+    resetLifetimeDistance(): void {
+        this.totalDistanceTraveled = 0;
+        this.saveDistanceTraveled();
+    }
+
     // Getters for external access
     getX(): number { return this.x; }
     getY(): number { return this.y; }

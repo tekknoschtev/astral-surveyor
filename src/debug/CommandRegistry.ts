@@ -2,6 +2,8 @@
 // Provides extensible command infrastructure with parameter validation and auto-completion
 
 import { DebugSpawner } from './debug-spawner.js';
+import type { Camera } from '../camera/camera.js';
+import type { ChunkManager } from '../world/ChunkManager.js';
 
 interface ParameterDefinition {
     name: string;
@@ -20,9 +22,9 @@ interface CommandDefinition {
 }
 
 export interface CommandContext {
-    camera: any; // TODO: Import Camera type when available
-    chunkManager: any; // TODO: Import ChunkManager type when available
-    debugSpawner?: any; // TODO: Import DebugSpawner type when available
+    camera: Camera;
+    chunkManager: ChunkManager;
+    debugSpawner?: typeof DebugSpawner;
 }
 
 interface ParsedCommand {
