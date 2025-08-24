@@ -70,7 +70,7 @@ export class DiscoveryDisplay {
         this.notifications.push(notification);
     }
 
-    update(deltaTime: number): void {
+    update(_deltaTime: number): void {
         const currentTime = Date.now();
         
         // Remove expired discoveries
@@ -125,7 +125,7 @@ export class DiscoveryDisplay {
     }
 
     renderNotifications(renderer: Renderer): void {
-        const padding = 20;
+        // const padding = 20;
         const lineHeight = 30;
         const centerX = renderer.canvas.width / 2;
         const topY = 100;

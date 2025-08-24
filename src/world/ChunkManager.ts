@@ -908,7 +908,7 @@ export class ChunkManager {
                     // If not in active chunks, use stored discovery data
                     if (!planetData) {
                         // Use stored planet type from discovery data
-                        let planetTypeName = discoveryData.planetTypeName;
+                        const planetTypeName = discoveryData.planetTypeName;
                         let planetType = null;
                         
                         if (planetTypeName) {

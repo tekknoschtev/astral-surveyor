@@ -306,14 +306,14 @@ export class EventDispatcher implements IEventDispatcher {
         if (this.disposed) return;
 
         // Clear all listeners
-        for (const [eventType, listeners] of this.listeners) {
+        for (const [/* eventType */, listeners] of this.listeners) {
             for (const listener of listeners) {
                 try {
                     // If listener has a dispose method, call it
                     if (typeof (listener.handler as any).dispose === 'function') {
                         (listener.handler as any).dispose();
                     }
-                } catch (error) {
+                } catch (_error) {
                     // Ignore disposal errors
                 }
             }

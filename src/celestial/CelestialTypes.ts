@@ -2,7 +2,6 @@
 // Extracted from celestial.ts for better modularity
 
 // Import dependencies
-import type { SeededRandom } from '../utils/random.js';
 import { DiscoveryService } from '../services/DiscoveryService.js';
 
 // Interface definitions for renderer and camera

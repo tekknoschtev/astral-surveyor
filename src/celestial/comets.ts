@@ -262,7 +262,7 @@ export class Comet extends CelestialObject {
     }
     
     // Calculate current position using deterministic universal time
-    updatePosition(deltaTime: number): void {
+    updatePosition(_deltaTime: number): void {
         // Calculate universal time that advances with real time for orbital animation
         const currentTime = Date.now();
         const timeElapsed = (currentTime - this.animationStartTime) / 1000; // Convert to seconds
@@ -854,7 +854,7 @@ export class Comet extends CelestialObject {
         this.currentLODLevel = this.calculateLODLevel(camera);
         
         // Phase 4.5: Adjust rendering based on LOD
-        const shouldRenderAdvanced = this.shouldRenderAdvancedEffects(this.currentLODLevel);
+        // const shouldRenderAdvanced = this.shouldRenderAdvancedEffects(this.currentLODLevel);
         
         // Render tail first (behind nucleus)
         if (this.tailLength > 0) {
@@ -1098,7 +1098,7 @@ export class Comet extends CelestialObject {
             const particle = Comet.getParticleFromPool();
             
             // Base position along tail
-            let baseProgress = (i + 1) / particleCount; // 0 to 1 along tail
+            const baseProgress = (i + 1) / particleCount; // 0 to 1 along tail
             
             // Add animated flow offset (particles flow from nucleus to tail end)
             const particleFlow = (animationProgress + (i / particleCount) * 0.3) % 1; // Stagger particle timing

@@ -389,8 +389,8 @@ export class Planet extends CelestialObject {
             const frequency = 0.3;
             
             ctx.beginPath();
-            let startX = centerX - this.radius * 0.8;
-            let startY = y + Math.sin(startX * frequency) * amplitude;
+            const startX = centerX - this.radius * 0.8;
+            const startY = y + Math.sin(startX * frequency) * amplitude;
             ctx.moveTo(startX, startY);
             
             for (let x = startX; x <= centerX + this.radius * 0.8; x += 2) {
@@ -477,7 +477,7 @@ export class Planet extends CelestialObject {
         // Draw shimmer effect for exotic worlds
         const time = Date.now() * 0.001;
         const shimmerAlpha = Math.sin(time * 2) * 0.3 + 0.7; // Oscillate between 0.4 and 1.0
-        const alphaHex = Math.floor(shimmerAlpha * 255).toString(16).padStart(2, '0');
+        // const alphaHex = Math.floor(shimmerAlpha * 255).toString(16).padStart(2, '0');
         
         // Create multiple shimmer rings
         for (let i = 0; i < 3; i++) {
@@ -602,7 +602,7 @@ export class Planet extends CelestialObject {
             const offset = Math.sin(movingTime + i) * this.radius * 0.2;
             
             ctx.beginPath();
-            let startX = centerX - this.radius * 0.8 + offset;
+            const startX = centerX - this.radius * 0.8 + offset;
             ctx.moveTo(startX, y);
             
             for (let x = startX; x <= startX + this.radius * 1.6; x += 4) {

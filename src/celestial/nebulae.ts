@@ -199,7 +199,7 @@ export class Nebula extends CelestialObject {
         return false;
     }
     
-    shouldDiscover(ship: { x: number; y: number }, camera: Camera, canvasWidth: number, canvasHeight: number): boolean {
+    shouldDiscover(ship: { x: number; y: number }, _camera: Camera, _canvasWidth: number, _canvasHeight: number): boolean {
         if (this.discovered) {
             return false;
         }

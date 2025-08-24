@@ -1452,7 +1452,7 @@ export class StellarMap {
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 4]); // Distinctive dashed pattern
         
-        for (const [wormholeId, wormholes] of wormholePairs) {
+        for (const [/* wormholeId */, wormholes] of wormholePairs) {
             // Only draw connection if we have both wormholes discovered
             if (wormholes.length === 2) {
                 const alpha = wormholes.find(w => w.designation === 'alpha');
@@ -2553,7 +2553,7 @@ export class StellarMap {
         // Generate name using naming service
         try {
             return this.namingService.generateDisplayName(asteroidGarden);
-        } catch (error) {
+        } catch (_error) {
             return `Asteroid Garden`;
         }
     }

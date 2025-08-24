@@ -26,10 +26,7 @@ import { SettingsMenu } from './ui/SettingsMenu.js';
 import { 
     initializeUniverseSeed, 
     getStartingCoordinates, 
-    generateShareableURL,
-    resetUniverse,
-    generateSafeSpawnPosition,
-    getUniverseResetCount
+    generateShareableURL
 } from './utils/random.js';
 // Note: Will add proper types in future phases when we extract celestial classes
 
@@ -81,14 +78,6 @@ interface ActiveObjects {
     comets: CelestialObject[];
 }
 
-interface TraversalDestination {
-    x: number;
-    y: number;
-    velocityX: number;
-    velocityY: number;
-    wormhole: CelestialObject;
-    stellarMapWasVisible: boolean;
-}
 
 export class Game {
     renderer: Renderer;
@@ -214,7 +203,6 @@ export class Game {
         if (startingCoords) {
             this.camera.x = startingCoords.x;
             this.camera.y = startingCoords.y;
-            console.log(`📍 Camera positioned at shared coordinates: (${startingCoords.x}, ${startingCoords.y})`);
         }
         
         // Create starting position object for stellar map reference
@@ -229,7 +217,6 @@ export class Game {
         // Log lifetime distance traveled
         const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
         if (lifetimeDistance !== '0 km') {
-            console.log(`🚀 Lifetime distance traveled: ${lifetimeDistance}`);
         }
         
         // Initialize chunks around starting position
@@ -567,8 +554,6 @@ export class Game {
         // Try to copy to clipboard
         if (navigator.clipboard) {
             navigator.clipboard.writeText(shareableURL).then(() => {
-                console.log(`📋 Coordinates copied to clipboard: (${Math.round(this.camera.x)}, ${Math.round(this.camera.y)})`);
-                console.log(`🔗 Shareable URL: ${shareableURL}`);
                 this.discoveryDisplay.addNotification('Coordinates copied to clipboard!');
             }).catch(err => {
                 console.warn('Failed to copy to clipboard:', err);
@@ -580,8 +565,7 @@ export class Game {
         }
     }
 
-    showFallbackCopy(url: string): void {
-        console.log(`📋 Copy this URL to share coordinates: ${url}`);
+    showFallbackCopy(_url: string): void {
         this.discoveryDisplay.addNotification('Copy URL from console to share coordinates');
     }
 
@@ -711,8 +695,7 @@ export class Game {
         // Play dedicated wormhole traversal sound effect
         this.soundManager.playWormholeTraversal();
         
-        const destinationDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
-        console.log(`🌀 Starting wormhole traversal: ${wormhole.pairId} → destination ${destinationDesignation}`);
+        // const destinationDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
     }
 
     private async handleAudioContextActivation(): Promise<void> {
@@ -775,7 +758,7 @@ export class Game {
         const betaWormholes = activeObjects.wormholes.filter(w => w.designation === 'beta');
         if (betaWormholes.length > 1) {
             // Keep only the first beta wormhole, remove all others  
-            const keepBeta = betaWormholes[0];
+            // const keepBeta = betaWormholes[0];
             const removeBetas = betaWormholes.slice(1);
             
             // Remove duplicates from activeObjects.wormholes array
@@ -1120,22 +1103,18 @@ export class Game {
         return {
             setMasterVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setMasterVolume called with:', volume);
                 this.soundManager.setMasterVolume(volume);
             },
             setAmbientVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setAmbientVolume called with:', volume);
                 this.soundManager.setAmbientVolume(volume);
             },
             setDiscoveryVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setDiscoveryVolume called with:', volume);
                 this.soundManager.setDiscoveryVolume(volume);
             },
             setEffectsVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setEffectsVolume called with:', volume);
                 this.soundManager.setDiscoveryVolume(volume);
             },
             setMuted: (muted: boolean) => {
@@ -1146,15 +1125,12 @@ export class Game {
                 }
             },
             setMasterMuted: (muted: boolean) => {
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setMasterMuted called with:', muted);
                 this.soundManager.setMasterMuted(muted);
             },
             setAmbientMuted: (muted: boolean) => {
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setAmbientMuted called with:', muted);
                 this.soundManager.setAmbientMuted(muted);
             },
             setDiscoveryMuted: (muted: boolean) => {
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setDiscoveryMuted called with:', muted);
                 this.soundManager.setDiscoveryMuted(muted);
             },
             // Return actual values from SoundManager (converted back to 0-100 range)

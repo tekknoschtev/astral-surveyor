@@ -55,7 +55,7 @@ export class SettingsMenu {
         this.dimensions = this.calculateDimensions({ width: 1024, height: 768 }); // Default dimensions
         
         // Set up settings change listener
-        this.settingsChangeHandler = (event: any) => {
+        this.settingsChangeHandler = (_event: any) => {
             this.needsRedrawFlag = true;
         };
         this.settingsService.addEventListener('settingsChanged', this.settingsChangeHandler);

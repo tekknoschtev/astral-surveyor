@@ -2,7 +2,7 @@
 // Extremely rare phenomena that enable instantaneous travel across vast cosmic distances
 
 // Import dependencies
-import { SeededRandom, hashPosition } from '../utils/random.js';
+import { SeededRandom } from '../utils/random.js';
 import { CelestialObject } from './celestial.js';
 import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 
@@ -449,7 +449,7 @@ export class Wormhole extends CelestialObject {
     private renderLensingPreview(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, apertureRadius: number, previewObjects: { x: number; y: number; type: string; relativeX?: number; relativeY?: number }[]): void {
         // Scale factor for rendering objects within the aperture
         const previewScale = apertureRadius / 150; // 150px preview area maps to aperture
-        const maxDistance = 300; // Max distance we're previewing from destination
+        // const maxDistance = 300; // Max distance we're previewing from destination
         
         ctx.save();
         
@@ -501,7 +501,7 @@ export class Wormhole extends CelestialObject {
                 ctx.fill();
                 break;
                 
-            case 'nebula':
+            case 'nebula': {
                 // Simplified nebula rendering
                 const nebulaColors = ['#FF69B4', '#9370DB', '#00CED1'];
                 ctx.fillStyle = (nebulaColors[obj.nebulaType] || nebulaColors[0]) + '60';
@@ -509,6 +509,7 @@ export class Wormhole extends CelestialObject {
                 ctx.arc(x, y, size * 2, 0, Math.PI * 2);
                 ctx.fill();
                 break;
+            }
                 
             case 'wormhole':
                 // Simplified wormhole rendering (just a swirl)

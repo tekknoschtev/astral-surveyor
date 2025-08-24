@@ -59,7 +59,7 @@ export class DiscoveryVisualizationService {
      */
     updateAnimationState(objectId: string, options: DiscoveryIndicatorOptions): DiscoveryAnimationState {
         const config = this.getRarityConfig(options.rarity, options.objectType);
-        let animationState = this.animationStates.get(objectId) || {};
+        const animationState = this.animationStates.get(objectId) || {};
 
         // Handle discovery pulse (one-time effect)
         if (config.hasDiscoveryPulse && options.discoveryTimestamp) {

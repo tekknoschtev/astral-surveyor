@@ -74,12 +74,6 @@ export class StateManager {
         if (debugEnabled) {
             // Enable the debug configuration when URL debug mode is active
             GameConfig.debug.enabled = true;
-            console.log('🔧 Debug mode activated!');
-            console.log('Debug controls:');
-            console.log('  W: Spawn wormhole pair');
-            console.log('  B: Spawn black hole');
-            console.log('  Shift + H: Show debug help');
-            console.log('  Note: Check console for additional debug output');
         }
         
         return debugEnabled;
@@ -159,7 +153,6 @@ export class StateManager {
             const destinationDesignation = this.traversalDestination.wormhole.designation === 'alpha' ? 'β' : 'α';
             discoveryDisplay.addNotification(`Traversed to ${this.traversalDestination.wormhole.wormholeId}-${destinationDesignation}`);
             
-            console.log(`🌀 Completed wormhole traversal to ${destinationDesignation}`);
         }
         
         // End traversal
@@ -182,7 +175,6 @@ export class StateManager {
         
         // CRITICAL: Prevent multiple simultaneous calls
         if (this.betaCreationInProgress) {
-            console.log(`🌀 DEBUG: Beta creation already in progress, skipping duplicate call`);
             return;
         }
         
@@ -389,7 +381,6 @@ export class StateManager {
     initiateUniverseReset(): void {
         this.isResettingUniverse = true;
         this.resetStartTime = 0;
-        console.log('🕳️ SINGULARITY COLLISION - Initiating cosmic rebirth...');
     }
 
     /**
@@ -439,7 +430,6 @@ export class StateManager {
             // Play cosmic rebirth completion sound
             soundManager.playRareDiscovery(); // Temporary sound
             
-            console.log(`🌌 Cosmic rebirth complete! New universe spawned at (${Math.floor(camera.x)}, ${Math.floor(camera.y)})`);
         }
         
         // End reset transition

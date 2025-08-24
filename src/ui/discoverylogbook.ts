@@ -161,7 +161,7 @@ export class DiscoveryLogbook {
     }
 
     // Check if mouse coordinates are over the logbook panel
-    isMouseOver(mouseX: number, mouseY: number, canvasWidth: number, canvasHeight: number): boolean {
+    isMouseOver(mouseX: number, mouseY: number, canvasWidth: number, _canvasHeight: number): boolean {
         if (!this.visible) return false;
         
         const panelX = canvasWidth - this.panelWidth - 20;
@@ -177,7 +177,7 @@ export class DiscoveryLogbook {
         }
     }
 
-    render(renderer: Renderer, camera?: Camera): void {
+    render(renderer: Renderer, _camera?: Camera): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;

@@ -131,7 +131,7 @@ export class TouchUI {
         }
     }
 
-    updateButtonVisibility(stellarMap: StellarMapLike, discoveryLogbook: DiscoveryLogbookLike): void {
+    updateButtonVisibility(stellarMap: StellarMapLike, _discoveryLogbook: DiscoveryLogbookLike): void {
         for (const button of this.buttons) {
             if (button.id === 'mapToggle') {
                 // Show map button only when map is closed

@@ -190,7 +190,7 @@ export class BlackHole extends CelestialObject {
     }
 
     // Check if ship is within gravitational influence and apply effects
-    updateGravitationalEffects(camera: Camera, deltaTime: number): GravitationalEffects {
+    updateGravitationalEffects(camera: Camera, _deltaTime: number): GravitationalEffects {
         const distance = this.distanceToShip(camera);
         
         // Reset states
@@ -309,7 +309,8 @@ export class BlackHole extends CelestialObject {
 
     private renderAccretionDisk(renderer: Renderer, centerX: number, centerY: number): void {
         const ctx = renderer.ctx;
-        const time = Date.now() * 0.001;
+        // Animation time for future disk rotation effects
+        // const time = Date.now() * 0.001;
         
         // Render multiple disk layers for depth
         for (let layer = 0; layer < this.accretionDiskConfig.layers; layer++) {
@@ -324,7 +325,8 @@ export class BlackHole extends CelestialObject {
             
             // Brightness decreases with outer layers
             const brightness = this.accretionDiskConfig.brightness * (1 - layerProgress * 0.3);
-            const alpha = Math.floor(brightness * 255).toString(16).padStart(2, '0');
+            // Alpha value for future transparency effects
+            // const alpha = Math.floor(brightness * 255).toString(16).padStart(2, '0');
             
             // Create gradient for disk layer
             const gradient = ctx.createRadialGradient(

@@ -2,10 +2,7 @@
 // Replaces direct service coupling with event-based communication
 
 import { EventDispatcher, IEventDispatcher } from './EventSystem.js';
-import { WorldService } from './WorldService.js';
-import { CelestialService } from './CelestialService.js';
 import { AudioService } from './AudioService.js';
-import { ConfigService } from '../config/ConfigService.js';
 
 // Standard game event types for type safety
 export const GameEvents = {
@@ -235,21 +232,23 @@ export class ServiceOrchestrator {
                 });
                 break;
                 
-            case 'wormhole':
+            case 'wormhole': {
                 // Wormholes have special discovery sound
                 const audioService = this.getService<AudioService>('audio');
                 if (audioService) {
                     audioService.playDiscoverySound('wormhole');
                 }
                 break;
+            }
                 
-            case 'blackhole':
+            case 'blackhole': {
                 // Black holes have special discovery sound
                 const audioService2 = this.getService<AudioService>('audio');
                 if (audioService2) {
                     audioService2.playDiscoverySound('blackhole');
                 }
                 break;
+            }
         }
 
         // Play additional rare discovery sound for special objects
