@@ -100,6 +100,9 @@ export class Game {
     developerConsole: DeveloperConsole;
     audioService: AudioService;
     settingsService: SettingsService;
+    
+    // Performance optimization: Cache active objects between update and render phases
+    private cachedActiveObjects?: ActiveObjects;
     settingsMenu: SettingsMenu;
     
     // Expose properties for backward compatibility with tests
@@ -398,8 +401,9 @@ export class Game {
         // Update chunk loading based on camera position
         this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
         
-        // Get active celestial objects for physics and discovery
-        const activeObjects = this.chunkManager.getAllActiveObjects();
+        // Get active celestial objects for physics and discovery (cache for render phase)
+        this.cachedActiveObjects = this.chunkManager.getAllActiveObjects();
+        const activeObjects = this.cachedActiveObjects;
         const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets];
         
         // Update orbital positions and animations for all celestial objects
@@ -417,7 +421,7 @@ export class Game {
         this.checkWormholeTraversal(activeObjects.wormholes);
         
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
-        this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
+        this.starParticles.update(deltaTime, activeObjects.celestialStars as any, this.camera);
         
         // Ambient sounds disabled for now - focusing on discovery chimes only
         // const velocity = Math.sqrt(this.camera.velocityX ** 2 + this.camera.velocityY ** 2);
@@ -717,33 +721,48 @@ export class Game {
         
         this.starField.render(this.renderer, this.camera);
         
-        // Render celestial objects from active chunks
-        const activeObjects = this.chunkManager.getAllActiveObjects();
+        // Use cached active objects from update phase for performance
+        const activeObjects = this.cachedActiveObjects || this.chunkManager.getAllActiveObjects();
         
-        // Render nebulae first (background layer)
+        // Performance optimization: Calculate screen bounds for render culling
+        const screenBounds = this.calculateScreenBounds();
+        
+        // Render nebulae first (background layer) - with culling disabled for now
         for (const obj of activeObjects.nebulae) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
-        // Then render asteroid gardens (mid-background layer)
+        // Then render asteroid gardens (mid-background layer) - culling disabled
         for (const obj of activeObjects.asteroidGardens) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
-        // Render comets (intermediate layer - after background, before stars)
+        // Render comets (intermediate layer - after background, before stars) - culling disabled
         for (const obj of activeObjects.comets) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
-        // Then render stars, planets, and moons (foreground layers)
+        // Then render stars, planets, and moons (foreground layers) - culling disabled
         for (const obj of activeObjects.planets) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         for (const obj of activeObjects.moons) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         for (const obj of activeObjects.celestialStars) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
         // Render wormholes (prominent foreground layer, after stars)
@@ -759,14 +778,18 @@ export class Game {
         }
         
         for (const obj of activeObjects.wormholes) {
-            // Get destination preview objects for gravitational lensing
-            const destinationPreview = this.getDestinationPreviewObjects(obj);
-            obj.render(this.renderer, this.camera, destinationPreview);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                // Get destination preview objects for gravitational lensing
+                const destinationPreview = this.getDestinationPreviewObjects(obj);
+                (obj as any).render(this.renderer, this.camera, destinationPreview);
+            // }
         }
         
-        // Render black holes (ultra-prominent cosmic phenomena - dominating layer)
+        // Render black holes (ultra-prominent cosmic phenomena - dominating layer) - culling disabled
         for (const obj of activeObjects.blackholes) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
         // Render chunk boundaries (debug visualization)
@@ -776,7 +799,7 @@ export class Game {
         
         this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
-        this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars);
+        this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars as any);
         this.discoveryDisplay.render(this.renderer, this.camera);
         this.discoveryLogbook.render(this.renderer, this.camera);
         
@@ -1137,6 +1160,34 @@ export class Game {
             isAmbientMuted: () => this.soundManager.isAmbientMuted(),
             isDiscoveryMuted: () => this.soundManager.isDiscoveryMuted()
         };
+    }
+
+    // Performance optimization helpers
+    
+    /**
+     * Calculate screen bounds for render culling
+     */
+    private calculateScreenBounds(): { left: number; right: number; top: number; bottom: number } {
+        const margin = 100; // Extra margin to account for object sizes
+        return {
+            left: this.camera.x - (this.renderer.canvas.width / 2) - margin,
+            right: this.camera.x + (this.renderer.canvas.width / 2) + margin,
+            top: this.camera.y - (this.renderer.canvas.height / 2) - margin,
+            bottom: this.camera.y + (this.renderer.canvas.height / 2) + margin
+        };
+    }
+
+    /**
+     * Check if an object is within screen bounds for render culling
+     */
+    private isObjectInScreen(obj: CelestialObject, screenBounds: { left: number; right: number; top: number; bottom: number }): boolean {
+        // Get object bounds with some padding for visual effects
+        const padding = (obj as any).radius || 50; // Use object radius or default padding
+        
+        return obj.x + padding >= screenBounds.left &&
+               obj.x - padding <= screenBounds.right &&
+               obj.y + padding >= screenBounds.top &&
+               obj.y - padding <= screenBounds.bottom;
     }
 
     // Removed syncInitialAudioSettings to avoid audio issues

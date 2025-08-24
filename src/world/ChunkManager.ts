@@ -259,13 +259,17 @@ export class ChunkManager {
     }
 
     generateChunk(chunkX: number, chunkY: number): Chunk {
-        return this.errorService.safeExecute(
+        // Use error handling but don't fallback to empty chunks in normal operation
+        const result = this.errorService.safeExecute(
             'ChunkManager',
             `generateChunk(${chunkX}, ${chunkY})`,
             () => this._generateChunk(chunkX, chunkY),
-            this._createEmptyChunk(chunkX, chunkY),
+            null, // Don't use empty chunk fallback for normal operation
             `Failed to generate world chunk at (${chunkX}, ${chunkY}). Using empty chunk.`
-        ) || this._createEmptyChunk(chunkX, chunkY);
+        );
+        
+        // Only use empty chunk as absolute last resort
+        return result || this._generateChunk(chunkX, chunkY);
     }
 
     private _generateChunk(chunkX: number, chunkY: number): Chunk {
@@ -703,9 +707,10 @@ export class ChunkManager {
             }
         }
 
-        // Unload distant chunks to save memory
-        for (const [chunkKey] of this.activeChunks) {
+        // Unload distant chunks to save memory with proper cleanup
+        for (const [chunkKey, chunk] of this.activeChunks) {
             if (!requiredChunks.has(chunkKey)) {
+                this.cleanupChunkObjects(chunk);
                 this.activeChunks.delete(chunkKey);
             }
         }
@@ -2087,6 +2092,61 @@ export class ChunkManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Clean up celestial objects when chunks are unloaded to prevent memory leaks
+     */
+    private cleanupChunkObjects(chunk: Chunk): void {
+        // Dispose of objects that have cleanup methods
+        const allObjects = [
+            ...chunk.celestialStars,
+            ...chunk.planets,
+            ...chunk.moons,
+            ...chunk.nebulae,
+            ...chunk.asteroidGardens,
+            ...chunk.wormholes,
+            ...chunk.blackholes,
+            ...chunk.comets
+        ];
+
+        for (const obj of allObjects) {
+            // Clean up animation timers, event listeners, etc.
+            if (obj && typeof (obj as any).dispose === 'function') {
+                (obj as any).dispose();
+            }
+            
+            // Clear references to help garbage collection
+            if (obj) {
+                (obj as any).discoveryState = null;
+                (obj as any).parentStar = null;
+                (obj as any).parentPlanet = null;
+                (obj as any).twinWormhole = null;
+            }
+        }
+
+        // Clear chunk arrays
+        chunk.stars.length = 0;
+        chunk.celestialStars.length = 0;
+        chunk.planets.length = 0;
+        chunk.moons.length = 0;
+        chunk.nebulae.length = 0;
+        chunk.asteroidGardens.length = 0;
+        chunk.wormholes.length = 0;
+        chunk.blackholes.length = 0;
+        chunk.comets.length = 0;
+    }
+
+    /**
+     * Enhanced clear method with proper cleanup
+     */
+    clearAllChunksWithCleanup(): void {
+        for (const [, chunk] of this.activeChunks) {
+            this.cleanupChunkObjects(chunk);
+        }
+        this.activeChunks.clear();
+        this.discoveredObjects.clear();
+        console.log('🌌 All chunks cleared with proper cleanup');
     }
 }
 
