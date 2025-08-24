@@ -213,6 +213,7 @@ export class Input {
         this.wheelDeltaY = 0;
         this.keyPressed.clear(); // Clear just-pressed flags
         this.twoFingerTapTriggered = false; // Clear mobile brake tap
+        this.touchConsumed = false; // Reset input consumption for next frame
     }
 
     wasClicked(): boolean {

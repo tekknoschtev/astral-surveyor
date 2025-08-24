@@ -28,6 +28,14 @@ interface ISoundManager {
     playNebulaDiscovery(nebulaType: string): void;
     setVolume?(channel: string, volume: number): void;
     stopAmbient?(): void;
+    
+    // Individual channel mute methods
+    isMasterMuted?(): boolean;
+    setMasterMuted?(muted: boolean): void;
+    isAmbientMuted?(): boolean;
+    setAmbientMuted?(muted: boolean): void;
+    isEffectsMuted?(): boolean;
+    setEffectsMuted?(muted: boolean): void;
     startSpaceDrone?(): void;
     stopSpaceDrone?(): void;
     isSpaceDronePlaying?(): boolean;
@@ -46,6 +54,14 @@ export interface IAudioService {
     isMuted(): boolean;
     setMuted(muted: boolean): void;
     toggleMute(): boolean;
+    
+    // Individual channel mute management
+    isMasterMuted(): boolean;
+    setMasterMuted(muted: boolean): void;
+    isAmbientMuted(): boolean;
+    setAmbientMuted(muted: boolean): void;
+    isDiscoveryMuted(): boolean;
+    setDiscoveryMuted(muted: boolean): void;
     
     // Discovery sound effects
     playStarDiscovery(starType: string): void;
@@ -435,6 +451,64 @@ export class AudioService implements IAudioService {
             localStorage.setItem('astralSurveyor_audioSettings', settingsJson);
         } catch (error) {
             console.warn('Failed to save audio settings:', error);
+        }
+    }
+
+    /**
+     * Individual channel mute management
+     */
+    isMasterMuted(): boolean {
+        // Delegate to sound manager if available
+        if (this.soundManager.isMasterMuted && typeof this.soundManager.isMasterMuted === 'function') {
+            return this.soundManager.isMasterMuted();
+        }
+        return this.audioSettings.muted;
+    }
+    
+    setMasterMuted(muted: boolean): void {
+        console.log('🔊 AUDIO DEBUG: AudioService.setMasterMuted called with:', muted);
+        this.ensureNotDisposed();
+        if (this.soundManager.setMasterMuted && typeof this.soundManager.setMasterMuted === 'function') {
+            console.log('🔊 AUDIO DEBUG: Calling soundManager.setMasterMuted');
+            this.soundManager.setMasterMuted(muted);
+        } else {
+            console.log('🔊 AUDIO DEBUG: soundManager.setMasterMuted not available');
+        }
+    }
+    
+    isAmbientMuted(): boolean {
+        if (this.soundManager.isAmbientMuted && typeof this.soundManager.isAmbientMuted === 'function') {
+            return this.soundManager.isAmbientMuted();
+        }
+        return false;
+    }
+    
+    setAmbientMuted(muted: boolean): void {
+        console.log('🔊 AUDIO DEBUG: AudioService.setAmbientMuted called with:', muted);
+        this.ensureNotDisposed();
+        if (this.soundManager.setAmbientMuted && typeof this.soundManager.setAmbientMuted === 'function') {
+            console.log('🔊 AUDIO DEBUG: Calling soundManager.setAmbientMuted');
+            this.soundManager.setAmbientMuted(muted);
+        } else {
+            console.log('🔊 AUDIO DEBUG: soundManager.setAmbientMuted not available');
+        }
+    }
+    
+    isDiscoveryMuted(): boolean {
+        if (this.soundManager.isEffectsMuted && typeof this.soundManager.isEffectsMuted === 'function') {
+            return this.soundManager.isEffectsMuted();
+        }
+        return false;
+    }
+    
+    setDiscoveryMuted(muted: boolean): void {
+        console.log('🔊 AUDIO DEBUG: AudioService.setDiscoveryMuted called with:', muted);
+        this.ensureNotDisposed();
+        if (this.soundManager.setEffectsMuted && typeof this.soundManager.setEffectsMuted === 'function') {
+            console.log('🔊 AUDIO DEBUG: Calling soundManager.setEffectsMuted');
+            this.soundManager.setEffectsMuted(muted);
+        } else {
+            console.log('🔊 AUDIO DEBUG: soundManager.setEffectsMuted not available');
         }
     }
 

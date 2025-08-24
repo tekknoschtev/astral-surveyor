@@ -72,6 +72,15 @@ export class Camera {
     }
 
     update(input: CameraInput, deltaTime: number, canvasWidth: number, canvasHeight: number, celestialObjects: any[] = [], stellarMap: StellarMap | null = null): void {
+        // Skip movement input processing if input has been consumed by UI elements (like settings menu)
+        if (input.isTouchConsumed && input.isTouchConsumed()) {
+            // Still update position from existing velocity but don't process new input
+            this.x += this.velocityX * deltaTime;
+            this.y += this.velocityY * deltaTime;
+            this.smoothRotate(deltaTime);
+            return;
+        }
+        
         // Movement logic restored from working version
         let thrustX = 0;
         let thrustY = 0;
