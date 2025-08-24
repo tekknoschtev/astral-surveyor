@@ -335,22 +335,27 @@ export class Game {
         // Handle debug commands (development builds only)
         this.handleDebugInput();
         
-        // Handle settings menu keyboard shortcuts
+        // Handle settings menu keyboard shortcuts - consume input to prevent ship movement
         if (this.settingsMenu.isVisible()) {
-            // Check for number key tab switches (1, 2, 3)
+            // Check for number key tab switches (currently only 1 for Audio)
             if (this.input.wasJustPressed('Digit1')) {
                 this.settingsMenu.handleKeyPress('Digit1');
-            } else if (this.input.wasJustPressed('Digit2')) {
-                this.settingsMenu.handleKeyPress('Digit2');
-            } else if (this.input.wasJustPressed('Digit3')) {
-                this.settingsMenu.handleKeyPress('Digit3');
+                this.input.consumeTouch(); // Prevent ship movement
             }
+            // Future shortcuts (framework preserved):
+            // } else if (this.input.wasJustPressed('Digit2')) {
+            //     this.settingsMenu.handleKeyPress('Digit2');
+            //     this.input.consumeTouch(); // Prevent ship movement
+            // } else if (this.input.wasJustPressed('Digit3')) {
+            //     this.settingsMenu.handleKeyPress('Digit3');
+            //     this.input.consumeTouch(); // Prevent ship movement
         }
         
         // Handle settings menu toggle and close (Escape key)
         if (this.input.wasJustPressed('Escape')) {
             if (this.settingsMenu.isVisible()) {
                 this.settingsMenu.handleKeyPress('Escape');
+                this.input.consumeTouch(); // Consume escape when closing settings
             } else if (this.stellarMap.isVisible()) {
                 this.stellarMap.toggle();
             } else if (this.discoveryLogbook.isVisible()) {

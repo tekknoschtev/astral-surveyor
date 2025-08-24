@@ -84,7 +84,8 @@ describe('SettingsMenu UI Component', () => {
             getMouseY: vi.fn().mockReturnValue(0),
             wasJustPressed: vi.fn().mockReturnValue(false),
             getTouchCount: vi.fn().mockReturnValue(0),
-            clearFrameState: vi.fn()
+            clearFrameState: vi.fn(),
+            consumeTouch: vi.fn()
         };
 
         settingsMenu = new SettingsMenu(mockSettingsService);
@@ -191,31 +192,24 @@ describe('SettingsMenu UI Component', () => {
         it('should render tab buttons', () => {
             settingsMenu.render(mockContext, mockCanvas);
             
-            // Should draw tab buttons and text
+            // Should draw Audio tab button (Display and Data tabs are disabled)
             expect(mockContext.fillText).toHaveBeenCalledWith('Audio', expect.any(Number), expect.any(Number));
-            expect(mockContext.fillText).toHaveBeenCalledWith('Display', expect.any(Number), expect.any(Number));
-            expect(mockContext.fillText).toHaveBeenCalledWith('Data', expect.any(Number), expect.any(Number));
         });
 
         it('should highlight active tab', () => {
-            settingsMenu.setCurrentTab('display');
+            // Only audio tab is available, so it should be highlighted by default
             settingsMenu.render(mockContext, mockCanvas);
             
-            // Should render tabs (active tab color is set but may be overwritten)
+            // Should render tab (active tab color is set but may be overwritten)
             expect(mockContext.fillRect).toHaveBeenCalled();
-            expect(mockContext.fillText).toHaveBeenCalledWith('Display', expect.any(Number), expect.any(Number));
+            expect(mockContext.fillText).toHaveBeenCalledWith('Audio', expect.any(Number), expect.any(Number));
         });
 
         it('should render current tab content', () => {
-            // Audio tab should render volume controls
+            // Only Audio tab is available and should render volume controls
             settingsMenu.setCurrentTab('audio');
             settingsMenu.render(mockContext, mockCanvas);
             expect(mockContext.fillText).toHaveBeenCalledWith(expect.stringContaining('Ambient'), expect.any(Number), expect.any(Number));
-            
-            // Display tab should render display options  
-            settingsMenu.setCurrentTab('display');
-            settingsMenu.render(mockContext, mockCanvas);
-            expect(mockContext.fillText).toHaveBeenCalledWith(expect.stringContaining('Coordinates'), expect.any(Number), expect.any(Number));
         });
     });
 
@@ -261,73 +255,75 @@ describe('SettingsMenu UI Component', () => {
         });
     });
 
-    describe('Display Tab Functionality', () => {
-        beforeEach(() => {
-            settingsMenu.show();
-            settingsMenu.setCurrentTab('display');
-        });
+    // Display Tab Functionality tests disabled - Display tab is currently disabled
+    // describe('Display Tab Functionality', () => {
+    //     beforeEach(() => {
+    //         settingsMenu.show();
+    //         settingsMenu.setCurrentTab('display');
+    //     });
 
-        it('should render coordinate display toggle', () => {
-            settingsMenu.render(mockContext, mockCanvas);
+    //     it('should render coordinate display toggle', () => {
+    //         settingsMenu.render(mockContext, mockCanvas);
             
-            expect(mockContext.fillText).toHaveBeenCalledWith(
-                expect.stringContaining('Show Coordinates'), 
-                expect.any(Number), expect.any(Number)
-            );
-        });
+    //         expect(mockContext.fillText).toHaveBeenCalledWith(
+    //             expect.stringContaining('Show Coordinates'), 
+    //             expect.any(Number), expect.any(Number)
+    //         );
+    //     });
 
-        it('should render UI scale slider', () => {
-            settingsMenu.render(mockContext, mockCanvas);
+    //     it('should render UI scale slider', () => {
+    //         settingsMenu.render(mockContext, mockCanvas);
             
-            expect(mockContext.fillText).toHaveBeenCalledWith(
-                expect.stringContaining('UI Scale'), 
-                expect.any(Number), expect.any(Number)
-            );
-        });
+    //         expect(mockContext.fillText).toHaveBeenCalledWith(
+    //             expect.stringContaining('UI Scale'), 
+    //             expect.any(Number), expect.any(Number)
+    //         );
+    //     });
 
-        it('should render fullscreen toggle', () => {
-            settingsMenu.render(mockContext, mockCanvas);
+    //     it('should render fullscreen toggle', () => {
+    //         settingsMenu.render(mockContext, mockCanvas);
             
-            expect(mockContext.fillText).toHaveBeenCalledWith(
-                expect.stringContaining('Fullscreen'), 
-                expect.any(Number), expect.any(Number)
-            );
-        });
-    });
+    //         expect(mockContext.fillText).toHaveBeenCalledWith(
+    //             expect.stringContaining('Fullscreen'), 
+    //             expect.any(Number), expect.any(Number)
+    //         );
+    //     });
+    // });
 
-    describe('Data Tab Functionality', () => {
-        beforeEach(() => {
-            settingsMenu.show();
-            settingsMenu.setCurrentTab('data');
-        });
+    // Data Tab Functionality tests disabled - Data tab is currently disabled
+    // describe('Data Tab Functionality', () => {
+    //     beforeEach(() => {
+    //         settingsMenu.show();
+    //         settingsMenu.setCurrentTab('data');
+    //     });
 
-        it('should render export button', () => {
-            settingsMenu.render(mockContext, mockCanvas);
+    //     it('should render export button', () => {
+    //         settingsMenu.render(mockContext, mockCanvas);
             
-            expect(mockContext.fillText).toHaveBeenCalledWith(
-                expect.stringContaining('Export'), 
-                expect.any(Number), expect.any(Number)
-            );
-        });
+    //         expect(mockContext.fillText).toHaveBeenCalledWith(
+    //             expect.stringContaining('Export'), 
+    //             expect.any(Number), expect.any(Number)
+    //         );
+    //     });
 
-        it('should render reset distance button', () => {
-            settingsMenu.render(mockContext, mockCanvas);
+    //     it('should render reset distance button', () => {
+    //         settingsMenu.render(mockContext, mockCanvas);
             
-            expect(mockContext.fillText).toHaveBeenCalledWith(
-                expect.stringContaining('Reset Distance'), 
-                expect.any(Number), expect.any(Number)
-            );
-        });
+    //         expect(mockContext.fillText).toHaveBeenCalledWith(
+    //             expect.stringContaining('Reset Distance'), 
+    //             expect.any(Number), expect.any(Number)
+    //         );
+    //     });
 
-        it('should render clear history button', () => {
-            settingsMenu.render(mockContext, mockCanvas);
+    //     it('should render clear history button', () => {
+    //         settingsMenu.render(mockContext, mockCanvas);
             
-            expect(mockContext.fillText).toHaveBeenCalledWith(
-                'Clear Discovery History', 
-                expect.any(Number), expect.any(Number)
-            );
-        });
-    });
+    //         expect(mockContext.fillText).toHaveBeenCalledWith(
+    //             'Clear Discovery History', 
+    //             expect.any(Number), expect.any(Number)
+    //         );
+    //     });
+    // });
 
     describe('Input Handling', () => {
         beforeEach(() => {
@@ -336,12 +332,13 @@ describe('SettingsMenu UI Component', () => {
 
         it('should handle tab switching clicks', () => {
             mockInput.wasClicked.mockReturnValue(true);
-            mockInput.getMouseX.mockReturnValue(512); // Middle tab (Display) area
+            mockInput.getMouseX.mockReturnValue(512); // Audio tab area (only tab available)
             mockInput.getMouseY.mockReturnValue(154); // Tab area Y coordinate
             
             settingsMenu.handleInput(mockInput);
             
-            expect(settingsMenu.getCurrentTab()).toBe('display');
+            // Should remain on audio tab since it's the only available tab
+            expect(settingsMenu.getCurrentTab()).toBe('audio');
         });
 
         it('should handle volume slider interactions', () => {
@@ -520,6 +517,9 @@ describe('SettingsMenu UI Component', () => {
             });
 
             it('should handle multiple rapid clicks correctly', () => {
+                // Use fake timers to control debouncing
+                vi.useFakeTimers();
+                
                 mockSettingsService.isAmbientMuted.mockReturnValue(false);
                 settingsMenu.render(mockContext, mockCanvas);
                 
@@ -532,8 +532,14 @@ describe('SettingsMenu UI Component', () => {
                 // Now ambient should be muted
                 mockSettingsService.isAmbientMuted.mockReturnValue(true);
                 
+                // Advance time beyond debounce period (200ms)
+                vi.advanceTimersByTime(250);
+                
                 // Second click
                 settingsMenu.handleInput(mockInput);
+                
+                // Restore real timers
+                vi.useRealTimers();
                 
                 // Should have been called twice, with opposite values
                 expect(mockSettingsService.setAmbientMuted).toHaveBeenCalledTimes(2);
@@ -542,29 +548,30 @@ describe('SettingsMenu UI Component', () => {
             });
         });
 
-        it('should handle export button click', () => {
-            // Mock URL.createObjectURL and document.createElement for download test
-            global.URL = { 
-                createObjectURL: vi.fn().mockReturnValue('blob:test'),
-                revokeObjectURL: vi.fn()
-            };
-            global.document = {
-                createElement: vi.fn().mockReturnValue({
-                    href: '',
-                    download: '',
-                    click: vi.fn()
-                })
-            };
+        // Export button test disabled - Data tab is currently disabled
+        // it('should handle export button click', () => {
+        //     // Mock URL.createObjectURL and document.createElement for download test
+        //     global.URL = { 
+        //         createObjectURL: vi.fn().mockReturnValue('blob:test'),
+        //         revokeObjectURL: vi.fn()
+        //     };
+        //     global.document = {
+        //         createElement: vi.fn().mockReturnValue({
+        //             href: '',
+        //             download: '',
+        //             click: vi.fn()
+        //         })
+        //     };
             
-            settingsMenu.setCurrentTab('data');
-            mockInput.wasClicked.mockReturnValue(true);
-            mockInput.getMouseX.mockReturnValue(400); // On export button
-            mockInput.getMouseY.mockReturnValue(350);
+        //     settingsMenu.setCurrentTab('data');
+        //     mockInput.wasClicked.mockReturnValue(true);
+        //     mockInput.getMouseX.mockReturnValue(400); // On export button
+        //     mockInput.getMouseY.mockReturnValue(350);
             
-            settingsMenu.handleInput(mockInput);
+        //     settingsMenu.handleInput(mockInput);
             
-            expect(mockSettingsService.exportSaveData).toHaveBeenCalled();
-        });
+        //     expect(mockSettingsService.exportSaveData).toHaveBeenCalled();
+        // });
 
         it('should not handle input when invisible', () => {
             settingsMenu.hide();
@@ -603,14 +610,18 @@ describe('SettingsMenu UI Component', () => {
         it('should switch tabs with number keys', () => {
             mockInput.wasJustPressed.mockReturnValue(true);
             
+            // Test switching to audio tab (only available tab)
             settingsMenu.handleKeyPress('Digit1');
             expect(settingsMenu.getCurrentTab()).toBe('audio');
             
-            settingsMenu.handleKeyPress('Digit2');
-            expect(settingsMenu.getCurrentTab()).toBe('display');
+            // Test that disabled tab shortcuts return false and don't change tab
+            const result2 = settingsMenu.handleKeyPress('Digit2');
+            expect(result2).toBe(false);
+            expect(settingsMenu.getCurrentTab()).toBe('audio');
             
-            settingsMenu.handleKeyPress('Digit3');
-            expect(settingsMenu.getCurrentTab()).toBe('data');
+            const result3 = settingsMenu.handleKeyPress('Digit3');
+            expect(result3).toBe(false);
+            expect(settingsMenu.getCurrentTab()).toBe('audio');
         });
 
         it('should not handle keys when invisible', () => {

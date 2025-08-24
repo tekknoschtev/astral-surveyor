@@ -325,16 +325,17 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       expect(game.discoveryLogbook.toggle).toHaveBeenCalled();
     });
 
-    it('should handle audio mute toggle (H key)', async () => {
-      game.input.wasJustPressed.mockImplementation((key) => key === 'KeyH');
-      game.soundManager.toggleMute = vi.fn().mockReturnValue(true);
-      game.discoveryDisplay.addNotification = vi.fn();
+    // H key mute toggle test disabled - functionality moved to settings menu
+    // it('should handle audio mute toggle (H key)', async () => {
+    //   game.input.wasJustPressed.mockImplementation((key) => key === 'KeyH');
+    //   game.soundManager.toggleMute = vi.fn().mockReturnValue(true);
+    //   game.discoveryDisplay.addNotification = vi.fn();
 
-      await game.update(0.016);
+    //   await game.update(0.016);
 
-      expect(game.soundManager.toggleMute).toHaveBeenCalled();
-      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('Audio muted');
-    });
+    //   expect(game.soundManager.toggleMute).toHaveBeenCalled();
+    //   expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('Audio muted');
+    // });
 
     it('should handle escape key for closing UI', async () => {
       game.input.wasJustPressed.mockImplementation((key) => key === 'Escape');
@@ -1395,23 +1396,24 @@ describe('Game System - Main Game Loop and Orchestration', () => {
     });
   });
 
-  describe('Audio State Management', () => {
-    beforeEach(() => {
-      game = new Game(mockCanvas);
-      game.soundManager.toggleMute = vi.fn();
-      game.discoveryDisplay.addNotification = vi.fn();
-    });
+  // Audio State Management tests disabled - H key functionality moved to settings menu
+  // describe('Audio State Management', () => {
+  //   beforeEach(() => {
+  //     game = new Game(mockCanvas);
+  //     game.soundManager.toggleMute = vi.fn();
+  //     game.discoveryDisplay.addNotification = vi.fn();
+  //   });
 
-    it('should handle audio unmute notification', async () => {
-      game.input.wasJustPressed = vi.fn().mockImplementation((key) => key === 'KeyH');
-      game.soundManager.toggleMute.mockReturnValue(false); // Not muted
+  //   it('should handle audio unmute notification', async () => {
+  //     game.input.wasJustPressed = vi.fn().mockImplementation((key) => key === 'KeyH');
+  //     game.soundManager.toggleMute.mockReturnValue(false); // Not muted
       
-      await game.update(0.016);
+  //     await game.update(0.016);
 
-      expect(game.soundManager.toggleMute).toHaveBeenCalled();
-      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('Audio unmuted');
-    });
-  });
+  //     expect(game.soundManager.toggleMute).toHaveBeenCalled();
+  //     expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('Audio unmuted');
+  //   });
+  // });
 
   describe('Destination Preview System', () => {
     beforeEach(() => {

@@ -110,6 +110,43 @@ export class SettingsMenu {
         this.masterSlider.dragging = false;
         this.uiScaleSlider.dragging = false;
     }
+    
+    private isPointInMenu(mouseX: number, mouseY: number): boolean {
+        const { x, y, width, height } = this.dimensions;
+        return mouseX >= x && mouseX <= x + width && 
+               mouseY >= y && mouseY <= y + height;
+    }
+    
+    private isDragging(): boolean {
+        return this.ambientSlider.dragging || 
+               this.discoverySlider.dragging || 
+               this.masterSlider.dragging || 
+               this.uiScaleSlider.dragging;
+    }
+    
+    handleKeyPress(key: string): boolean {
+        if (!this.visible) {
+            return false;
+        }
+        
+        switch (key) {
+            case 'Escape':
+                this.hide();
+                return true;
+            case 'Digit1':
+                this.setCurrentTab('audio');
+                return true;
+            // Future keyboard shortcuts (framework preserved):
+            // case 'Digit2':
+            //     this.setCurrentTab('display');
+            //     return true;
+            // case 'Digit3':
+            //     this.setCurrentTab('data');
+            //     return true;
+            default:
+                return false;
+        }
+    }
 
     // Tab Management
     getCurrentTab(): TabName {
@@ -191,13 +228,16 @@ export class SettingsMenu {
 
     private renderTabs(ctx: CanvasRenderingContext2D): void {
         const { x, y, width, tabHeight } = this.dimensions;
-        const tabWidth = width / 3;
         
+        // Currently only Audio tab is implemented - Display and Data tabs disabled for now
         const tabs: { name: TabName; label: string }[] = [
-            { name: 'audio', label: 'Audio' },
-            { name: 'display', label: 'Display' },
-            { name: 'data', label: 'Data' }
+            { name: 'audio', label: 'Audio' }
+            // Future tabs (framework preserved):
+            // { name: 'display', label: 'Display' },
+            // { name: 'data', label: 'Data' }
         ];
+        
+        const tabWidth = width / tabs.length;
         
         // Use monospace font like logbook
         ctx.font = this.touchMode ? '16px "Courier New", monospace' : '14px "Courier New", monospace';
@@ -228,12 +268,13 @@ export class SettingsMenu {
             case 'audio':
                 this.renderAudioTab(ctx);
                 break;
-            case 'display':
-                this.renderDisplayTab(ctx);
-                break;
-            case 'data':
-                this.renderDataTab(ctx);
-                break;
+            // Future tab renderers (framework preserved):
+            // case 'display':
+            //     this.renderDisplayTab(ctx);
+            //     break;
+            // case 'data':
+            //     this.renderDataTab(ctx);
+            //     break;
         }
     }
 
@@ -467,14 +508,28 @@ export class SettingsMenu {
         const mouseX = input.getMouseX();
         const mouseY = input.getMouseY();
         
-        // Handle clicks
+        // Check if mouse is over the settings menu area
+        const isOverMenu = this.isPointInMenu(mouseX, mouseY);
+        const isDragging = this.isDragging();
+        
+        // Handle clicks - consume input if over menu or if dragging
         if (input.wasClicked()) {
             this.handleClick(mouseX, mouseY);
+            
+            // If click was over menu area or outside (closing menu), consume it
+            if (isOverMenu || !this.visible) { // Menu might close in handleClick
+                input.consumeTouch();
+            }
         }
         
-        // Handle mouse drag for sliders
+        // Handle mouse drag for sliders - always consume when dragging
         if (input.isMousePressed()) {
             this.handleMouseDrag(mouseX, mouseY);
+            
+            // Consume input if over menu or actively dragging sliders
+            if (isOverMenu || isDragging) {
+                input.consumeTouch();
+            }
         } else {
             this.clearDragStates();
         }
@@ -489,11 +544,11 @@ export class SettingsMenu {
             return;
         }
         
-        // Handle tab clicks
+        // Handle tab clicks (currently only Audio tab available)
         if (mouseY >= y && mouseY <= y + tabHeight) {
-            const tabWidth = width / 3;
+            const tabs: TabName[] = ['audio']; // Future tabs: 'display', 'data'
+            const tabWidth = width / tabs.length;
             const tabIndex = Math.floor((mouseX - x) / tabWidth);
-            const tabs: TabName[] = ['audio', 'display', 'data'];
             
             if (tabIndex >= 0 && tabIndex < tabs.length) {
                 this.setCurrentTab(tabs[tabIndex]);
@@ -511,12 +566,13 @@ export class SettingsMenu {
                 case 'audio':
                     this.handleAudioTabClick(mouseX, mouseY);
                     break;
-                case 'display':
-                    this.handleDisplayTabClick(mouseX, mouseY);
-                    break;
-                case 'data':
-                    this.handleDataTabClick(mouseX, mouseY);
-                    break;
+                // Future tab handlers (framework preserved):
+                // case 'display':
+                //     this.handleDisplayTabClick(mouseX, mouseY);
+                //     break;
+                // case 'data':
+                //     this.handleDataTabClick(mouseX, mouseY);
+                //     break;
             }
         } catch (error) {
             console.warn('Error handling content click:', error);
@@ -678,29 +734,6 @@ export class SettingsMenu {
         }
     }
 
-    // Keyboard Shortcuts
-    handleKeyPress(key: string): boolean {
-        if (!this.visible) {
-            return false;
-        }
-        
-        switch (key) {
-            case 'Escape':
-                this.hide();
-                return true;
-            case 'Digit1':
-                this.setCurrentTab('audio');
-                return true;
-            case 'Digit2':
-                this.setCurrentTab('display');
-                return true;
-            case 'Digit3':
-                this.setCurrentTab('data');
-                return true;
-            default:
-                return false;
-        }
-    }
 
     // Cleanup
     dispose(): void {

@@ -135,8 +135,8 @@ describe('SoundManager Audio System', () => {
     it('should set initial volume levels correctly', () => {
       soundManager = new SoundManager();
       
-      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 0); // master volume
-      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.3, 0); // ambient volume
+      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 0); // master volume
+      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.6, 0); // ambient volume
       expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.7, 0); // effects volume
     });
 
@@ -194,7 +194,15 @@ describe('SoundManager Audio System', () => {
       
       expect(global.localStorage.setItem).toHaveBeenCalledWith(
         'astralSurveyor_audioSettings',
-        JSON.stringify({ muted: true })
+        JSON.stringify({ 
+          muted: true, 
+          masterVolume: 0.8, 
+          ambientVolume: 0.6, 
+          effectsVolume: 0.7, 
+          masterMuted: false, 
+          ambientMuted: false, 
+          effectsMuted: false 
+        })
       );
     });
 
@@ -241,7 +249,7 @@ describe('SoundManager Audio System', () => {
       
       soundManager.toggleMute(); // unmute
       
-      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 0);
+      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 0);
     });
 
     it('should save settings when toggling mute', () => {

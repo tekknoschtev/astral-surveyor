@@ -18,7 +18,14 @@ describe('SettingsService', () => {
             getEffectsVolume: vi.fn().mockReturnValue(0.7),
             setEffectsVolume: vi.fn(),
             isMuted: vi.fn().mockReturnValue(false),
-            setMuted: vi.fn()
+            setMuted: vi.fn(),
+            // Individual channel mute methods
+            isMasterMuted: vi.fn().mockReturnValue(false),
+            setMasterMuted: vi.fn(),
+            isAmbientMuted: vi.fn().mockReturnValue(false),
+            setAmbientMuted: vi.fn(),
+            isDiscoveryMuted: vi.fn().mockReturnValue(false),
+            setDiscoveryMuted: vi.fn()
         };
 
         // Mock localStorage
@@ -153,10 +160,10 @@ describe('SettingsService', () => {
 
         it('should sync mute state with AudioService', () => {
             settingsService.setMasterMuted(true);
-            expect(mockAudioService.setMuted).toHaveBeenCalledWith(true);
+            expect(mockAudioService.setMasterMuted).toHaveBeenCalledWith(true);
             
             settingsService.setMasterMuted(false);
-            expect(mockAudioService.setMuted).toHaveBeenCalledWith(false);
+            expect(mockAudioService.setMasterMuted).toHaveBeenCalledWith(false);
         });
     });
 
