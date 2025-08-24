@@ -26,8 +26,8 @@ interface UserSettings {
 interface SettingsChangeEvent {
     type: 'settingsChanged';
     setting: string;
-    value: any;
-    previousValue: any;
+    value: unknown;
+    previousValue: unknown;
 }
 
 export class SettingsService {
@@ -39,7 +39,7 @@ export class SettingsService {
         discovery: 70,
         master: 80
     };
-    private eventListeners: Map<string, ((...args: any[]) => void)[]> = new Map();
+    private eventListeners: Map<string, ((...args: unknown[]) => void)[]> = new Map();
     
     // Callbacks for external operations
     onDistanceReset?: () => void;
@@ -133,7 +133,7 @@ export class SettingsService {
         this.audioService.setMuted(this.settings.masterMuted);
     }
 
-    private validateVolume(volume: any): void {
+    private validateVolume(volume: unknown): void {
         if (typeof volume !== 'number') {
             throw new Error('Volume must be a number');
         }
@@ -142,7 +142,7 @@ export class SettingsService {
         }
     }
 
-    private validateUIScale(scale: any): void {
+    private validateUIScale(scale: unknown): void {
         if (typeof scale !== 'number') {
             throw new Error('UI scale must be a number');
         }
@@ -151,13 +151,13 @@ export class SettingsService {
         }
     }
 
-    private validateBoolean(value: any, settingName: string): void {
+    private validateBoolean(value: unknown, settingName: string): void {
         if (typeof value !== 'boolean') {
             throw new Error(`${settingName} must be a boolean`);
         }
     }
 
-    private emitSettingsChange(setting: string, value: any, previousValue: any): void {
+    private emitSettingsChange(setting: string, value: unknown, previousValue: unknown): void {
         const event: SettingsChangeEvent = {
             type: 'settingsChanged',
             setting,
@@ -400,7 +400,7 @@ export class SettingsService {
     }
 
     // Event System
-    addEventListener(eventType: string, listener: (...args: any[]) => void): void {
+    addEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
         if (!this.eventListeners.has(eventType)) {
             this.eventListeners.set(eventType, []);
         }
@@ -409,7 +409,7 @@ export class SettingsService {
         listeners.push(listener);
     }
 
-    removeEventListener(eventType: string, listener: (...args: any[]) => void): void {
+    removeEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
         const listeners = this.eventListeners.get(eventType);
         if (listeners) {
             const index = listeners.indexOf(listener);

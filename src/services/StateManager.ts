@@ -6,6 +6,9 @@ import { StellarMap } from '../ui/stellarmap.js';
 import { DiscoveryDisplay } from '../ui/ui.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { resetUniverse, generateSafeSpawnPosition } from '../utils/random.js';
+import type { ChunkManager } from '../world/ChunkManager.js';
+import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
+import type { SoundManager } from '../audio/soundmanager.js';
 
 // Interface for wormhole traversal destination
 interface TraversalDestination {
@@ -112,7 +115,7 @@ export class StateManager {
     /**
      * Update traversal state during transition
      */
-    updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: any): void {
+    updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: ChunkManager): void {
         if (!this.traversalDestination) return;
         
         this.traversalStartTime += deltaTime;
@@ -389,10 +392,10 @@ export class StateManager {
     updateUniverseReset(
         deltaTime: number, 
         camera: Camera, 
-        chunkManager: any, 
-        discoveryLogbook: any,
+        chunkManager: ChunkManager, 
+        discoveryLogbook: DiscoveryLogbook,
         stellarMap: StellarMap,
-        soundManager: any
+        soundManager: SoundManager
     ): void {
         this.resetStartTime += deltaTime;
         
@@ -422,7 +425,7 @@ export class StateManager {
             chunkManager.updateActiveChunks(camera.x, camera.y);
             
             // Restore discovery history (cosmic knowledge persists across rebirths)
-            discoveries.forEach(discovery => discoveryLogbook.addDiscovery(discovery.objectName, discovery.objectType));
+            discoveries.forEach(discovery => discoveryLogbook.addDiscovery(discovery.name, discovery.type));
             
             // Center stellar map on new position
             stellarMap.centerOnPosition(camera.x, camera.y);
