@@ -10,6 +10,7 @@ import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import { Comet, selectCometType } from '../celestial/comets.js';
 import { GameConfig } from '../config/gameConfig.js';
+import { ErrorService } from '../services/ErrorService.js';
 
 // Interface definitions
 interface ChunkCoords {
@@ -207,12 +208,14 @@ export class ChunkManager {
     activeChunks: Map<string, Chunk>;
     discoveredObjects: Map<string, DiscoveryData>;
     debugObjects?: DebugObject[];
+    private errorService: ErrorService;
 
-    constructor() {
+    constructor(errorService?: ErrorService) {
         this.chunkSize = GameConfig.world.chunkSize;
         this.loadRadius = 1; // Load chunks in 3x3 grid around player
         this.activeChunks = new Map(); // Key: "x,y", Value: chunk data
         this.discoveredObjects = new Map(); // Key: "objId", Value: discovery state
+        this.errorService = errorService || new ErrorService();
     }
 
     getChunkCoords(worldX: number, worldY: number): ChunkCoords {
@@ -256,6 +259,16 @@ export class ChunkManager {
     }
 
     generateChunk(chunkX: number, chunkY: number): Chunk {
+        return this.errorService.safeExecute(
+            'ChunkManager',
+            `generateChunk(${chunkX}, ${chunkY})`,
+            () => this._generateChunk(chunkX, chunkY),
+            this._createEmptyChunk(chunkX, chunkY),
+            `Failed to generate world chunk at (${chunkX}, ${chunkY}). Using empty chunk.`
+        ) || this._createEmptyChunk(chunkX, chunkY);
+    }
+
+    private _generateChunk(chunkX: number, chunkY: number): Chunk {
         const chunkKey = this.getChunkKey(chunkX, chunkY);
         if (this.activeChunks.has(chunkKey)) {
             return this.activeChunks.get(chunkKey)!;
@@ -489,6 +502,26 @@ export class ChunkManager {
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
+    }
+
+    private _createEmptyChunk(chunkX: number, chunkY: number): Chunk {
+        const emptyChunk: Chunk = {
+            x: chunkX,
+            y: chunkY,
+            stars: [],
+            planets: [],
+            moons: [],
+            celestialStars: [],
+            nebulae: [],
+            asteroidGardens: [],
+            wormholes: [],
+            blackholes: [],
+            comets: []
+        };
+        
+        const chunkKey = this.getChunkKey(chunkX, chunkY);
+        this.activeChunks.set(chunkKey, emptyChunk);
+        return emptyChunk;
     }
 
     selectPlanetType(rng: SeededRandom, orbitalDistance: number, star: Star): typeof PlanetTypes[keyof typeof PlanetTypes] {

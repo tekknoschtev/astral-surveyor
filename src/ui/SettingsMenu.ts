@@ -3,6 +3,8 @@
 
 import type { SettingsService } from '../services/SettingsService.js';
 import type { Input } from '../input/input.js';
+import { UIErrorBoundary } from './UIErrorBoundary.js';
+import { getErrorService } from '../services/ErrorService.js';
 
 type TabName = 'audio' | 'display' | 'data';
 
@@ -26,6 +28,7 @@ interface SliderState {
 
 export class SettingsMenu {
     private readonly settingsService: SettingsService;
+    private readonly errorBoundary: UIErrorBoundary;
     private visible: boolean = false;
     private currentTab: TabName = 'audio';
     private touchMode: boolean = false;
@@ -52,12 +55,17 @@ export class SettingsMenu {
         }
         
         this.settingsService = settingsService;
+        this.errorBoundary = new UIErrorBoundary(getErrorService(), {
+            showErrorDetails: true,
+            enableRecovery: true,
+            fallbackMessage: 'Settings menu temporarily unavailable'
+        });
         this.dimensions = this.calculateDimensions({ width: 1024, height: 768 }); // Default dimensions
         
         // Set up settings change listener
-        this.settingsChangeHandler = (_event: any) => {
+        this.settingsChangeHandler = this.errorBoundary.safeEventHandler('SettingsMenu', (_event: any) => {
             this.needsRedrawFlag = true;
-        };
+        });
         this.settingsService.addEventListener('settingsChanged', this.settingsChangeHandler);
     }
 
@@ -180,31 +188,33 @@ export class SettingsMenu {
             return;
         }
 
-        console.log('🎨 RENDER: Settings menu render called, needsRedrawFlag:', this.needsRedrawFlag);
-        // Always render for now - the optimization was causing issues
-        // if (!this.needsRedrawFlag) {
-        //     return;
-        // }
+        this.errorBoundary.wrapComponent('SettingsMenu.render', () => {
+            console.log('🎨 RENDER: Settings menu render called, needsRedrawFlag:', this.needsRedrawFlag);
+            // Always render for now - the optimization was causing issues
+            // if (!this.needsRedrawFlag) {
+            //     return;
+            // }
 
-        this.dimensions = this.calculateDimensions(canvas);
+            this.dimensions = this.calculateDimensions(canvas);
+            
+            ctx.save();
+            
+            // Render modal overlay
+            this.renderOverlay(ctx, canvas);
+            
+            // Render settings panel
+            this.renderPanel(ctx);
         
-        ctx.save();
-        
-        // Render modal overlay
-        this.renderOverlay(ctx, canvas);
-        
-        // Render settings panel
-        this.renderPanel(ctx);
-        
-        // Render tabs
-        this.renderTabs(ctx);
-        
-        // Render current tab content
-        this.renderCurrentTabContent(ctx);
-        
-        ctx.restore();
-        
-        this.needsRedrawFlag = false;
+            // Render tabs
+            this.renderTabs(ctx);
+            
+            // Render current tab content
+            this.renderCurrentTabContent(ctx);
+            
+            ctx.restore();
+            
+            this.needsRedrawFlag = false;
+        });
     }
 
     private renderOverlay(ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }): void {
@@ -745,6 +755,7 @@ export class SettingsMenu {
             this.settingsService.removeEventListener('settingsChanged', this.settingsChangeHandler);
         }
         
+        this.errorBoundary.dispose();
         this.disposed = true;
     }
 }
