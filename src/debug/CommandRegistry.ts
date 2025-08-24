@@ -17,7 +17,7 @@ interface CommandDefinition {
     name: string;
     description: string;
     parameters: ParameterDefinition[];
-    execute: (params: any[], context: CommandContext) => void;
+    execute: (params: string[], context: CommandContext) => void;
     autocomplete?: (partial: string) => string[];
 }
 

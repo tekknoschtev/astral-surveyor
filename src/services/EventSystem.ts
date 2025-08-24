@@ -6,20 +6,20 @@ interface EventMetadata {
     source?: string;
     context?: string;
     timestamp?: number;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 // Event listener options
 interface ListenerOptions {
     priority?: number;
-    condition?: (data: any) => boolean;
+    condition?: (data: unknown) => boolean;
     context?: string;
     once?: boolean;
 }
 
 // Event listener internal structure
 interface EventListener {
-    handler: (data: any, event?: GameEvent) => void;
+    handler: (data: unknown, event?: GameEvent) => void;
     options: ListenerOptions;
     id: string;
 }
@@ -27,7 +27,7 @@ interface EventListener {
 // Event history entry for debugging
 interface EventHistoryEntry {
     eventType: string;
-    data: any;
+    data: unknown;
     metadata?: EventMetadata;
     timestamp: number;
     listenerCount: number;
@@ -42,14 +42,14 @@ interface EventResult {
 
 export class GameEvent {
     public readonly type: string;
-    public readonly data: any;
+    public readonly data: unknown;
     public readonly metadata: EventMetadata;
     public readonly timestamp: number;
     
     private _defaultPrevented: boolean = false;
     private _propagationStopped: boolean = false;
 
-    constructor(type: string, data: any, metadata: EventMetadata = {}) {
+    constructor(type: string, data: unknown, metadata: EventMetadata = {}) {
         this.type = type;
         this.data = data;
         this.metadata = { ...metadata, timestamp: Date.now() };
@@ -75,12 +75,12 @@ export class GameEvent {
 
 export interface IEventDispatcher {
     // Event registration
-    on(eventType: string, handler: (data: any, event?: GameEvent) => void, options?: ListenerOptions): void;
-    once(eventType: string, handler: (data: any, event?: GameEvent) => void, options?: ListenerOptions): void;
-    off(eventType: string, handler?: (data: any, event?: GameEvent) => void): void;
+    on(eventType: string, handler: (data: unknown, event?: GameEvent) => void, options?: ListenerOptions): void;
+    once(eventType: string, handler: (data: unknown, event?: GameEvent) => void, options?: ListenerOptions): void;
+    off(eventType: string, handler?: (data: unknown, event?: GameEvent) => void): void;
     
     // Event emission
-    emit(eventType: string, data: any, metadata?: EventMetadata): EventResult;
+    emit(eventType: string, data: unknown, metadata?: EventMetadata): EventResult;
     
     // Event introspection
     hasListeners(eventType: string): boolean;
@@ -108,7 +108,7 @@ export class EventDispatcher implements IEventDispatcher {
     /**
      * Register an event listener
      */
-    on(eventType: string, handler: (data: any, event?: GameEvent) => void, options: ListenerOptions = {}): void {
+    on(eventType: string, handler: (data: unknown, event?: GameEvent) => void, options: ListenerOptions = {}): void {
         this.ensureNotDisposed();
         this.validateEventType(eventType);
         this.validateHandler(handler);
@@ -133,14 +133,14 @@ export class EventDispatcher implements IEventDispatcher {
     /**
      * Register a one-time event listener
      */
-    once(eventType: string, handler: (data: any, event?: GameEvent) => void, options: ListenerOptions = {}): void {
+    once(eventType: string, handler: (data: unknown, event?: GameEvent) => void, options: ListenerOptions = {}): void {
         this.on(eventType, handler, { ...options, once: true });
     }
 
     /**
      * Unregister event listener(s)
      */
-    off(eventType: string, handler?: (data: any, event?: GameEvent) => void): void {
+    off(eventType: string, handler?: (data: unknown, event?: GameEvent) => void): void {
         this.ensureNotDisposed();
         this.validateEventType(eventType);
 
@@ -167,7 +167,7 @@ export class EventDispatcher implements IEventDispatcher {
     /**
      * Emit an event to all registered listeners
      */
-    emit(eventType: string, data: any, metadata: EventMetadata = {}): EventResult {
+    emit(eventType: string, data: unknown, metadata: EventMetadata = {}): EventResult {
         this.ensureNotDisposed();
 
         const listeners = this.listeners.get(eventType);
@@ -310,8 +310,8 @@ export class EventDispatcher implements IEventDispatcher {
             for (const listener of listeners) {
                 try {
                     // If listener has a dispose method, call it
-                    if (typeof (listener.handler as any).dispose === 'function') {
-                        (listener.handler as any).dispose();
+                    if (typeof (listener.handler as unknown as { dispose?: () => void }).dispose === 'function') {
+                        (listener.handler as unknown as { dispose: () => void }).dispose();
                     }
                 } catch (_error) {
                     // Ignore disposal errors
@@ -338,7 +338,7 @@ export class EventDispatcher implements IEventDispatcher {
         }
     }
 
-    private validateHandler(handler: any): void {
+    private validateHandler(handler: unknown): void {
         if (typeof handler !== 'function') {
             throw new Error('Event handler must be a function');
         }
