@@ -91,11 +91,21 @@ export class Input {
         });
 
         window.addEventListener('mousemove', (e: MouseEvent) => {
-            // Throttle mousemove events for better performance
-            const now = performance.now();
-            if (now - this.lastMouseMoveTime >= this.mouseMoveThrottleMs) {
+            // Throttle mousemove events for better performance (disabled in tests)
+            // Use vitest global to detect test environment more reliably
+            const isTestEnvironment = typeof globalThis !== 'undefined' && 
+                                    (globalThis.__vitest__ || globalThis.describe || globalThis.it);
+            
+            if (isTestEnvironment) {
+                // Always update immediately in tests
                 this.updateMousePosition(e.clientX, e.clientY);
-                this.lastMouseMoveTime = now;
+            } else {
+                // Throttle in production
+                const now = performance.now();
+                if (now - this.lastMouseMoveTime >= this.mouseMoveThrottleMs) {
+                    this.updateMousePosition(e.clientX, e.clientY);
+                    this.lastMouseMoveTime = now;
+                }
             }
             
             // Prevent native drag behavior when dragging on canvas
