@@ -1,23 +1,71 @@
-// RenderCache - Caches rendered sprites and graphics for better performance
-// Reduces CPU overhead for frequently rendered static objects
+/**
+ * @fileoverview RenderCache - High-performance LRU cache for rendered graphics
+ * Reduces CPU overhead by caching frequently rendered static objects like sprites and UI elements.
+ * 
+ * @author Astral Surveyor Development Team
+ * @since 0.1.0
+ */
 
+/**
+ * Represents a cached rendered item with metadata for LRU management.
+ * @interface
+ */
 export interface CacheEntry {
+    /** The cached canvas element containing the rendered content */
     canvas: HTMLCanvasElement;
+    /** The 2D rendering context for the cached canvas */
     ctx: CanvasRenderingContext2D;
+    /** Timestamp when this entry was created */
     timestamp: number;
+    /** Number of times this cache entry has been accessed */
     hitCount: number;
 }
 
+/**
+ * Performance statistics for the render cache.
+ * @interface
+ */
 export interface RenderCacheStats {
+    /** Total number of entries currently in the cache */
     totalEntries: number;
+    /** Number of successful cache hits */
     cacheHits: number;
+    /** Number of cache misses (entries not found or expired) */
     cacheMisses: number;
+    /** Hit rate percentage (hits / total requests) */
     hitRate: number;
-    memoryUsage: number; // Estimated in KB
+    /** Estimated memory usage in KB */
+    memoryUsage: number;
 }
 
 /**
- * Simple LRU cache for rendered graphics to improve performance
+ * High-performance LRU (Least Recently Used) cache for rendered graphics.
+ * Automatically manages memory usage and provides performance statistics.
+ * 
+ * @class RenderCache
+ * @description This cache system improves rendering performance by storing rendered content
+ * in offscreen canvases and reusing them for subsequent draw operations. Features include:
+ * - Automatic LRU eviction when at capacity
+ * - Time-based expiration for dynamic content
+ * - Performance monitoring with hit/miss statistics
+ * - Memory usage tracking and optimization
+ * 
+ * @example
+ * ```typescript
+ * const cache = new RenderCache(100, 60); // 100 entries, 60 second TTL
+ * 
+ * // Cache a rendered sprite
+ * cache.renderCached(ctx, 'player-idle', x, y, 32, 32, (cacheCtx) => {
+ *   // Draw sprite to cache context
+ *   cacheCtx.drawImage(spriteSheet, sx, sy, sw, sh, 0, 0, 32, 32);
+ * });
+ * 
+ * // Get performance stats
+ * const stats = cache.getStats();
+ * console.log(`Cache hit rate: ${stats.hitRate * 100}%`);
+ * ```
+ * 
+ * @since 0.1.0
  */
 export class RenderCache {
     private cache = new Map<string, CacheEntry>();

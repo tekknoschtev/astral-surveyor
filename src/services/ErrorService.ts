@@ -1,23 +1,45 @@
-// ErrorService - Centralized error handling service integrating with ErrorBoundary
-// Provides consistent error handling patterns across all services
+/**
+ * @fileoverview ErrorService - Centralized error handling service integrating with ErrorBoundary
+ * Provides circuit breaker patterns, retry logic, and error reporting for robust application behavior.
+ * 
+ * @author Astral Surveyor Development Team
+ * @since 0.1.0
+ */
 
 import { ErrorBoundary, Logger, ErrorRecord, HealthStatus, GracefulDegradation } from './ErrorBoundary.js';
 import { EventDispatcher, IEventDispatcher } from './EventSystem.js';
 import { LoggerService, LogLevel } from './LoggerService.js';
 
-// Standard error event types
+/**
+ * Standard error event types used throughout the application for consistent error communication.
+ * @readonly
+ * @enum {string}
+ */
 export const ErrorEvents = {
+    /** Emitted when any error occurs in a service operation */
     ERROR_OCCURRED: 'error.occurred',
+    /** Emitted when a service enters degraded mode */
     SERVICE_DEGRADED: 'error.service.degraded',
+    /** Emitted when a service recovers from degraded mode */
     SERVICE_RECOVERED: 'error.service.recovered',
+    /** Emitted for critical errors that require immediate attention */
     CRITICAL_ERROR: 'error.critical'
 } as const;
 
+/**
+ * Event data structure for error-related events.
+ * @interface
+ */
 export interface ErrorEventData {
+    /** The service where the error occurred */
     service: string;
+    /** The specific operation that failed */
     operation: string;
+    /** The actual error object */
     error: Error;
+    /** Whether the error can potentially be recovered from */
     recoverable: boolean;
+    /** Optional user-friendly message to display */
     userMessage?: string;
 }
 
@@ -51,7 +73,36 @@ class StructuredLogger implements Logger {
 }
 
 /**
- * ErrorService provides centralized, consistent error handling for all services
+ * ErrorService provides centralized, consistent error handling for all services using
+ * circuit breaker patterns, retry logic, and graceful degradation strategies.
+ * 
+ * @class ErrorService
+ * @description This service acts as the main coordinator for error handling across the application.
+ * It integrates with ErrorBoundary for service-level error handling and provides:
+ * - Circuit breaker pattern to prevent cascade failures
+ * - Automatic retry logic with exponential backoff  
+ * - Event-driven error reporting and recovery notifications
+ * - Service degradation management with graceful fallbacks
+ * 
+ * @example
+ * ```typescript
+ * const errorService = new ErrorService(eventSystem);
+ * 
+ * // Safe execution with fallback
+ * const result = errorService.safeExecute(
+ *   'UserService', 
+ *   'fetchUser', 
+ *   () => userAPI.getUser(id),
+ *   null, // fallback value
+ *   'Unable to load user data' // user message
+ * );
+ * 
+ * // Get error statistics
+ * const stats = errorService.getErrorStats();
+ * console.log(`Error rate: ${stats.errorRate * 100}%`);
+ * ```
+ * 
+ * @since 0.1.0
  */
 export class ErrorService {
     private errorBoundary: ErrorBoundary;
@@ -79,7 +130,29 @@ export class ErrorService {
     }
 
     /**
-     * Execute a function safely with consistent error handling
+     * Execute a function safely with comprehensive error handling including circuit breakers,
+     * retry logic, and event notifications.
+     * 
+     * @template T - The return type of the function being executed
+     * @param {string} service - The name of the service executing this operation
+     * @param {string} operation - The specific operation being performed
+     * @param {() => T} fn - The function to execute safely
+     * @param {T | null} [fallback=null] - Fallback value to return on error
+     * @param {string} [userMessage] - Optional user-friendly error message
+     * @returns {T | null} The function result, fallback value, or null on error
+     * 
+     * @example
+     * ```typescript
+     * const userData = errorService.safeExecute(
+     *   'UserService',
+     *   'fetchProfile', 
+     *   () => api.getUserProfile(userId),
+     *   { name: 'Unknown User' }, // fallback
+     *   'Could not load user profile'
+     * );
+     * ```
+     * 
+     * @since 0.1.0
      */
     safeExecute<T>(
         service: string, 

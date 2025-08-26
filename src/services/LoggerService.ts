@@ -1,11 +1,26 @@
-// LoggerService - Centralized logging service with structured error tracking
-// Provides consistent logging patterns and error aggregation for debugging
+/**
+ * @fileoverview LoggerService - Centralized logging service with structured error tracking
+ * Provides consistent logging patterns and error aggregation for debugging across the application.
+ * 
+ * @author Astral Surveyor Development Team
+ * @since 0.1.0
+ */
 
+/**
+ * Log levels used throughout the application for filtering and prioritizing messages.
+ * @readonly
+ * @enum {number}
+ */
 export enum LogLevel {
+    /** Debug messages for development */
     DEBUG = 0,
+    /** General information messages */
     INFO = 1,
+    /** Warning messages that don't break functionality */
     WARN = 2,
+    /** Error messages for recoverable failures */
     ERROR = 3,
+    /** Critical errors requiring immediate attention */
     CRITICAL = 4
 }
 
