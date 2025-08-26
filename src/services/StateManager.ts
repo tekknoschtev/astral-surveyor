@@ -6,6 +6,9 @@ import { StellarMap } from '../ui/stellarmap.js';
 import { DiscoveryDisplay } from '../ui/ui.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { resetUniverse, generateSafeSpawnPosition } from '../utils/random.js';
+import type { ChunkManager } from '../world/ChunkManager.js';
+import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
+import type { SoundManager } from '../audio/soundmanager.js';
 
 // Interface for wormhole traversal destination
 interface TraversalDestination {
@@ -74,12 +77,6 @@ export class StateManager {
         if (debugEnabled) {
             // Enable the debug configuration when URL debug mode is active
             GameConfig.debug.enabled = true;
-            console.log('🔧 Debug mode activated!');
-            console.log('Debug controls:');
-            console.log('  W: Spawn wormhole pair');
-            console.log('  B: Spawn black hole');
-            console.log('  Shift + H: Show debug help');
-            console.log('  Note: Check console for additional debug output');
         }
         
         return debugEnabled;
@@ -118,7 +115,7 @@ export class StateManager {
     /**
      * Update traversal state during transition
      */
-    updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: any): void {
+    updateTraversal(deltaTime: number, camera: Camera, stellarMap: StellarMap, discoveryDisplay: DiscoveryDisplay, chunkManager: ChunkManager): void {
         if (!this.traversalDestination) return;
         
         this.traversalStartTime += deltaTime;
@@ -159,7 +156,6 @@ export class StateManager {
             const destinationDesignation = this.traversalDestination.wormhole.designation === 'alpha' ? 'β' : 'α';
             discoveryDisplay.addNotification(`Traversed to ${this.traversalDestination.wormhole.wormholeId}-${destinationDesignation}`);
             
-            console.log(`🌀 Completed wormhole traversal to ${destinationDesignation}`);
         }
         
         // End traversal
@@ -182,7 +178,6 @@ export class StateManager {
         
         // CRITICAL: Prevent multiple simultaneous calls
         if (this.betaCreationInProgress) {
-            console.log(`🌀 DEBUG: Beta creation already in progress, skipping duplicate call`);
             return;
         }
         
@@ -389,7 +384,6 @@ export class StateManager {
     initiateUniverseReset(): void {
         this.isResettingUniverse = true;
         this.resetStartTime = 0;
-        console.log('🕳️ SINGULARITY COLLISION - Initiating cosmic rebirth...');
     }
 
     /**
@@ -398,10 +392,10 @@ export class StateManager {
     updateUniverseReset(
         deltaTime: number, 
         camera: Camera, 
-        chunkManager: any, 
-        discoveryLogbook: any,
+        chunkManager: ChunkManager, 
+        discoveryLogbook: DiscoveryLogbook,
         stellarMap: StellarMap,
-        soundManager: any
+        soundManager: SoundManager
     ): void {
         this.resetStartTime += deltaTime;
         
@@ -431,7 +425,7 @@ export class StateManager {
             chunkManager.updateActiveChunks(camera.x, camera.y);
             
             // Restore discovery history (cosmic knowledge persists across rebirths)
-            discoveries.forEach(discovery => discoveryLogbook.addDiscovery(discovery.objectName, discovery.objectType));
+            discoveries.forEach(discovery => discoveryLogbook.addDiscovery(discovery.name, discovery.type));
             
             // Center stellar map on new position
             stellarMap.centerOnPosition(camera.x, camera.y);
@@ -439,7 +433,6 @@ export class StateManager {
             // Play cosmic rebirth completion sound
             soundManager.playRareDiscovery(); // Temporary sound
             
-            console.log(`🌌 Cosmic rebirth complete! New universe spawned at (${Math.floor(camera.x)}, ${Math.floor(camera.y)})`);
         }
         
         // End reset transition

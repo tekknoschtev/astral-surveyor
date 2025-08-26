@@ -155,41 +155,27 @@ export class SoundManager {
     private updateMasterVolume(): void {
         if (this.masterGain && this.context) {
             const volume = (this.muted || this.masterMuted) ? 0 : this.masterVolume;
-            console.log('🔊 AUDIO DEBUG: updateMasterVolume - muted:', this.muted, 'masterMuted:', this.masterMuted, 'volume:', this.masterVolume, '→ final:', volume);
             this.masterGain.gain.setValueAtTime(volume, this.context.currentTime);
-            console.log('🔊 AUDIO DEBUG: Master gain node updated to:', volume, 'at time:', this.context.currentTime);
         } else {
-            console.warn('🔊 AUDIO DEBUG: updateMasterVolume called but masterGain or context is null');
+            // Master gain or context is null
         }
     }
 
     private updateAmbientVolume(): void {
         if (this.ambientGain && this.context) {
             const volume = (this.muted || this.masterMuted || this.ambientMuted) ? 0 : this.ambientVolume;
-            console.log('🔊 AUDIO DEBUG: updateAmbientVolume - muted:', this.muted, 'masterMuted:', this.masterMuted, 'ambientMuted:', this.ambientMuted, 'volume:', this.ambientVolume, '→ final:', volume);
             this.ambientGain.gain.setValueAtTime(volume, this.context.currentTime);
-            console.log('🔊 AUDIO DEBUG: Ambient gain node updated to:', volume);
-            console.log('🔊 AUDIO DEBUG: Actual ambientGain.gain.value:', this.ambientGain.gain.value);
-            console.log('🔊 AUDIO DEBUG: Context currentTime:', this.context.currentTime);
             // Force immediate value (bypass Web Audio scheduling)
             this.ambientGain.gain.value = volume;
-            console.log('🔊 AUDIO DEBUG: Forced ambientGain.gain.value to:', this.ambientGain.gain.value);
-            console.log('🔊 AUDIO DEBUG: ambientGain node ID:', this.ambientGain);
-            console.log('🔊 AUDIO DEBUG: ambientMasterGain node ID:', this.ambientMasterGain);
-            console.log('🔊 AUDIO DEBUG: context ID:', this.context);
         } else {
-            console.warn('🔊 AUDIO DEBUG: updateAmbientVolume called but ambientGain or context is null');
+            // Ambient gain or context is null
         }
     }
 
     private updateEffectsVolume(): void {
         if (this.effectsGain && this.context) {
             const volume = (this.muted || this.masterMuted || this.effectsMuted) ? 0 : this.effectsVolume;
-            console.log('🔊 AUDIO DEBUG: updateEffectsVolume - muted:', this.muted, 'masterMuted:', this.masterMuted, 'effectsMuted:', this.effectsMuted, 'volume:', this.effectsVolume, '→ final:', volume);
             this.effectsGain.gain.setValueAtTime(volume, this.context.currentTime);
-            console.log('🔊 AUDIO DEBUG: Effects gain node updated to:', volume);
-        } else {
-            console.warn('🔊 AUDIO DEBUG: updateEffectsVolume called but effectsGain or context is null');
         }
     }
 
@@ -213,7 +199,6 @@ export class SoundManager {
     // Individual volume controls
     setMasterVolume(volume: number): void {
         const clampedVolume = Math.max(0, Math.min(1, volume));
-        console.log('🔊 AUDIO DEBUG: setMasterVolume called:', volume, '→', clampedVolume, 'old:', this.masterVolume);
         this.masterVolume = clampedVolume;
         this.updateMasterVolume();
         this.saveSettings();
@@ -221,7 +206,6 @@ export class SoundManager {
 
     setAmbientVolume(volume: number): void {
         const clampedVolume = Math.max(0, Math.min(1, volume));
-        console.log('🔊 AUDIO DEBUG: setAmbientVolume called:', volume, '→', clampedVolume, 'old:', this.ambientVolume);
         this.ambientVolume = clampedVolume;
         this.updateAmbientVolume();
         this.saveSettings();
@@ -229,7 +213,6 @@ export class SoundManager {
 
     setEffectsVolume(volume: number): void {
         const clampedVolume = Math.max(0, Math.min(1, volume));
-        console.log('🔊 AUDIO DEBUG: setEffectsVolume called:', volume, '→', clampedVolume, 'old:', this.effectsVolume);
         this.effectsVolume = clampedVolume;
         this.updateEffectsVolume();
         this.saveSettings();
@@ -258,14 +241,12 @@ export class SoundManager {
 
     // Individual mute controls
     setMasterMuted(muted: boolean): void {
-        console.log('🔊 AUDIO DEBUG: setMasterMuted called:', muted, 'old:', this.masterMuted);
         this.masterMuted = muted;
         this.updateAllVolumes(); // Master mute affects all channels
         this.saveSettings();
     }
 
     setAmbientMuted(muted: boolean): void {
-        console.log('🔊 AUDIO DEBUG: setAmbientMuted called:', muted, 'old:', this.ambientMuted);
         this.ambientMuted = muted;
         
         // ELEGANT SOLUTION: Use gain nodes for instant muting (no stopping/starting)
@@ -274,7 +255,6 @@ export class SoundManager {
     }
 
     setEffectsMuted(muted: boolean): void {
-        console.log('🔊 AUDIO DEBUG: setEffectsMuted called:', muted, 'old:', this.effectsMuted);
         this.effectsMuted = muted;
         this.updateEffectsVolume();
         this.saveSettings();
@@ -286,22 +266,18 @@ export class SoundManager {
     }
 
     isMasterMuted(): boolean {
-        console.log('🔊 AUDIO DEBUG: isMasterMuted called, returning:', this.masterMuted);
         return this.masterMuted;
     }
 
     isAmbientMuted(): boolean {
-        console.log('🔊 AUDIO DEBUG: isAmbientMuted called, returning:', this.ambientMuted);
         return this.ambientMuted;
     }
 
     isEffectsMuted(): boolean {
-        console.log('🔊 AUDIO DEBUG: isEffectsMuted called, returning:', this.effectsMuted);
         return this.effectsMuted;
     }
 
     isDiscoveryMuted(): boolean {
-        console.log('🔊 AUDIO DEBUG: isDiscoveryMuted called, returning:', this.effectsMuted);
         return this.effectsMuted;
     }
 
@@ -402,6 +378,23 @@ export class SoundManager {
                 reverbTime: 4.0,      // Very long cosmic reverb
                 reverbDecay: 4.0,     // Ultra-slow decay for cosmic mystery
                 reverbWetness: 0.7    // High reverb for otherworldly effect
+            },
+            'blackhole_discovery': {
+                type: 'oscillator',
+                frequency: 32,        // Ultra-deep, ominous frequency
+                frequency2: 64,       // Octave relationship for harmonic depth
+                duration: 4.0,        // Extended for cosmic grandeur
+                attack: 0.8,          // Very slow, building emergence
+                decay: 0.8,           // Long decay for gravitational pull effect
+                sustain: 0.2,         // Low sustain for ominous presence
+                release: 2.0,         // Extremely long fade for cosmic void
+                volume: 0.7,          // Slightly louder for impact
+                waveform: 'sawtooth', // Harsher waveform for ominous effect
+                filterFreq: 100,      // Very low filter for deep, dark tone
+                filterQ: 1.5,         // More resonant for gravitational effect
+                reverbTime: 5.0,      // Longest reverb for infinite depth
+                reverbDecay: 5.0,     // Ultra-slow decay for void effect
+                reverbWetness: 0.8    // Maximum reverb for cosmic enormity
             },
             'wormhole_traversal': {
                 type: 'oscillator',
@@ -714,6 +707,11 @@ export class SoundManager {
         if (config) this.playOscillatorSound(config);
     }
 
+    playBlackHoleDiscovery(): void {
+        const config = this.getSoundConfig('blackhole_discovery');
+        if (config) this.playOscillatorSound(config);
+    }
+
     playWormholeTraversal(): void {
         const config = this.getSoundConfig('wormhole_traversal');
         if (config) this.playOscillatorSound(config);
@@ -744,30 +742,19 @@ export class SoundManager {
      * Creates multiple evolving tonal layers that fade in and out over time
      */
     async startSpaceDrone(): Promise<void> {
-        console.log('🔊 AUDIO DEBUG: startSpaceDrone called');
-        console.log('🔊 AUDIO DEBUG: - context exists:', !!this.context);
-        console.log('🔊 AUDIO DEBUG: - ambientGain exists:', !!this.ambientGain);
-        console.log('🔊 AUDIO DEBUG: - muted:', this.muted);
-        console.log('🔊 AUDIO DEBUG: - masterMuted:', this.masterMuted);
-        console.log('🔊 AUDIO DEBUG: - ambientMuted:', this.ambientMuted);
         
         if (!this.context || !this.ambientGain || this.muted) {
-            console.warn('🔊 AUDIO DEBUG: startSpaceDrone early return - missing context/gain or muted');
             return;
         }
         
         // Resume audio context if suspended (browser autoplay policy)
         if (this.context.state === 'suspended') {
-            console.log('🔊 AUDIO DEBUG: Audio context suspended, attempting resume...');
             try {
                 await this.context.resume();
-                console.log('🔊 AUDIO DEBUG: Audio context resumed for space drone, new state:', this.context.state);
             } catch (error) {
-                console.error('🔊 AUDIO DEBUG: Failed to resume audio context:', error);
+                console.error('Failed to resume audio context:', error);
                 return;
             }
-        } else {
-            console.log('🔊 AUDIO DEBUG: Audio context already running, state:', this.context.state);
         }
         
         // Stop any existing ambient layers first
@@ -779,9 +766,7 @@ export class SoundManager {
             // Create master gain for all ambient layers
             this.ambientMasterGain = this.context.createGain();
             this.ambientMasterGain.gain.setValueAtTime(0.6, now); // Overall ambient volume - moderate level
-            console.log('🔊 AUDIO DEBUG: SpaceDrone - Created ambientMasterGain:', this.ambientMasterGain, 'connecting to ambientGain:', this.ambientGain);
             this.ambientMasterGain.connect(this.ambientGain);
-            console.log('🔊 AUDIO DEBUG: SpaceDrone - Connection established, ambientGain current value:', this.ambientGain.gain.value);
             
             // Define ethereal frequency layers (harmonically related for pleasant sound)
             const frequencies = [
@@ -884,7 +869,7 @@ export class SoundManager {
         const silenceTime = 5 + Math.random() * 15; // 5-20 second silence
         
         switch (layer.fadeDirection) {
-            case 'in':
+            case 'in': {
                 // Start fading in
                 const fadeInTarget = layer.targetVolume * (0.7 + Math.random() * 0.6); // Vary intensity
                 layer.currentVolume = fadeInTarget;
@@ -892,6 +877,7 @@ export class SoundManager {
                 layer.fadeDirection = 'sustain';
                 layer.nextPhaseTime = currentTime + fadeTime + sustainTime;
                 break;
+            }
                 
             case 'sustain':
                 // Start fading out
@@ -1089,34 +1075,27 @@ export class SoundManager {
      * Check if space drone is currently playing
      */
     isSpaceDronePlaying(): boolean {
-        const isPlaying = this.ambientLayers.length > 0 && this.ambientUpdateInterval !== null;
-        console.log('🔊 AUDIO DEBUG: isSpaceDronePlaying called, result:', isPlaying, 'layers:', this.ambientLayers.length, 'interval:', !!this.ambientUpdateInterval);
-        return isPlaying;
+        return this.ambientLayers.length > 0 && this.ambientUpdateInterval !== null;
     }
 
     /**
      * Resume audio context if suspended - call on user interaction
      */
     async resumeAudioContext(): Promise<boolean> {
-        console.log('🔊 AUDIO DEBUG: resumeAudioContext called, context state:', this.context?.state);
         if (!this.context) {
-            console.warn('🔊 AUDIO DEBUG: No audio context available');
             return false;
         }
         
         if (this.context.state === 'suspended') {
             try {
-                console.log('🔊 AUDIO DEBUG: Attempting to resume suspended audio context...');
                 await this.context.resume();
-                console.log('🔊 AUDIO DEBUG: Audio context resumed successfully! New state:', this.context.state);
                 return true;
             } catch (error) {
-                console.error('🔊 AUDIO DEBUG: Failed to resume audio context:', error.message);
-                console.error('🔊 AUDIO DEBUG: Error details:', error);
+                console.error('Failed to resume audio context:', error.message);
+                console.error('Error details:', error);
                 return false;
             }
         }
-        console.log('🔊 AUDIO DEBUG: Audio context already running, state:', this.context.state);
         return true; // Already running
     }
 
@@ -1124,7 +1103,6 @@ export class SoundManager {
      * Get audio context state for debugging
      */
     getAudioContextState(): string {
-        console.log('🔊 AUDIO DEBUG: getAudioContextState called, state:', this.context?.state || 'no-context');
         return this.context?.state || 'no-context';
     }
 

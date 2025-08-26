@@ -2,10 +2,7 @@
 // Replaces direct service coupling with event-based communication
 
 import { EventDispatcher, IEventDispatcher } from './EventSystem.js';
-import { WorldService } from './WorldService.js';
-import { CelestialService } from './CelestialService.js';
 import { AudioService } from './AudioService.js';
-import { ConfigService } from '../config/ConfigService.js';
 
 // Standard game event types for type safety
 export const GameEvents = {
@@ -54,8 +51,8 @@ export interface AudioEventData {
 
 export interface ConfigEventData {
     key: string;
-    oldValue: any;
-    newValue: any;
+    oldValue: unknown;
+    newValue: unknown;
 }
 
 export interface WorldEventData {
@@ -76,7 +73,7 @@ export interface UIEventData {
  */
 export class ServiceOrchestrator {
     private eventDispatcher: IEventDispatcher;
-    private services: Map<string, any> = new Map();
+    private services: Map<string, unknown> = new Map();
     private disposed: boolean = false;
 
     constructor() {
@@ -87,7 +84,7 @@ export class ServiceOrchestrator {
     /**
      * Register a service with the orchestrator
      */
-    registerService(name: string, service: any): void {
+    registerService(name: string, service: unknown): void {
         this.ensureNotDisposed();
         this.services.set(name, service);
         
@@ -235,21 +232,23 @@ export class ServiceOrchestrator {
                 });
                 break;
                 
-            case 'wormhole':
+            case 'wormhole': {
                 // Wormholes have special discovery sound
                 const audioService = this.getService<AudioService>('audio');
                 if (audioService) {
                     audioService.playDiscoverySound('wormhole');
                 }
                 break;
+            }
                 
-            case 'blackhole':
+            case 'blackhole': {
                 // Black holes have special discovery sound
                 const audioService2 = this.getService<AudioService>('audio');
                 if (audioService2) {
                     audioService2.playDiscoverySound('blackhole');
                 }
                 break;
+            }
         }
 
         // Play additional rare discovery sound for special objects
@@ -274,18 +273,18 @@ export class ServiceOrchestrator {
         }
     }
 
-    private wireServiceEvents(name: string, service: any): void {
+    private wireServiceEvents(name: string, service: unknown): void {
         // Auto-wire common service patterns based on service type
-        if (name === 'audio' && typeof service.reloadConfiguration === 'function') {
+        if (name === 'audio' && service && typeof service === 'object' && 'reloadConfiguration' in service && typeof (service as any).reloadConfiguration === 'function') {
             // Audio service listens for configuration changes
             this.eventDispatcher.on(GameEvents.CONFIG_CHANGED, (data: ConfigEventData) => {
                 if (data.key.startsWith('audio.')) {
-                    service.reloadConfiguration();
+                    (service as any).reloadConfiguration();
                 }
             });
         }
 
-        if (name === 'world' && typeof service.generateChunk === 'function') {
+        if (name === 'world' && service && typeof service === 'object' && 'generateChunk' in service && typeof (service as any).generateChunk === 'function') {
             // World service emits chunk generation events
             // This would be implemented by modifying WorldService to emit events
         }

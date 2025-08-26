@@ -26,10 +26,7 @@ import { SettingsMenu } from './ui/SettingsMenu.js';
 import { 
     initializeUniverseSeed, 
     getStartingCoordinates, 
-    generateShareableURL,
-    resetUniverse,
-    generateSafeSpawnPosition,
-    getUniverseResetCount
+    generateShareableURL
 } from './utils/random.js';
 // Note: Will add proper types in future phases when we extract celestial classes
 
@@ -81,14 +78,6 @@ interface ActiveObjects {
     comets: CelestialObject[];
 }
 
-interface TraversalDestination {
-    x: number;
-    y: number;
-    velocityX: number;
-    velocityY: number;
-    wormhole: CelestialObject;
-    stellarMapWasVisible: boolean;
-}
 
 export class Game {
     renderer: Renderer;
@@ -111,6 +100,9 @@ export class Game {
     developerConsole: DeveloperConsole;
     audioService: AudioService;
     settingsService: SettingsService;
+    
+    // Performance optimization: Cache active objects between update and render phases
+    private cachedActiveObjects?: ActiveObjects;
     settingsMenu: SettingsMenu;
     
     // Expose properties for backward compatibility with tests
@@ -174,16 +166,14 @@ export class Game {
         
         // Set up callbacks for data management features
         this.settingsService.onDistanceReset = () => {
-            // TODO: Implement resetLifetimeDistance on Camera class
-            // this.camera.resetLifetimeDistance();
-            this.discoveryDisplay.addNotification('Distance traveled reset feature coming soon');
+            this.camera.resetLifetimeDistance();
+            this.discoveryDisplay.addNotification('Distance traveled has been reset');
         };
         
         this.settingsService.onDiscoveryHistoryClear = () => {
-            // TODO: Implement clearHistory on DiscoveryLogbook and ChunkManager
-            // this.discoveryLogbook.clearHistory();
-            // this.chunkManager.clearDiscoveryHistory();
-            this.discoveryDisplay.addNotification('Discovery history clear feature coming soon');
+            this.discoveryLogbook.clearHistory();
+            this.chunkManager.clearDiscoveryHistory();
+            this.discoveryDisplay.addNotification('Discovery history has been cleared');
         };
         
         // Space drone will be started on first user interaction due to browser autoplay policies
@@ -204,8 +194,7 @@ export class Game {
         );
         
         // Connect naming service to stellar map
-        // TODO: Fix interface mismatch between StellarMap and NamingService in Phase 2
-        // this.stellarMap.setNamingService(this.namingService);
+        this.stellarMap.setNamingService(this.namingService);
         
         this.setupCanvas();
         
@@ -214,7 +203,6 @@ export class Game {
         if (startingCoords) {
             this.camera.x = startingCoords.x;
             this.camera.y = startingCoords.y;
-            console.log(`📍 Camera positioned at shared coordinates: (${startingCoords.x}, ${startingCoords.y})`);
         }
         
         // Create starting position object for stellar map reference
@@ -229,7 +217,6 @@ export class Game {
         // Log lifetime distance traveled
         const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
         if (lifetimeDistance !== '0 km') {
-            console.log(`🚀 Lifetime distance traveled: ${lifetimeDistance}`);
         }
         
         // Initialize chunks around starting position
@@ -414,8 +401,9 @@ export class Game {
         // Update chunk loading based on camera position
         this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
         
-        // Get active celestial objects for physics and discovery
-        const activeObjects = this.chunkManager.getAllActiveObjects();
+        // Get active celestial objects for physics and discovery (cache for render phase)
+        this.cachedActiveObjects = this.chunkManager.getAllActiveObjects();
+        const activeObjects = this.cachedActiveObjects;
         const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets];
         
         // Update orbital positions and animations for all celestial objects
@@ -433,7 +421,7 @@ export class Game {
         this.checkWormholeTraversal(activeObjects.wormholes);
         
         this.thrusterParticles.update(deltaTime, this.camera, this.ship);
-        this.starParticles.update(deltaTime, activeObjects.celestialStars, this.camera);
+        this.starParticles.update(deltaTime, activeObjects.celestialStars as any, this.camera);
         
         // Ambient sounds disabled for now - focusing on discovery chimes only
         // const velocity = Math.sqrt(this.camera.velocityX ** 2 + this.camera.velocityY ** 2);
@@ -567,8 +555,6 @@ export class Game {
         // Try to copy to clipboard
         if (navigator.clipboard) {
             navigator.clipboard.writeText(shareableURL).then(() => {
-                console.log(`📋 Coordinates copied to clipboard: (${Math.round(this.camera.x)}, ${Math.round(this.camera.y)})`);
-                console.log(`🔗 Shareable URL: ${shareableURL}`);
                 this.discoveryDisplay.addNotification('Coordinates copied to clipboard!');
             }).catch(err => {
                 console.warn('Failed to copy to clipboard:', err);
@@ -580,8 +566,7 @@ export class Game {
         }
     }
 
-    showFallbackCopy(url: string): void {
-        console.log(`📋 Copy this URL to share coordinates: ${url}`);
+    showFallbackCopy(_url: string): void {
         this.discoveryDisplay.addNotification('Copy URL from console to share coordinates');
     }
 
@@ -592,9 +577,6 @@ export class Game {
     }
 
     updateShipAudio(): void {
-        // Note: This functionality is temporarily disabled to fix TypeScript compilation
-        // TODO: Add public methods to Camera class for thruster state access
-        /*
         const isThrusting = this.camera.isThrusting && !this.camera.isBraking;
         const isBraking = this.camera.isBraking;
         
@@ -611,7 +593,6 @@ export class Game {
         // Update previous states
         this.previousThrustState = isThrusting;
         this.previousBrakeState = isBraking;
-        */
     }
 
 
@@ -711,8 +692,7 @@ export class Game {
         // Play dedicated wormhole traversal sound effect
         this.soundManager.playWormholeTraversal();
         
-        const destinationDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
-        console.log(`🌀 Starting wormhole traversal: ${wormhole.pairId} → destination ${destinationDesignation}`);
+        // const destinationDesignation = wormhole.designation === 'alpha' ? 'β' : 'α';
     }
 
     private async handleAudioContextActivation(): Promise<void> {
@@ -741,33 +721,48 @@ export class Game {
         
         this.starField.render(this.renderer, this.camera);
         
-        // Render celestial objects from active chunks
-        const activeObjects = this.chunkManager.getAllActiveObjects();
+        // Use cached active objects from update phase for performance
+        const activeObjects = this.cachedActiveObjects || this.chunkManager.getAllActiveObjects();
         
-        // Render nebulae first (background layer)
+        // Performance optimization: Calculate screen bounds for render culling
+        const screenBounds = this.calculateScreenBounds();
+        
+        // Render nebulae first (background layer) - with culling disabled for now
         for (const obj of activeObjects.nebulae) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
-        // Then render asteroid gardens (mid-background layer)
+        // Then render asteroid gardens (mid-background layer) - culling disabled
         for (const obj of activeObjects.asteroidGardens) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
-        // Render comets (intermediate layer - after background, before stars)
+        // Render comets (intermediate layer - after background, before stars) - culling disabled
         for (const obj of activeObjects.comets) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
-        // Then render stars, planets, and moons (foreground layers)
+        // Then render stars, planets, and moons (foreground layers) - culling disabled
         for (const obj of activeObjects.planets) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         for (const obj of activeObjects.moons) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         for (const obj of activeObjects.celestialStars) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
         // Render wormholes (prominent foreground layer, after stars)
@@ -775,7 +770,7 @@ export class Game {
         const betaWormholes = activeObjects.wormholes.filter(w => w.designation === 'beta');
         if (betaWormholes.length > 1) {
             // Keep only the first beta wormhole, remove all others  
-            const keepBeta = betaWormholes[0];
+            // const keepBeta = betaWormholes[0];
             const removeBetas = betaWormholes.slice(1);
             
             // Remove duplicates from activeObjects.wormholes array
@@ -783,14 +778,18 @@ export class Game {
         }
         
         for (const obj of activeObjects.wormholes) {
-            // Get destination preview objects for gravitational lensing
-            const destinationPreview = this.getDestinationPreviewObjects(obj);
-            obj.render(this.renderer, this.camera, destinationPreview);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                // Get destination preview objects for gravitational lensing
+                const destinationPreview = this.getDestinationPreviewObjects(obj);
+                (obj as any).render(this.renderer, this.camera, destinationPreview);
+            // }
         }
         
-        // Render black holes (ultra-prominent cosmic phenomena - dominating layer)
+        // Render black holes (ultra-prominent cosmic phenomena - dominating layer) - culling disabled
         for (const obj of activeObjects.blackholes) {
-            obj.render(this.renderer, this.camera);
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
         }
         
         // Render chunk boundaries (debug visualization)
@@ -800,7 +799,7 @@ export class Game {
         
         this.starParticles.render(this.renderer, this.camera);
         this.thrusterParticles.render(this.renderer);
-        this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars);
+        this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars as any);
         this.discoveryDisplay.render(this.renderer, this.camera);
         this.discoveryLogbook.render(this.renderer, this.camera);
         
@@ -1120,22 +1119,18 @@ export class Game {
         return {
             setMasterVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setMasterVolume called with:', volume);
                 this.soundManager.setMasterVolume(volume);
             },
             setAmbientVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setAmbientVolume called with:', volume);
                 this.soundManager.setAmbientVolume(volume);
             },
             setDiscoveryVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setDiscoveryVolume called with:', volume);
                 this.soundManager.setDiscoveryVolume(volume);
             },
             setEffectsVolume: (volume: number) => {
                 // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setEffectsVolume called with:', volume);
                 this.soundManager.setDiscoveryVolume(volume);
             },
             setMuted: (muted: boolean) => {
@@ -1146,15 +1141,12 @@ export class Game {
                 }
             },
             setMasterMuted: (muted: boolean) => {
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setMasterMuted called with:', muted);
                 this.soundManager.setMasterMuted(muted);
             },
             setAmbientMuted: (muted: boolean) => {
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setAmbientMuted called with:', muted);
                 this.soundManager.setAmbientMuted(muted);
             },
             setDiscoveryMuted: (muted: boolean) => {
-                console.log('🔊 AUDIO DEBUG: Audio wrapper setDiscoveryMuted called with:', muted);
                 this.soundManager.setDiscoveryMuted(muted);
             },
             // Return actual values from SoundManager (converted back to 0-100 range)
@@ -1168,6 +1160,34 @@ export class Game {
             isAmbientMuted: () => this.soundManager.isAmbientMuted(),
             isDiscoveryMuted: () => this.soundManager.isDiscoveryMuted()
         };
+    }
+
+    // Performance optimization helpers
+    
+    /**
+     * Calculate screen bounds for render culling
+     */
+    private calculateScreenBounds(): { left: number; right: number; top: number; bottom: number } {
+        const margin = 100; // Extra margin to account for object sizes
+        return {
+            left: this.camera.x - (this.renderer.canvas.width / 2) - margin,
+            right: this.camera.x + (this.renderer.canvas.width / 2) + margin,
+            top: this.camera.y - (this.renderer.canvas.height / 2) - margin,
+            bottom: this.camera.y + (this.renderer.canvas.height / 2) + margin
+        };
+    }
+
+    /**
+     * Check if an object is within screen bounds for render culling
+     */
+    private isObjectInScreen(obj: CelestialObject, screenBounds: { left: number; right: number; top: number; bottom: number }): boolean {
+        // Get object bounds with some padding for visual effects
+        const padding = (obj as any).radius || 50; // Use object radius or default padding
+        
+        return obj.x + padding >= screenBounds.left &&
+               obj.x - padding <= screenBounds.right &&
+               obj.y + padding >= screenBounds.top &&
+               obj.y - padding <= screenBounds.bottom;
     }
 
     // Removed syncInitialAudioSettings to avoid audio issues

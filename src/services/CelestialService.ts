@@ -7,9 +7,7 @@ import { Moon } from '../celestial/Moon.js';
 import { SeededRandom } from '../utils/random.js';
 import type { 
     Renderer, 
-    Camera,
-    StarType,
-    PlanetType
+    Camera
 } from '../celestial/CelestialTypes.js';
 import type { ConfigService } from '../config/ConfigService.js';
 import type { DiscoveryService } from './DiscoveryService.js';

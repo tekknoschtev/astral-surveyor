@@ -10,6 +10,7 @@ import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import { Comet, selectCometType } from '../celestial/comets.js';
 import { GameConfig } from '../config/gameConfig.js';
+import { ErrorService } from '../services/ErrorService.js';
 
 // Interface definitions
 interface ChunkCoords {
@@ -207,12 +208,14 @@ export class ChunkManager {
     activeChunks: Map<string, Chunk>;
     discoveredObjects: Map<string, DiscoveryData>;
     debugObjects?: DebugObject[];
+    private errorService: ErrorService;
 
-    constructor() {
+    constructor(errorService?: ErrorService) {
         this.chunkSize = GameConfig.world.chunkSize;
         this.loadRadius = 1; // Load chunks in 3x3 grid around player
         this.activeChunks = new Map(); // Key: "x,y", Value: chunk data
         this.discoveredObjects = new Map(); // Key: "objId", Value: discovery state
+        this.errorService = errorService || new ErrorService();
     }
 
     getChunkCoords(worldX: number, worldY: number): ChunkCoords {
@@ -256,6 +259,20 @@ export class ChunkManager {
     }
 
     generateChunk(chunkX: number, chunkY: number): Chunk {
+        // Use error handling but don't fallback to empty chunks in normal operation
+        const result = this.errorService.safeExecute(
+            'ChunkManager',
+            `generateChunk(${chunkX}, ${chunkY})`,
+            () => this._generateChunk(chunkX, chunkY),
+            null, // Don't use empty chunk fallback for normal operation
+            `Failed to generate world chunk at (${chunkX}, ${chunkY}). Using empty chunk.`
+        );
+        
+        // Only use empty chunk as absolute last resort
+        return result || this._generateChunk(chunkX, chunkY);
+    }
+
+    private _generateChunk(chunkX: number, chunkY: number): Chunk {
         const chunkKey = this.getChunkKey(chunkX, chunkY);
         if (this.activeChunks.has(chunkKey)) {
             return this.activeChunks.get(chunkKey)!;
@@ -491,6 +508,26 @@ export class ChunkManager {
         return chunk;
     }
 
+    private _createEmptyChunk(chunkX: number, chunkY: number): Chunk {
+        const emptyChunk: Chunk = {
+            x: chunkX,
+            y: chunkY,
+            stars: [],
+            planets: [],
+            moons: [],
+            celestialStars: [],
+            nebulae: [],
+            asteroidGardens: [],
+            wormholes: [],
+            blackholes: [],
+            comets: []
+        };
+        
+        const chunkKey = this.getChunkKey(chunkX, chunkY);
+        this.activeChunks.set(chunkKey, emptyChunk);
+        return emptyChunk;
+    }
+
     selectPlanetType(rng: SeededRandom, orbitalDistance: number, star: Star): typeof PlanetTypes[keyof typeof PlanetTypes] {
         // Create weighted selection based on orbital distance and star characteristics
         const minDistance = star.radius + 60;
@@ -670,9 +707,10 @@ export class ChunkManager {
             }
         }
 
-        // Unload distant chunks to save memory
-        for (const [chunkKey] of this.activeChunks) {
+        // Unload distant chunks to save memory with proper cleanup
+        for (const [chunkKey, chunk] of this.activeChunks) {
             if (!requiredChunks.has(chunkKey)) {
+                this.cleanupChunkObjects(chunk);
                 this.activeChunks.delete(chunkKey);
             }
         }
@@ -908,7 +946,7 @@ export class ChunkManager {
                     // If not in active chunks, use stored discovery data
                     if (!planetData) {
                         // Use stored planet type from discovery data
-                        let planetTypeName = discoveryData.planetTypeName;
+                        const planetTypeName = discoveryData.planetTypeName;
                         let planetType = null;
                         
                         if (planetTypeName) {
@@ -1948,6 +1986,11 @@ export class ChunkManager {
         this.discoveredObjects.clear();
         console.log('🌌 All chunks cleared for universe regeneration');
     }
+
+    // Clear only discovery history (preserves chunks)
+    clearDiscoveryHistory(): void {
+        this.discoveredObjects.clear();
+    }
     
     // Helper method to get basic nebula colors for fallback reconstruction
     private getBasicNebulaColors(nebulaType: string): string[] {
@@ -2049,6 +2092,61 @@ export class ChunkManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Clean up celestial objects when chunks are unloaded to prevent memory leaks
+     */
+    private cleanupChunkObjects(chunk: Chunk): void {
+        // Dispose of objects that have cleanup methods
+        const allObjects = [
+            ...chunk.celestialStars,
+            ...chunk.planets,
+            ...chunk.moons,
+            ...chunk.nebulae,
+            ...chunk.asteroidGardens,
+            ...chunk.wormholes,
+            ...chunk.blackholes,
+            ...chunk.comets
+        ];
+
+        for (const obj of allObjects) {
+            // Clean up animation timers, event listeners, etc.
+            if (obj && typeof (obj as any).dispose === 'function') {
+                (obj as any).dispose();
+            }
+            
+            // Clear references to help garbage collection
+            if (obj) {
+                (obj as any).discoveryState = null;
+                (obj as any).parentStar = null;
+                (obj as any).parentPlanet = null;
+                (obj as any).twinWormhole = null;
+            }
+        }
+
+        // Clear chunk arrays
+        chunk.stars.length = 0;
+        chunk.celestialStars.length = 0;
+        chunk.planets.length = 0;
+        chunk.moons.length = 0;
+        chunk.nebulae.length = 0;
+        chunk.asteroidGardens.length = 0;
+        chunk.wormholes.length = 0;
+        chunk.blackholes.length = 0;
+        chunk.comets.length = 0;
+    }
+
+    /**
+     * Enhanced clear method with proper cleanup
+     */
+    clearAllChunksWithCleanup(): void {
+        for (const [, chunk] of this.activeChunks) {
+            this.cleanupChunkObjects(chunk);
+        }
+        this.activeChunks.clear();
+        this.discoveredObjects.clear();
+        console.log('🌌 All chunks cleared with proper cleanup');
     }
 }
 

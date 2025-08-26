@@ -164,8 +164,7 @@ export class DiscoveryManager {
             this.soundManager.playWormholeDiscovery();
         } else if (obj.type === 'blackhole') {
             // Play ultra-rare black hole discovery sound - deep, ominous, cosmic
-            // TODO: Add dedicated black hole discovery sound in Phase 6
-            this.soundManager.playWormholeDiscovery(); // Temporary - use wormhole sound
+            this.soundManager.playBlackHoleDiscovery();
         }
         
         // Play additional rare discovery sound for special objects

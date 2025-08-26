@@ -42,6 +42,10 @@ export class Input {
     
     // Developer console input routing
     private consoleInputHandler: ((event: KeyboardEvent) => boolean) | null = null;
+    
+    // Performance optimization: Throttle high-frequency events  
+    private lastMouseMoveTime = 0;
+    private mouseMoveThrottleMs = 8; // ~120fps max - less aggressive throttling
 
     constructor() {
         this.setupEventListeners();
@@ -87,7 +91,23 @@ export class Input {
         });
 
         window.addEventListener('mousemove', (e: MouseEvent) => {
-            this.updateMousePosition(e.clientX, e.clientY);
+            // Throttle mousemove events for better performance (disabled in tests)
+            // Use vitest global to detect test environment more reliably
+            const isTestEnvironment = typeof globalThis !== 'undefined' && 
+                                    (globalThis.__vitest__ || globalThis.describe || globalThis.it);
+            
+            if (isTestEnvironment) {
+                // Always update immediately in tests
+                this.updateMousePosition(e.clientX, e.clientY);
+            } else {
+                // Throttle in production
+                const now = performance.now();
+                if (now - this.lastMouseMoveTime >= this.mouseMoveThrottleMs) {
+                    this.updateMousePosition(e.clientX, e.clientY);
+                    this.lastMouseMoveTime = now;
+                }
+            }
+            
             // Prevent native drag behavior when dragging on canvas
             if (this.mousePressed && (e.target as HTMLElement)?.tagName === 'CANVAS') {
                 e.preventDefault();

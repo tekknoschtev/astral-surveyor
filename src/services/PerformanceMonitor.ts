@@ -2,10 +2,10 @@
 // Comprehensive performance monitoring and optimization for Astral Surveyor
 
 export interface Logger {
-    error(message: string, ...args: any[]): void;
-    warn(message: string, ...args: any[]): void;
-    info(message: string, ...args: any[]): void;
-    debug(message: string, ...args: any[]): void;
+    error(message: string, ...args: unknown[]): void;
+    warn(message: string, ...args: unknown[]): void;
+    info(message: string, ...args: unknown[]): void;
+    debug(message: string, ...args: unknown[]): void;
 }
 
 export interface PerformanceThresholds {
@@ -262,7 +262,7 @@ export class PerformanceMonitor {
     measureMemory(): void {
         this.ensureNotDisposed();
 
-        const perfMemory = (performance as any).memory;
+        const perfMemory = (performance as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
         if (typeof perfMemory !== 'undefined') {
             this.memoryMetrics = {
                 used: perfMemory.usedJSHeapSize,
@@ -430,7 +430,7 @@ export class PerformanceMonitor {
     compareProfiles(baseline: PerformanceProfile, current: PerformanceProfile): ProfileComparison {
         this.ensureNotDisposed();
 
-        const operationChanges: Record<string, any> = {};
+        const operationChanges: Record<string, { baselineTime: number; currentTime: number; change: number; changePercent: number }> = {};
         
         for (const [operation, currentMetrics] of Object.entries(current.operations)) {
             const baselineMetrics = baseline.operations[operation];

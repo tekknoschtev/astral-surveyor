@@ -750,7 +750,7 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         distanceToShip: vi.fn().mockReturnValue(1000)
       };
 
-      game.soundManager.playWormholeDiscovery = vi.fn(); // Used as temporary sound
+      game.soundManager.playBlackHoleDiscovery = vi.fn();
       game.soundManager.playRareDiscovery = vi.fn();
 
       game.chunkManager.getAllActiveObjects = vi.fn().mockReturnValue({
@@ -768,7 +768,7 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       await game.update(0.016);
 
       expect(game.discoveryDisplay.addDiscovery).toHaveBeenCalledWith('Test Star HD-1234', 'Stellar Mass Black Hole');
-      expect(game.soundManager.playWormholeDiscovery).toHaveBeenCalled(); // Temporary sound
+      expect(game.soundManager.playBlackHoleDiscovery).toHaveBeenCalled();
       // Black holes are ultra-rare, so should play rare discovery sound
       expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 300);
     });

@@ -22,29 +22,29 @@ export interface BatchCreationRequest {
     x: number;
     y: number;
     objectType?: string;
-    parent?: any;
+    parent?: Star | Planet | unknown;
 }
 
-// Base factory interface
-export interface ICelestialObjectFactory {
-    create(x: number, y: number, objectType?: string, parent?: any): any;
+// Base factory interface with generic typing
+export interface ICelestialObjectFactory<TResult = unknown, TParent = unknown> {
+    create(x: number, y: number, objectType?: string, parent?: TParent): TResult;
     dispose(): void;
 }
 
-// Specific factory interfaces
-export interface IStarFactory extends ICelestialObjectFactory {
+// Specific factory interfaces with proper typing
+export interface IStarFactory extends ICelestialObjectFactory<Star, number> {
     create(x: number, y: number, starType?: string, seed?: number): Star;
 }
 
-export interface IPlanetFactory extends ICelestialObjectFactory {
-    create(x: number, y: number, planetType?: string, parentStar?: any): Planet;
+export interface IPlanetFactory extends ICelestialObjectFactory<Planet, Star> {
+    create(x: number, y: number, planetType?: string, parentStar?: Star): Planet;
 }
 
-export interface IMoonFactory extends ICelestialObjectFactory {
-    create(x: number, y: number, moonType?: undefined, parentPlanet?: any): Moon;
+export interface IMoonFactory extends ICelestialObjectFactory<Moon, Planet> {
+    create(x: number, y: number, moonType?: undefined, parentPlanet?: Planet): Moon;
 }
 
-export interface INebulaFactory extends ICelestialObjectFactory {
+export interface INebulaFactory extends ICelestialObjectFactory<Nebula, number> {
     create(x: number, y: number, nebulaType?: string, seed?: number): Nebula;
 }
 
@@ -108,7 +108,7 @@ export class PlanetFactory implements IPlanetFactory {
         'Volcanic World', 'Frozen World', 'Exotic World'
     ];
 
-    create(x: number, y: number, planetType?: string, parentStar?: any): Planet {
+    create(x: number, y: number, planetType?: string, parentStar?: Star): Planet {
         this.validateCoordinates(x, y);
         
         if (!parentStar) {
@@ -147,13 +147,13 @@ export class PlanetFactory implements IPlanetFactory {
         }
     }
 
-    private calculateOrbitalDistance(parentStar: any, x: number, y: number): number {
+    private calculateOrbitalDistance(parentStar: Star, x: number, y: number): number {
         const dx = x - parentStar.x;
         const dy = y - parentStar.y;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    private calculateOrbitalAngle(parentStar: any, x: number, y: number): number {
+    private calculateOrbitalAngle(parentStar: Star, x: number, y: number): number {
         const dx = x - parentStar.x;
         const dy = y - parentStar.y;
         return Math.atan2(dy, dx);
@@ -169,7 +169,7 @@ export class PlanetFactory implements IPlanetFactory {
  * Moon factory implementation
  */
 export class MoonFactory implements IMoonFactory {
-    create(x: number, y: number, moonType?: undefined, parentPlanet?: any): Moon {
+    create(x: number, y: number, moonType?: undefined, parentPlanet?: Planet): Moon {
         this.validateCoordinates(x, y);
         
         if (!parentPlanet) {
@@ -194,13 +194,13 @@ export class MoonFactory implements IMoonFactory {
         }
     }
 
-    private calculateOrbitalDistance(parentPlanet: any, x: number, y: number): number {
+    private calculateOrbitalDistance(parentPlanet: Planet, x: number, y: number): number {
         const dx = x - parentPlanet.x;
         const dy = y - parentPlanet.y;
         return Math.min(80, Math.sqrt(dx * dx + dy * dy)); // Cap moon orbital distance
     }
 
-    private calculateOrbitalAngle(parentPlanet: any, x: number, y: number): number {
+    private calculateOrbitalAngle(parentPlanet: Planet, x: number, y: number): number {
         const dx = x - parentPlanet.x;
         const dy = y - parentPlanet.y;
         return Math.atan2(dy, dx);
@@ -293,7 +293,7 @@ export class CelestialFactory {
     /**
      * Create a celestial object of the specified type
      */
-    create(type: string, x: number, y: number, objectType?: string, parent?: any): any {
+    create(type: string, x: number, y: number, objectType?: string, parent?: Star | Planet | number): Star | Planet | Moon | Nebula {
         this.ensureNotDisposed();
         this.validateCoordinates(x, y);
         
@@ -303,7 +303,7 @@ export class CelestialFactory {
         }
 
         try {
-            return factory.create(x, y, objectType, parent);
+            return factory.create(x, y, objectType, parent) as Star | Planet | Moon | Nebula;
         } catch (error) {
             // Re-throw factory errors with context
             throw new Error(`Failed to create ${type} at (${x}, ${y}): ${error.message}`);
@@ -313,14 +313,14 @@ export class CelestialFactory {
     /**
      * Create multiple celestial objects in batch
      */
-    createBatch(requests: BatchCreationRequest[]): any[] {
+    createBatch(requests: BatchCreationRequest[]): (Star | Planet | Moon | Nebula)[] {
         this.ensureNotDisposed();
         
-        const results: any[] = [];
+        const results: (Star | Planet | Moon | Nebula)[] = [];
         
         for (const request of requests) {
             try {
-                const object = this.create(request.type, request.x, request.y, request.objectType, request.parent);
+                const object = this.create(request.type, request.x, request.y, request.objectType, request.parent as Star | Planet | number);
                 results.push(object);
             } catch (error) {
                 console.warn(`Failed to create ${request.type} in batch:`, error);
@@ -429,7 +429,7 @@ export class CelestialFactory {
         }
     }
 
-    private validateConfiguration(config: any): void {
+    private validateConfiguration(config: Record<string, unknown>): void {
         // Validate configuration structure
         if (!config || typeof config !== 'object') {
             throw new Error('Configuration must be an object');
@@ -437,8 +437,8 @@ export class CelestialFactory {
 
         // Validate density values
         for (const [key, value] of Object.entries(config)) {
-            if (value && typeof value === 'object' && 'density' in value) {
-                const density = (value as any).density;
+            if (value && typeof value === 'object' && value !== null && 'density' in value) {
+                const density = (value as Record<string, unknown>).density;
                 if (typeof density === 'number' && (density < 0 || density > 1)) {
                     throw new Error(`Invalid density for ${key}: must be between 0 and 1`);
                 }

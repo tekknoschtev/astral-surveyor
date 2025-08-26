@@ -26,8 +26,8 @@ interface UserSettings {
 interface SettingsChangeEvent {
     type: 'settingsChanged';
     setting: string;
-    value: any;
-    previousValue: any;
+    value: unknown;
+    previousValue: unknown;
 }
 
 export class SettingsService {
@@ -39,7 +39,7 @@ export class SettingsService {
         discovery: 70,
         master: 80
     };
-    private eventListeners: Map<string, Function[]> = new Map();
+    private eventListeners: Map<string, ((...args: unknown[]) => void)[]> = new Map();
     
     // Callbacks for external operations
     onDistanceReset?: () => void;
@@ -50,12 +50,9 @@ export class SettingsService {
             throw new Error('AudioService is required');
         }
         
-        console.log('⚙️ SETTINGS DEBUG: Constructor called for instance', this.instanceId);
         this.audioService = audioService;
         this.settings = this.getDefaultSettings();
-        console.log('⚙️ SETTINGS DEBUG: Default settings set:', this.settings.ambientMuted);
         this.loadSettings();
-        console.log('⚙️ SETTINGS DEBUG: Constructor completed, final ambientMuted:', this.settings.ambientMuted);
     }
 
     private getDefaultSettings(): UserSettings {
@@ -80,19 +77,15 @@ export class SettingsService {
     private loadSettings(): void {
         try {
             if (typeof localStorage === 'undefined' || !localStorage) {
-                console.log('⚙️ SETTINGS DEBUG: localStorage not available on instance', this.instanceId);
                 return; // Gracefully handle missing localStorage
             }
             
             const saved = localStorage.getItem('astralSurveyor_settings');
-            console.log('⚙️ SETTINGS DEBUG: loadSettings called on instance', this.instanceId, 'localStorage data:', saved);
             if (saved) {
                 const parsedSettings = JSON.parse(saved);
-                console.log('⚙️ SETTINGS DEBUG: Parsed settings ambientMuted:', parsedSettings.ambientMuted);
                 
                 // Merge with defaults to handle new settings in updates
                 this.settings = { ...this.settings, ...parsedSettings };
-                console.log('⚙️ SETTINGS DEBUG: After merge, ambientMuted:', this.settings.ambientMuted);
                 
                 // Store previous volumes for unmuting
                 if (!this.settings.ambientMuted) {
@@ -108,7 +101,6 @@ export class SettingsService {
                 // Sync initial state with audio service
                 this.syncWithAudioService();
             } else {
-                console.log('⚙️ SETTINGS DEBUG: No saved settings found, using defaults on instance', this.instanceId);
             }
         } catch (error) {
             console.warn('Failed to load settings, using defaults:', error);
@@ -123,7 +115,6 @@ export class SettingsService {
             }
             
             const settingsJson = JSON.stringify(this.settings);
-            console.log('⚙️ SETTINGS DEBUG: Saving settings:', settingsJson);
             localStorage.setItem('astralSurveyor_settings', settingsJson);
         } catch (error) {
             console.warn('Failed to save settings:', error);
@@ -142,7 +133,7 @@ export class SettingsService {
         this.audioService.setMuted(this.settings.masterMuted);
     }
 
-    private validateVolume(volume: any): void {
+    private validateVolume(volume: unknown): void {
         if (typeof volume !== 'number') {
             throw new Error('Volume must be a number');
         }
@@ -151,7 +142,7 @@ export class SettingsService {
         }
     }
 
-    private validateUIScale(scale: any): void {
+    private validateUIScale(scale: unknown): void {
         if (typeof scale !== 'number') {
             throw new Error('UI scale must be a number');
         }
@@ -160,13 +151,13 @@ export class SettingsService {
         }
     }
 
-    private validateBoolean(value: any, settingName: string): void {
+    private validateBoolean(value: unknown, settingName: string): void {
         if (typeof value !== 'boolean') {
             throw new Error(`${settingName} must be a boolean`);
         }
     }
 
-    private emitSettingsChange(setting: string, value: any, previousValue: any): void {
+    private emitSettingsChange(setting: string, value: unknown, previousValue: unknown): void {
         const event: SettingsChangeEvent = {
             type: 'settingsChanged',
             setting,
@@ -279,17 +270,14 @@ export class SettingsService {
     }
 
     setDiscoveryMuted(muted: boolean): void {
-        console.log('⚙️ SETTINGS DEBUG: setDiscoveryMuted called with:', muted, 'current:', this.settings.discoveryMuted);
         this.validateBoolean(muted, 'Discovery muted');
         
         const previousValue = this.settings.discoveryMuted;
         this.settings.discoveryMuted = muted;
         
         if (muted) {
-            console.log('⚙️ SETTINGS DEBUG: Muting discovery - calling setDiscoveryMuted(true)');
             this.audioService.setDiscoveryMuted(true);
         } else {
-            console.log('⚙️ SETTINGS DEBUG: Unmuting discovery - calling setDiscoveryMuted(false) and restoring volume');
             this.settings.discoveryVolume = this.previousVolumes.discovery;
             this.audioService.setDiscoveryMuted(false);
             this.audioService.setEffectsVolume(this.settings.discoveryVolume / 100);
@@ -297,7 +285,6 @@ export class SettingsService {
         
         this.saveSettings();
         this.emitSettingsChange('discoveryMuted', muted, previousValue);
-        console.log('⚙️ SETTINGS DEBUG: setDiscoveryMuted completed, new state:', this.settings.discoveryMuted);
     }
 
     isMasterMuted(): boolean {
@@ -305,24 +292,20 @@ export class SettingsService {
     }
 
     setMasterMuted(muted: boolean): void {
-        console.log('⚙️ SETTINGS DEBUG: setMasterMuted called with:', muted, 'current:', this.settings.masterMuted);
         this.validateBoolean(muted, 'Master muted');
         
         const previousValue = this.settings.masterMuted;
         this.settings.masterMuted = muted;
         
-        console.log('⚙️ SETTINGS DEBUG: Setting master muted via setMasterMuted:', muted);
         this.audioService.setMasterMuted(muted);
         
         if (!muted) {
-            console.log('⚙️ SETTINGS DEBUG: Unmuting master - restoring volume:', this.previousVolumes.master / 100);
             this.settings.masterVolume = this.previousVolumes.master;
             this.audioService.setMasterVolume(this.settings.masterVolume / 100);
         }
         
         this.saveSettings();
         this.emitSettingsChange('masterMuted', muted, previousValue);
-        console.log('⚙️ SETTINGS DEBUG: setMasterMuted completed, new state:', this.settings.masterMuted);
     }
 
     // Display Settings
@@ -417,7 +400,7 @@ export class SettingsService {
     }
 
     // Event System
-    addEventListener(eventType: string, listener: Function): void {
+    addEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
         if (!this.eventListeners.has(eventType)) {
             this.eventListeners.set(eventType, []);
         }
@@ -426,7 +409,7 @@ export class SettingsService {
         listeners.push(listener);
     }
 
-    removeEventListener(eventType: string, listener: Function): void {
+    removeEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
         const listeners = this.eventListeners.get(eventType);
         if (listeners) {
             const index = listeners.indexOf(listener);

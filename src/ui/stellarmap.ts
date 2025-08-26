@@ -5,6 +5,7 @@
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 import type { Input } from '../input/input.js';
+import { NamingService } from '../naming/naming.js';
 
 // Interface definitions
 interface StarLike {
@@ -101,18 +102,6 @@ interface CometLike {
 // Union type for all discoverable objects
 type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | AsteroidGardenLike | BlackHoleLike | CometLike;
 
-interface NamingService {
-    generateDisplayName(object: DiscoverableObject): string;
-    generateFullDesignation(object: DiscoverableObject): {
-        catalog?: string;
-        coordinate?: string;
-        designation?: string;
-        type: string;
-        classification?: string | null;
-        parentStar?: string;
-        orbitalIndex?: number;
-    } | null;
-}
 
 interface GameStartingPosition {
     x: number;
@@ -1452,7 +1441,7 @@ export class StellarMap {
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 4]); // Distinctive dashed pattern
         
-        for (const [wormholeId, wormholes] of wormholePairs) {
+        for (const [/* wormholeId */, wormholes] of wormholePairs) {
             // Only draw connection if we have both wormholes discovered
             if (wormholes.length === 2) {
                 const alpha = wormholes.find(w => w.designation === 'alpha');
@@ -2553,7 +2542,7 @@ export class StellarMap {
         // Generate name using naming service
         try {
             return this.namingService.generateDisplayName(asteroidGarden);
-        } catch (error) {
+        } catch (_error) {
             return `Asteroid Garden`;
         }
     }

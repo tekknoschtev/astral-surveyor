@@ -11,8 +11,7 @@ import type {
     Camera, 
     StarType, 
     StarVisualEffects, 
-    Sunspot, 
-    CoronaConfig 
+    Sunspot 
 } from './CelestialTypes.js';
 
 // Import Planet class now that it's extracted

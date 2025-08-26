@@ -6,7 +6,7 @@ import { GameConstants, validateConstants } from './GameConstants.js';
 import { VisualConfig } from './VisualConfig.js';
 
 // Event listener types
-type ConfigChangeListener = (path: string, value: any) => void;
+type ConfigChangeListener = (path: string, value: unknown) => void;
 type ConfigResetListener = () => void;
 
 // Configuration path type for type safety
@@ -88,14 +88,14 @@ export class ConfigService {
         const constantsValidation = validateConstants();
         errors.push(...constantsValidation.errors);
         
-        // Check configuration values
+        // Check configuration values using type guards
         const chunkSize = this.get('world.chunkSize');
-        if (typeof chunkSize !== 'number' || chunkSize <= 0) {
+        if (!this.isNumber(chunkSize) || chunkSize <= 0) {
             errors.push('world.chunkSize must be a positive number');
         }
         
         const debugEnabled = this.get('debug.enabled');
-        if (typeof debugEnabled !== 'boolean') {
+        if (!this.isBoolean(debugEnabled)) {
             errors.push('debug.enabled must be a boolean');
         }
         
@@ -135,36 +135,36 @@ export class ConfigService {
     /**
      * Get world configuration
      */
-    getWorldConfig(): any {
-        return this.get('world');
+    getWorldConfig(): typeof GameConfig.world {
+        return this.get('world') as typeof GameConfig.world;
     }
     
     /**
      * Get celestial configuration
      */
-    getCelestialConfig(): any {
-        return this.get('celestial');
+    getCelestialConfig(): typeof GameConfig.celestial {
+        return this.get('celestial') as typeof GameConfig.celestial;
     }
     
     /**
      * Get discovery configuration
      */
-    getDiscoveryConfig(): any {
-        return this.get('discovery');
+    getDiscoveryConfig(): typeof GameConfig.discovery {
+        return this.get('discovery') as typeof GameConfig.discovery;
     }
     
     /**
      * Get visual configuration
      */
-    getVisualConfig(): any {
-        return this.get('visual');
+    getVisualConfig(): typeof VisualConfig {
+        return this.get('visual') as typeof VisualConfig;
     }
     
     /**
      * Get debug configuration
      */
-    getDebugConfig(): any {
-        return this.get('debug');
+    getDebugConfig(): typeof GameConfig.debug {
+        return this.get('debug') as typeof GameConfig.debug;
     }
     
     /**
@@ -195,14 +195,14 @@ export class ConfigService {
     /**
      * Export configuration for debugging/backup
      */
-    exportConfig(): any {
+    exportConfig(): Record<string, unknown> {
         return this.deepClone(this.config);
     }
     
     /**
      * Import configuration from object
      */
-    importConfig(configObject: any): void {
+    importConfig(configObject: Record<string, unknown>): void {
         if (typeof configObject === 'object' && configObject !== null) {
             this.config = this.deepClone({
                 ...this.defaultConfig,
@@ -223,6 +223,25 @@ export class ConfigService {
         }
     }
     
+    /**
+     * Type guard utilities for better config validation
+     */
+    isNumber(value: unknown): value is number {
+        return typeof value === 'number' && !isNaN(value);
+    }
+
+    isBoolean(value: unknown): value is boolean {
+        return typeof value === 'boolean';
+    }
+
+    isString(value: unknown): value is string {
+        return typeof value === 'string';
+    }
+
+    isObject(value: unknown): value is Record<string, unknown> {
+        return value !== null && typeof value === 'object' && !Array.isArray(value);
+    }
+
     // Private helper methods
     
     private getNestedValue(obj: any, path: string, defaultValue?: any): any {
@@ -272,7 +291,7 @@ export class ConfigService {
         
         const cloned: any = {};
         for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 cloned[key] = this.deepClone(obj[key]);
             }
         }
@@ -280,7 +299,7 @@ export class ConfigService {
         return cloned;
     }
     
-    private notifyChange(path: string, value: any): void {
+    private notifyChange(path: string, value: unknown): void {
         this.changeListeners.forEach(listener => {
             try {
                 listener(path, value);
