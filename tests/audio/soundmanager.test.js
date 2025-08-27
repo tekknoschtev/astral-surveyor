@@ -269,30 +269,32 @@ describe('SoundManager Audio System', () => {
       soundManager.playStarDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(98, 0);
-      expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(147, expect.any(Number));
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110, 0);
+      // Pure tone - no frequency sweeping
+      expect(mockOscillator.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
     });
 
     it('should have correct planet discovery sound config', () => {
       soundManager.playPlanetDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(196, 0);
-      expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(294, expect.any(Number));
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
+      // Pure tone - no frequency sweeping
+      expect(mockOscillator.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
     });
 
     it('should have correct moon discovery sound config', () => {
       soundManager.playMoonDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(392, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(329.6, 0);
     });
 
     it('should have correct rare discovery sound config', () => {
       soundManager.playRareDiscovery();
       
       expect(mockAudioContext.createOscillator).toHaveBeenCalled();
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(58, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(65.4, 0);
     });
 
     it('should have UI sound configurations', () => {
@@ -314,12 +316,12 @@ describe('SoundManager Audio System', () => {
     it('should vary frequency for different star types', () => {
       const starTypes = [
         { name: 'G-Type Star', multiplier: 1.0 },
-        { name: 'K-Type Star', multiplier: 0.8 },
-        { name: 'M-Type Star', multiplier: 0.6 },
-        { name: 'Red Giant', multiplier: 0.4 },
-        { name: 'Blue Giant', multiplier: 1.5 },
-        { name: 'White Dwarf', multiplier: 1.8 },
-        { name: 'Neutron Star', multiplier: 2.2 }
+        { name: 'K-Type Star', multiplier: 0.89 },
+        { name: 'M-Type Star', multiplier: 0.75 },
+        { name: 'Red Giant', multiplier: 0.67 },
+        { name: 'Blue Giant', multiplier: 1.33 },
+        { name: 'White Dwarf', multiplier: 1.5 },
+        { name: 'Neutron Star', multiplier: 2.0 }
       ];
 
       starTypes.forEach(({ name, multiplier }) => {
@@ -328,15 +330,16 @@ describe('SoundManager Audio System', () => {
         
         soundManager.playStarDiscovery(name);
         
-        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(98 * multiplier, 0);
-        expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(147 * multiplier, expect.any(Number));
+        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110 * multiplier, 0);
+        // Pure tone - no frequency sweeping
+        expect(mockOscillator.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
       });
     });
 
     it('should handle unknown star types with default frequency', () => {
       soundManager.playStarDiscovery('Unknown Star Type');
       
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(98, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110, 0);
     });
   });
 
@@ -348,11 +351,11 @@ describe('SoundManager Audio System', () => {
     it('should vary frequency for different planet types', () => {
       const planetTypes = [
         { name: 'Rocky Planet', multiplier: 1.0 },
-        { name: 'Gas Giant', multiplier: 0.5 },
-        { name: 'Ice Giant', multiplier: 0.7 },
-        { name: 'Volcanic World', multiplier: 1.3 },
-        { name: 'Frozen World', multiplier: 0.6 },
-        { name: 'Exotic World', multiplier: 1.8 }
+        { name: 'Gas Giant', multiplier: 0.75 },
+        { name: 'Ice Giant', multiplier: 0.84 },
+        { name: 'Volcanic World', multiplier: 1.33 },
+        { name: 'Frozen World', multiplier: 0.89 },
+        { name: 'Exotic World', multiplier: 1.5 }
       ];
 
       planetTypes.forEach(({ name, multiplier }) => {
@@ -360,14 +363,14 @@ describe('SoundManager Audio System', () => {
         
         soundManager.playPlanetDiscovery(name);
         
-        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(196 * multiplier, 0);
+        expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220 * multiplier, 0);
       });
     });
 
     it('should handle unknown planet types with default frequency', () => {
       soundManager.playPlanetDiscovery('Unknown Planet Type');
       
-      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(196, 0);
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(220, 0);
     });
   });
 
@@ -405,10 +408,12 @@ describe('SoundManager Audio System', () => {
       expect(mockOscillator.stop).toHaveBeenCalledWith(expect.any(Number));
     });
 
-    it('should handle frequency sweeps for two-tone sounds', () => {
+    it('should create pure sustained tones without frequency sweeping', () => {
       soundManager.playStarDiscovery();
       
-      expect(mockOscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalled();
+      // Pure tone system - no frequency sweeping
+      expect(mockOscillator.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+      expect(mockOscillator.frequency.setValueAtTime).toHaveBeenCalledWith(110, 0);
     });
 
     it('should not play sound when muted', () => {

@@ -165,6 +165,9 @@ export class DiscoveryManager {
         } else if (obj.type === 'blackhole') {
             // Play ultra-rare black hole discovery sound - deep, ominous, cosmic
             this.soundManager.playBlackHoleDiscovery();
+        } else if (obj.type === 'comet') {
+            // Play comet discovery sound - bright, swift, crystalline
+            this.soundManager.playCometDiscovery();
         }
         
         // Play additional rare discovery sound for special objects

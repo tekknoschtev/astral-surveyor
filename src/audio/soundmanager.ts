@@ -286,132 +286,195 @@ export class SoundManager {
     }
 
     private getSoundConfig(name: string): SoundConfig | undefined {
-        // Define sound configurations for different discovery types
+        // HARMONIC DISCOVERY SOUND SYSTEM
+        // Base frequencies derived from harmonic series and space drone tones for coherent integration
+        // Designed around calm, meaningful discovery experiences with subtle object-type variations
+        
         const configs: Record<string, SoundConfig> = {
+            // === STAR DISCOVERIES === 
+            // Pure sustained tones with volume breathing - like wine glass resonance
+            // Mid-low frequency for clarity above ambient bass layers
             'star_discovery': {
                 type: 'oscillator',
-                frequency: 98,    // Slightly lower for warmer tone
-                frequency2: 147,  // Slightly lower for warmer harmony
-                duration: 2.0,    // Extended duration for reverb tail
-                attack: 0.3,      // Soft, gentle onset
-                decay: 0.4,       // Gradual decay
-                sustain: 0.3,
-                release: 0.8,     // Long, soft release
-                volume: 0.5,      // Slightly quieter
-                waveform: 'sine', // Pure, soft sine wave
-                reverbTime: 2.0,  // 2-second reverb tail
-                reverbDecay: 2.5, // Moderate decay rate
-                reverbWetness: 0.4 // 40% reverb mix
+                frequency: 110,       // Clear fundamental tone (A2) - above ambient bass
+                duration: 3.0,        // Extended for wine glass-like resonance
+                attack: 0.8,          // Very slow, gentle emergence
+                decay: 0.2,           // Quick to sustain for pure tone clarity
+                sustain: 0.75,        // Stronger sustained presence for clarity
+                release: 1.5,         // Long, gentle fade like glass resonance
+                volume: 0.55,         // Increased volume for prominence
+                waveform: 'sine',     // Pure sine wave for glass-like quality
+                reverbTime: 2.8,      // Slightly less reverb for clarity
+                reverbDecay: 3.0,     // Controlled resonant decay
+                reverbWetness: 0.45   // Balanced spatial presence for clarity
             },
+
+            // === PLANET DISCOVERIES ===
+            // Pure sustained planetary tones with gentle volume breathing
+            // Clear mid-range frequencies avoiding ambient layer overlap
             'planet_discovery': {
-                type: 'oscillator', 
-                frequency: 196,   // Lower for warmer tone
-                frequency2: 294,  // Lower harmony
-                duration: 1.5,    // Extended duration
-                attack: 0.2,      // Soft onset
-                decay: 0.3,       // Gentle decay
-                sustain: 0.4,
-                release: 0.6,     // Longer release
-                volume: 0.45,     // Slightly quieter
-                waveform: 'sine', // Softer sine instead of triangle
-                reverbTime: 1.5,  // 1.5-second reverb
-                reverbDecay: 2.0,
-                reverbWetness: 0.35
+                type: 'oscillator',
+                frequency: 220,       // Clear planetary tone (A3) - between ambient layers
+                duration: 2.5,        // Extended for sustained resonance
+                attack: 0.6,          // Gentle, welcoming emergence
+                decay: 0.15,          // Quick to pure sustain for clarity
+                sustain: 0.8,         // Stronger, stable planetary presence
+                release: 1.2,         // Warm, lingering planetary afterglow
+                volume: 0.5,          // Increased volume for prominence
+                waveform: 'sine',     // Pure sine for glass-like quality
+                reverbTime: 2.0,      // Slightly less reverb for clarity
+                reverbDecay: 2.3,     // Controlled, stable decay
+                reverbWetness: 0.4    // Balanced spatial presence for clarity
             },
+
+            // === MOON DISCOVERIES ===
+            // Pure ethereal tones for smaller celestial companions
+            // Higher register with delicate volume breathing
             'moon_discovery': {
                 type: 'oscillator',
-                frequency: 392,   // Lower, softer
-                duration: 0.8,    // Extended duration
-                attack: 0.1,      // Softer onset
-                decay: 0.2,       // Gentle decay
-                sustain: 0.2,
-                release: 0.4,     // Longer, gentle release
-                volume: 0.35,     // Quieter
-                waveform: 'sine',
-                reverbTime: 1.0,  // 1-second reverb
-                reverbDecay: 1.8,
-                reverbWetness: 0.3
+                frequency: 329.6,     // Pure lunar tone (E4)
+                duration: 1.8,        // Extended for gentle resonance
+                attack: 0.4,          // Gentle, ethereal emergence  
+                decay: 0.15,          // Quick to delicate sustain
+                sustain: 0.45,        // Subtle, sustained lunar presence
+                release: 0.8,         // Gentle, fading lunar glow
+                volume: 0.28,         // Delicate, unobtrusive
+                waveform: 'sine',     // Pure, crystalline tone
+                reverbTime: 2.0,      // Intimate lunar reverb
+                reverbDecay: 2.2,     // Light, floating decay
+                reverbWetness: 0.4    // Ethereal spatial presence
             },
+
+            // === NEBULA DISCOVERIES ===
+            // Pure crystalline tones for cosmic gas clouds and stellar nurseries
+            // High register with ethereal volume breathing
             'nebula_discovery': {
                 type: 'oscillator',
-                frequency: 784,    // Slightly lower for softer sparkle
-                frequency2: 1176,  // Maintain harmonic ratio but lower
-                duration: 1.8,     // Extended for reverb tail
-                attack: 0.25,      // Even slower ethereal build-up
-                decay: 0.4,        // Gentle decay
-                sustain: 0.2,      // Lower sustain for twinkly effect
-                release: 0.7,      // Longer ethereal fade
-                volume: 0.4,       // Slightly quieter
-                waveform: 'sine',  // Pure sine for softest sparkle
-                reverbTime: 2.5,   // Long cosmic reverb
-                reverbDecay: 3.0,  // Very ethereal decay
-                reverbWetness: 0.5 // High reverb mix for cosmic effect
+                frequency: 659.3,     // Pure crystalline tone (E5)
+                duration: 2.8,        // Extended for ethereal beauty
+                attack: 0.7,          // Slow, dreamy emergence
+                decay: 0.25,          // Quick to ethereal sustain
+                sustain: 0.4,         // Gentle, sustained cosmic presence
+                release: 1.3,         // Long, ethereal fade into space
+                volume: 0.32,         // Delicate, beautiful
+                waveform: 'sine',     // Pure, crystalline wine glass tone
+                reverbTime: 3.5,      // Long, cosmic reverb
+                reverbDecay: 3.8,     // Extended ethereal decay  
+                reverbWetness: 0.6    // High spatial beauty
             },
+
+            // === COMET DISCOVERIES ===
+            // Pure bright tones for dynamic cosmic visitors
+            // Mid-high register with swift but sustained presence
+            'comet_discovery': {
+                type: 'oscillator',
+                frequency: 523.3,     // Pure bright tone (C5)
+                duration: 2.0,        // Extended for resonant presence
+                attack: 0.2,          // Swift emergence like comet appearance
+                decay: 0.15,          // Quick to bright sustain
+                sustain: 0.55,        // Clear, sustained comet presence
+                release: 0.9,         // Trailing fade like comet tail
+                volume: 0.36,         // Bright but not overpowering
+                waveform: 'sine',     // Pure, crystalline streaming tone
+                reverbTime: 2.3,      // Moderate, clear reverb
+                reverbDecay: 2.6,     // Clean, dynamic decay
+                reverbWetness: 0.45   // Clear spatial movement
+            },
+
+            // === ASTEROID FIELD DISCOVERIES ===  
+            // Pure practical tones for scattered rocky debris
+            // Mid-range with solid, grounded presence
+            'asteroid_discovery': {
+                type: 'oscillator',
+                frequency: 293.7,     // Pure practical tone (D4)
+                duration: 1.5,        // Moderate, solid presence
+                attack: 0.3,          // Defined but gentle emergence
+                decay: 0.1,           // Quick to solid sustain
+                sustain: 0.5,         // Brief but clear rocky presence
+                release: 0.6,         // Clean, practical fade
+                volume: 0.32,         // Modest but clear
+                waveform: 'sine',     // Pure, solid wine glass tone
+                reverbTime: 1.8,      // Compact, grounded reverb
+                reverbDecay: 2.0,     // Clean, practical decay
+                reverbWetness: 0.35   // Moderate spatial presence
+            },
+
+            // === RARE DISCOVERY ENHANCEMENT ===
+            // Deep, profound mystery tones with extended harmonics
             'rare_discovery': {
                 type: 'oscillator',
-                frequency: 58,     // Deeper, more mysterious
-                frequency2: 87,    // Maintain ratio but deeper
-                duration: 2.5,     // Extended for epic feel
-                attack: 0.4,       // Slow, majestic onset
-                decay: 0.5,        // Gradual decay
-                sustain: 0.4,
-                release: 1.2,      // Very long, majestic release
-                volume: 0.5,       // Slightly quieter
-                waveform: 'sine',
-                reverbTime: 3.0,   // Long, majestic reverb
-                reverbDecay: 3.5,  // Very slow decay for rarity
-                reverbWetness: 0.6 // High reverb for cosmic grandeur
+                frequency: 65.4,      // Deep, mysterious fundamental (C2)
+                frequency2: 98.0,     // Perfect fifth harmony (G2)
+                duration: 3.0,        // Extended for rarity impact
+                attack: 0.6,          // Very slow, building mystery
+                decay: 0.7,           // Extended, profound decay
+                sustain: 0.3,         // Mysterious sustained presence
+                release: 1.5,         // Very long, profound fade
+                volume: 0.5,          // Substantial for rare discovery
+                waveform: 'sine',     // Pure, profound tone
+                reverbTime: 3.5,      // Long, mysterious reverb
+                reverbDecay: 4.0,     // Extended mysterious decay
+                reverbWetness: 0.6    // High spatial mystery
             },
+
+            // === WORMHOLE DISCOVERIES ===
+            // Ultra-deep, dimensional shift tones
             'wormhole_discovery': {
                 type: 'oscillator',
-                frequency: 49,        // Even deeper, more mysterious
-                frequency2: 98,       // Maintain octave relationship
-                duration: 3.0,        // Extended for reverb tail
-                attack: 0.5,          // Very slow, mysterious emergence
-                decay: 0.6,           // Extended decay for ethereal quality
-                sustain: 0.3,         // Sustained presence
-                release: 1.5,         // Extremely long haunting fade
-                volume: 0.6,          // Slightly quieter but present
-                waveform: 'sine',     // Softer sine instead of harsh sawtooth
-                filterFreq: 150,      // Lower filter for even softer tone
-                filterQ: 1.0,         // Gentler filtering
-                reverbTime: 4.0,      // Very long cosmic reverb
-                reverbDecay: 4.0,     // Ultra-slow decay for cosmic mystery
-                reverbWetness: 0.7    // High reverb for otherworldly effect
+                frequency: 49,        // Ultra-deep dimensional tone
+                frequency2: 73.4,     // Perfect fifth harmony
+                duration: 3.5,        // Extended dimensional presence
+                attack: 0.7,          // Very slow dimensional emergence
+                decay: 0.8,           // Extended dimensional decay
+                sustain: 0.25,        // Mysterious dimensional presence
+                release: 1.8,         // Very long dimensional fade
+                volume: 0.5,          // Significant dimensional impact
+                waveform: 'sine',     // Pure dimensional tone
+                filterFreq: 120,      // Deep filter for dimension effect
+                filterQ: 0.8,         // Smooth dimensional filtering
+                reverbTime: 4.5,      // Very long dimensional reverb
+                reverbDecay: 4.8,     // Ultra-slow dimensional decay
+                reverbWetness: 0.7    // High dimensional spatial effect
             },
+
+            // === BLACK HOLE DISCOVERIES ===
+            // Ultra-deep, gravitational tones with immense presence
             'blackhole_discovery': {
                 type: 'oscillator',
-                frequency: 32,        // Ultra-deep, ominous frequency
-                frequency2: 64,       // Octave relationship for harmonic depth
-                duration: 4.0,        // Extended for cosmic grandeur
-                attack: 0.8,          // Very slow, building emergence
-                decay: 0.8,           // Long decay for gravitational pull effect
-                sustain: 0.2,         // Low sustain for ominous presence
-                release: 2.0,         // Extremely long fade for cosmic void
-                volume: 0.7,          // Slightly louder for impact
-                waveform: 'sawtooth', // Harsher waveform for ominous effect
-                filterFreq: 100,      // Very low filter for deep, dark tone
-                filterQ: 1.5,         // More resonant for gravitational effect
-                reverbTime: 5.0,      // Longest reverb for infinite depth
-                reverbDecay: 5.0,     // Ultra-slow decay for void effect
-                reverbWetness: 0.8    // Maximum reverb for cosmic enormity
+                frequency: 32.7,      // Ultra-deep gravitational fundamental
+                frequency2: 49.0,     // Perfect fifth harmony
+                duration: 4.5,        // Extended for cosmic enormity
+                attack: 1.0,          // Very slow gravitational emergence
+                decay: 1.0,           // Extended gravitational decay
+                sustain: 0.2,         // Deep gravitational presence
+                release: 2.5,         // Very long gravitational fade
+                volume: 0.55,         // Substantial gravitational impact
+                waveform: 'sine',     // Pure gravitational tone (softer than sawtooth)
+                filterFreq: 80,       // Very deep filter for gravity effect
+                filterQ: 1.0,         // Smooth gravitational filtering
+                reverbTime: 5.5,      // Longest gravitational reverb
+                reverbDecay: 5.8,     // Ultra-slow gravitational decay
+                reverbWetness: 0.75   // Maximum gravitational spatial effect
             },
+
+            // === WORMHOLE TRAVERSAL ===
+            // Dimensional transition tones
             'wormhole_traversal': {
                 type: 'oscillator',
-                frequency: 72,        // Lower for softer dimensional shift
-                frequency2: 108,      // Maintain perfect fifth relationship
-                duration: 2.0,        // Extended duration for reverb
-                attack: 0.2,          // Softer onset for gentler shift
-                decay: 0.3,           // Longer decay
-                sustain: 0.5,         // Sustained transition
-                release: 0.8,         // Longer, softer landing
-                volume: 0.55,         // Quieter
-                waveform: 'sine',     // Softer sine wave
-                filterFreq: 300,      // Lower filter for softer tone
-                filterQ: 1.2,         // Gentler resonance
-                reverbTime: 2.0,      // Reverb for spatial sense
-                reverbDecay: 2.5,
-                reverbWetness: 0.4
+                frequency: 87,        // Transitional dimensional tone
+                frequency2: 130.8,    // Perfect fifth harmony
+                duration: 2.5,        // Extended transition
+                attack: 0.3,          // Smooth dimensional shift
+                decay: 0.4,           // Extended dimensional decay
+                sustain: 0.4,         // Stable dimensional transition
+                release: 1.0,         // Long dimensional landing
+                volume: 0.45,         // Clear dimensional transition
+                waveform: 'sine',     // Pure dimensional tone
+                filterFreq: 200,      // Moderate dimensional filtering
+                filterQ: 1.0,         // Smooth dimensional transition
+                reverbTime: 2.8,      // Extended dimensional reverb
+                reverbDecay: 3.0,     // Long dimensional decay
+                reverbWetness: 0.5    // Balanced dimensional spatial effect
             },
             'map_toggle': {
                 type: 'oscillator',
@@ -517,11 +580,23 @@ export class SoundManager {
                     oscillator.frequency.exponentialRampToValueAtTime(config.frequency2, now + duration * 0.7);
                 }
                 
-                // Set up ADSR envelope
+                // Set up ADSR envelope with subtle volume breathing for wine glass prominence
                 gainNode.gain.setValueAtTime(0, now);
                 gainNode.gain.linearRampToValueAtTime(volume, now + attack);
                 gainNode.gain.linearRampToValueAtTime(volume * sustain, now + attack + decay);
-                gainNode.gain.setValueAtTime(volume * sustain, now + duration - release);
+                
+                // Add gentle volume breathing during sustain phase for prominence
+                const sustainStart = now + attack + decay;
+                const sustainEnd = now + duration - release;
+                if (sustainEnd > sustainStart + 0.5) { // Only if sustain is long enough
+                    const midSustain = sustainStart + (sustainEnd - sustainStart) * 0.5;
+                    const breatheVolume = volume * sustain * 1.15; // Slight volume boost for prominence
+                    gainNode.gain.linearRampToValueAtTime(breatheVolume, midSustain);
+                    gainNode.gain.linearRampToValueAtTime(volume * sustain, sustainEnd);
+                } else {
+                    gainNode.gain.setValueAtTime(volume * sustain, sustainEnd);
+                }
+                
                 gainNode.gain.linearRampToValueAtTime(0, now + duration);
                 
                 // Apply filter if specified
@@ -620,26 +695,74 @@ export class SoundManager {
         }
     }
 
-    // Public API methods for specific game sounds
+    // === DISCOVERY SOUND API ===
+    // Harmonic variations that maintain coherent relationships while expressing object characteristics
+
     playStarDiscovery(starType: string = 'G-Type Star'): void {
         const config = this.getSoundConfig('star_discovery');
         if (config) {
-            // Vary frequency based on star type
-            const variations: Record<string, number> = {
-                'G-Type Star': 1.0,
-                'K-Type Star': 0.8,
-                'M-Type Star': 0.6,
-                'Red Giant': 0.4,
-                'Blue Giant': 1.5,
-                'White Dwarf': 1.8,
-                'Neutron Star': 2.2
+            // Star type variations using harmonic intervals for musical coherence
+            // Each type maintains perfect fifth relationships but shifts to different harmonic positions
+            const variations: Record<string, { freqMultiplier: number, harmonyMultiplier: number, durationMod: number, volumeMod: number, description: string }> = {
+                'G-Type Star': { 
+                    freqMultiplier: 1.0,     // Base: G2 (87 Hz) + C3 (130.8 Hz)
+                    harmonyMultiplier: 1.0,  // Perfect fifth harmony
+                    durationMod: 1.0, 
+                    volumeMod: 1.0,
+                    description: 'Warm, balanced solar presence'
+                },
+                'K-Type Star': { 
+                    freqMultiplier: 0.89,    // Slightly lower: F2 (77.8 Hz) + Bb2 (116.5 Hz) 
+                    harmonyMultiplier: 0.89, // Maintains perfect fifth
+                    durationMod: 1.1,        // Slightly longer for stable K-type
+                    volumeMod: 0.95,
+                    description: 'Warm orange dwarf - stable and welcoming'
+                },
+                'M-Type Star': { 
+                    freqMultiplier: 0.75,    // Lower: D2 (65.4 Hz) + A2 (98 Hz)
+                    harmonyMultiplier: 0.75, // Maintains perfect fifth 
+                    durationMod: 1.2,        // Longer for red dwarf longevity
+                    volumeMod: 0.85,
+                    description: 'Deep red dwarf - ancient and enduring'
+                },
+                'Red Giant': { 
+                    freqMultiplier: 0.67,    // Deep: C2 (58.3 Hz) + G2 (87 Hz)
+                    harmonyMultiplier: 0.67, // Maintains perfect fifth
+                    durationMod: 1.5,        // Much longer for giant presence
+                    volumeMod: 1.15,         // Slightly louder for size
+                    description: 'Majestic evolved giant - deep and expansive'
+                },
+                'Blue Giant': { 
+                    freqMultiplier: 1.33,    // Higher: B2 (116.5 Hz) + F#3 (174.6 Hz)
+                    harmonyMultiplier: 1.33, // Maintains perfect fifth
+                    durationMod: 0.9,        // Slightly shorter for hot giant energy  
+                    volumeMod: 1.25,         // Louder for massive presence
+                    description: 'Brilliant massive giant - bright and powerful'
+                },
+                'White Dwarf': { 
+                    freqMultiplier: 1.5,     // High: C3 (130.8 Hz) + G3 (196 Hz)
+                    harmonyMultiplier: 1.5,  // Maintains perfect fifth
+                    durationMod: 0.8,        // Shorter for compact density
+                    volumeMod: 0.9,          // Quieter for small size
+                    description: 'Dense compact remnant - crystalline and precise'
+                },
+                'Neutron Star': { 
+                    freqMultiplier: 2.0,     // Very high: G3 (174.6 Hz) + D4 (261.6 Hz)
+                    harmonyMultiplier: 2.0,  // Maintains perfect fifth
+                    durationMod: 0.7,        // Shorter for extreme density
+                    volumeMod: 1.1,          // Slightly louder for rarity impact
+                    description: 'Ultra-dense pulsar - intense and otherworldly'
+                }
             };
             
-            const multiplier = variations[starType] || 1.0;
+            const variation = variations[starType] || variations['G-Type Star'];
             const modifiedConfig = {
                 ...config,
-                frequency: (config.frequency || 440) * multiplier,
-                frequency2: config.frequency2 ? config.frequency2 * multiplier : undefined
+                frequency: (config.frequency || 110) * variation.freqMultiplier,
+                // Remove frequency sweeping - pure sustained tones only
+                frequency2: undefined,
+                duration: (config.duration || 3.0) * variation.durationMod,
+                volume: (config.volume || 0.55) * variation.volumeMod
             };
             
             this.playOscillatorSound(modifiedConfig);
@@ -649,21 +772,82 @@ export class SoundManager {
     playPlanetDiscovery(planetType: string = 'Rocky Planet'): void {
         const config = this.getSoundConfig('planet_discovery');
         if (config) {
-            // Vary tone based on planet type
-            const variations: Record<string, number> = {
-                'Rocky Planet': 1.0,
-                'Gas Giant': 0.5,
-                'Ice Giant': 0.7,
-                'Volcanic World': 1.3,
-                'Frozen World': 0.6,
-                'Exotic World': 1.8
+            // Planet type variations maintaining harmonic coherence within mid-register
+            const variations: Record<string, { freqMultiplier: number, harmonyMultiplier: number, durationMod: number, volumeMod: number, description: string }> = {
+                'Rocky Planet': { 
+                    freqMultiplier: 1.0,     // Base: F3 (174.6 Hz) + C4 (261.6 Hz)
+                    harmonyMultiplier: 1.0,  // Perfect fifth harmony
+                    durationMod: 1.0, 
+                    volumeMod: 1.0,
+                    description: 'Solid terrestrial foundation'
+                },
+                'Ocean World': { 
+                    freqMultiplier: 1.12,    // Higher: G3 (196 Hz) + D4 (293.7 Hz)
+                    harmonyMultiplier: 1.12, // Maintains perfect fifth - brighter for water worlds
+                    durationMod: 1.2,        // Longer for oceanic depth
+                    volumeMod: 1.05,         // Slightly more prominent for habitability
+                    description: 'Flowing oceanic depths - life potential'
+                },
+                'Gas Giant': { 
+                    freqMultiplier: 0.75,    // Lower: D3 (146.8 Hz) + A3 (220 Hz)
+                    harmonyMultiplier: 0.75, // Maintains perfect fifth - deeper for massive planets
+                    durationMod: 1.4,        // Much longer for giant presence
+                    volumeMod: 1.2,          // Louder for massive scale
+                    description: 'Massive atmospheric giant - deep and expansive'
+                },
+                'Ice Giant': { 
+                    freqMultiplier: 0.84,    // Slightly lower: Eb3 (155.6 Hz) + Bb3 (233.1 Hz) 
+                    harmonyMultiplier: 0.84, // Maintains perfect fifth - cool ice giant
+                    durationMod: 1.3,        // Longer for distant cold giant
+                    volumeMod: 1.1,          // Moderately louder for size
+                    description: 'Distant ice giant - crystalline and cold'
+                },
+                'Desert World': { 
+                    freqMultiplier: 1.19,    // Higher: Ab3 (207.7 Hz) + Eb4 (311.1 Hz)
+                    harmonyMultiplier: 1.19, // Maintains perfect fifth - warmer for desert
+                    durationMod: 0.9,        // Slightly shorter for arid simplicity
+                    volumeMod: 0.95,         // Slightly quieter for barren world
+                    description: 'Arid desert expanse - warm and dry'
+                },
+                'Frozen World': { 
+                    freqMultiplier: 0.89,    // Lower: E3 (164.8 Hz) + B3 (246.9 Hz)
+                    harmonyMultiplier: 0.89, // Maintains perfect fifth - cooler for ice
+                    durationMod: 1.1,        // Longer for frozen stillness
+                    volumeMod: 0.9,          // Quieter for frozen silence
+                    description: 'Frozen ice world - still and crystalline'
+                },
+                'Volcanic World': { 
+                    freqMultiplier: 1.33,    // Higher: Bb3 (233.1 Hz) + F4 (349.2 Hz)
+                    harmonyMultiplier: 1.33, // Maintains perfect fifth - energetic for volcanism
+                    durationMod: 0.8,        // Shorter for active energy
+                    volumeMod: 1.15,         // Louder for volcanic activity
+                    description: 'Active volcanic world - energetic and dynamic'
+                },
+                'Exotic World': { 
+                    freqMultiplier: 1.5,     // High: C4 (261.6 Hz) + G4 (392 Hz)
+                    harmonyMultiplier: 1.5,  // Maintains perfect fifth - unique for exotic
+                    durationMod: 1.3,        // Longer for mysterious exotic nature
+                    volumeMod: 1.1,          // Slightly louder for rarity
+                    description: 'Exotic anomalous world - mysterious and unique'
+                },
+                // Handle alternative namings
+                'Asteroid Garden': {
+                    freqMultiplier: 1.41,    // Higher: B3 (246.9 Hz) + F#4 (370 Hz) 
+                    harmonyMultiplier: 1.41, // Maintains perfect fifth - clustered asteroids
+                    durationMod: 0.7,        // Shorter for scattered debris
+                    volumeMod: 0.8,          // Quieter for smaller objects
+                    description: 'Scattered asteroid cluster - fragmented beauty'
+                }
             };
             
-            const multiplier = variations[planetType] || 1.0;
+            const variation = variations[planetType] || variations['Rocky Planet'];
             const modifiedConfig = {
                 ...config,
-                frequency: (config.frequency || 220) * multiplier,
-                frequency2: config.frequency2 ? config.frequency2 * multiplier : undefined
+                frequency: (config.frequency || 220) * variation.freqMultiplier,
+                // Remove frequency sweeping - pure sustained tones only  
+                frequency2: undefined,
+                duration: (config.duration || 2.5) * variation.durationMod,
+                volume: (config.volume || 0.5) * variation.volumeMod
             };
             
             this.playOscillatorSound(modifiedConfig);
@@ -678,23 +862,60 @@ export class SoundManager {
     playNebulaDiscovery(nebulaType: string = 'emission'): void {
         const config = this.getSoundConfig('nebula_discovery');
         if (config) {
-            // Vary sparkle based on nebula type for unique sonic identity
-            const variations: Record<string, number> = {
-                'emission': 1.0,      // Bright, warm sparkle
-                'reflection': 1.2,    // Higher, more reflective sparkle  
-                'planetary': 0.9,     // Slightly lower, more contained
-                'dark': 0.7          // Muted, mysterious sparkle
+            // Nebula type variations in high ethereal register
+            const variations: Record<string, { freqMultiplier: number, harmonyMultiplier: number, durationMod: number, volumeMod: number, description: string }> = {
+                'emission': { 
+                    freqMultiplier: 1.0,     // Base: E5 (659.3 Hz) + B5 (987.8 Hz)
+                    harmonyMultiplier: 1.0,  // Perfect fifth harmony - bright emission
+                    durationMod: 1.0, 
+                    volumeMod: 1.0,
+                    description: 'Bright emission nebula - stellar nursery glowing'
+                },
+                'reflection': { 
+                    freqMultiplier: 1.12,    // Higher: G5 (784 Hz) + D6 (1175 Hz)
+                    harmonyMultiplier: 1.12, // Maintains perfect fifth - reflective sparkle
+                    durationMod: 1.1,        // Slightly longer for reflective beauty
+                    volumeMod: 1.05,         // Slightly brighter for reflection
+                    description: 'Reflection nebula - starlight scattered in cosmic dust'
+                },
+                'planetary': { 
+                    freqMultiplier: 0.89,    // Lower: D5 (587.3 Hz) + A5 (880 Hz)
+                    harmonyMultiplier: 0.89, // Maintains perfect fifth - contained planetary
+                    durationMod: 0.9,        // Shorter for smaller planetary nebula
+                    volumeMod: 0.95,         // Slightly quieter for smaller scale
+                    description: 'Planetary nebula - stellar death creating beauty'
+                },
+                'dark': { 
+                    freqMultiplier: 0.75,    // Lower: C5 (523.3 Hz) + G5 (784 Hz)
+                    harmonyMultiplier: 0.75, // Maintains perfect fifth - mysterious dark
+                    durationMod: 1.3,        // Longer for dark mystery
+                    volumeMod: 0.8,          // Quieter for dark, hidden nature  
+                    description: 'Dark nebula - mysterious cosmic shadow'
+                }
             };
             
-            const multiplier = variations[nebulaType] || 1.0;
+            const variation = variations[nebulaType] || variations['emission'];
             const modifiedConfig = {
                 ...config,
-                frequency: (config.frequency || 880) * multiplier,
-                frequency2: config.frequency2 ? config.frequency2 * multiplier : undefined
+                frequency: (config.frequency || 659.3) * variation.freqMultiplier,
+                // Remove frequency sweeping - pure sustained tones only
+                frequency2: undefined,
+                duration: (config.duration || 2.8) * variation.durationMod,
+                volume: (config.volume || 0.32) * variation.volumeMod
             };
             
             this.playOscillatorSound(modifiedConfig);
         }
+    }
+
+    playCometDiscovery(): void {
+        const config = this.getSoundConfig('comet_discovery');
+        if (config) this.playOscillatorSound(config);
+    }
+
+    playAsteroidDiscovery(): void {
+        const config = this.getSoundConfig('asteroid_discovery');
+        if (config) this.playOscillatorSound(config);
     }
 
     playRareDiscovery(): void {
@@ -768,23 +989,64 @@ export class SoundManager {
             this.ambientMasterGain.gain.setValueAtTime(0.6, now); // Overall ambient volume - moderate level
             this.ambientMasterGain.connect(this.ambientGain);
             
-            // Define ethereal frequency layers (harmonically related for pleasant sound)
-            const frequencies = [
-                { freq: 65.4, cycle: 45, phase: 0 },      // C2 - deep foundation
-                { freq: 130.8, cycle: 38, phase: 12 },   // C3 - mid foundation  
-                { freq: 196.0, cycle: 52, phase: 25 },   // G3 - perfect fifth harmony
-                { freq: 261.6, cycle: 41, phase: 38 },   // C4 - octave brightness
-                { freq: 392.0, cycle: 47, phase: 8 },    // G4 - higher harmonic
-                { freq: 523.3, cycle: 55, phase: 31 }    // C5 - ethereal brightness
+            // PHASE 4: Layered Harmonic Textures
+            
+            // === HARMONIC INTEGRATION WITH DISCOVERY SYSTEM ===
+            // Ambient layers now designed to complement discovery sound frequencies
+            // All frequencies chosen to create perfect harmonic relationships with discovery tones
+            
+            // Layer 1: Bass Drone Layer (32-98Hz) - Fundamental cosmic foundation
+            // Supports star discovery range (58-174 Hz) with deep harmonics
+            const bassDroneFreqs = [
+                { freq: 32.7, cycle: 75, phase: 0, volume: 0.25 },   // Ultra-deep C1 - supports black holes
+                { freq: 49.0, cycle: 68, phase: 25, volume: 0.3 },   // G1 - supports wormholes & deep stars
+                { freq: 65.4, cycle: 60, phase: 45, volume: 0.35 },  // C2 - fundamental root, supports rare discoveries
+                { freq: 87.0, cycle: 55, phase: 15, volume: 0.3 }    // G2 - supports star discoveries
             ];
             
-            // Create each ambient layer
-            for (let i = 0; i < frequencies.length; i++) {
-                const config = frequencies[i];
+            // Layer 2: Planetary Harmonic Layer (130-261Hz) - Mid-register planetary resonance  
+            // Directly harmonizes with planet discovery range (146-392 Hz)
+            const melodicFreqs = [
+                { freq: 130.8, cycle: 45, phase: 20, volume: 0.35 }, // C3 - star discovery harmony
+                { freq: 174.6, cycle: 42, phase: 35, volume: 0.4 },  // F3 - planet discovery fundamental
+                { freq: 196.0, cycle: 48, phase: 10, volume: 0.32 }, // G3 - planet discovery harmony 
+                { freq: 261.6, cycle: 40, phase: 50, volume: 0.3 }   // C4 - planet discovery harmony
+            ];
+            
+            // Layer 3: Ethereal Overtone Layer (329-659Hz) - High harmonic sparkle
+            // Supports moon and nebula discovery range (329-987 Hz) 
+            const harmonicOvertones = [
+                { freq: 329.6, cycle: 55, phase: 5, volume: 0.12 },  // E4 - moon discovery fundamental
+                { freq: 392.0, cycle: 50, phase: 30, volume: 0.15 }, // G4 - general harmonic fifth
+                { freq: 523.3, cycle: 58, phase: 40, volume: 0.1 },  // C5 - comet discovery fundamental
+                { freq: 659.3, cycle: 62, phase: 15, volume: 0.08 }  // E5 - nebula discovery fundamental
+            ];
+            
+            // Layer 4: Cosmic Textural Layer (98-220Hz) - Deep harmonic foundation
+            // Provides rich harmonic support across the discovery spectrum
+            const texturalPads = [
+                { freq: 98.0, cycle: 80, phase: 35, volume: 0.18 },  // G2 - deep harmonic support
+                { freq: 146.8, cycle: 85, phase: 55, volume: 0.2 },  // D3 - planet discovery support  
+                { freq: 220.0, cycle: 78, phase: 20, volume: 0.16 }  // A3 - asteroid discovery support
+            ];
+            
+            // Combine all layers into unified system
+            const allFrequencies = [
+                ...bassDroneFreqs.map(f => ({...f, layer: 'bass'})),
+                ...melodicFreqs.map(f => ({...f, layer: 'melodic'})),
+                ...harmonicOvertones.map(f => ({...f, layer: 'harmonic'})),
+                ...texturalPads.map(f => ({...f, layer: 'textural'}))
+            ];
+            
+            // Create each ambient layer with proper volume balancing
+            for (let i = 0; i < allFrequencies.length; i++) {
+                const config = allFrequencies[i];
                 const oscillator = this.context.createOscillator();
                 const gain = this.context.createGain();
                 
-                oscillator.type = 'sine';
+                // Keep all waves as gentle sine waves for tranquil aesthetic
+                oscillator.type = 'sine'; // Pure, peaceful tones for all layers
+                
                 oscillator.frequency.setValueAtTime(config.freq, now);
                 
                 // Start with silence, will fade in/out organically
@@ -797,17 +1059,18 @@ export class SoundManager {
                 // Start oscillator
                 oscillator.start(now);
                 
-                // Create layer data for evolution
+                // Create layer data for evolution with Phase 4 enhancements
                 const layer = {
                     oscillator,
                     gain,
                     frequency: config.freq,
                     cycleTime: config.cycle,
                     phase: config.phase,
-                    targetVolume: 0.15 - (i * 0.02), // Higher layers quieter
+                    targetVolume: config.volume, // Use configured volume per layer type
                     currentVolume: 0,
                     fadeDirection: 'in' as 'in' | 'out' | 'sustain',
-                    nextPhaseTime: now + config.phase
+                    nextPhaseTime: now + config.phase,
+                    layerType: config.layer // Track layer type for evolution logic
                 };
                 
                 this.ambientLayers.push(layer);
@@ -864,9 +1127,40 @@ export class SoundManager {
      * Evolve a layer to its next phase (fade in, sustain, fade out)
      */
     private evolveLayer(layer: any, currentTime: number): void {
-        const fadeTime = 8 + Math.random() * 12; // 8-20 second fades for organic feel
-        const sustainTime = 15 + Math.random() * 25; // 15-40 second sustains
-        const silenceTime = 5 + Math.random() * 15; // 5-20 second silence
+        // PHASE 4: Layer-specific evolution behavior
+        let fadeTime: number, sustainTime: number, silenceTime: number;
+        
+        switch (layer.layerType) {
+            case 'bass':
+                // Bass drone: longer, more stable cycles
+                fadeTime = 15 + Math.random() * 15; // 15-30 second fades
+                sustainTime = 30 + Math.random() * 60; // 30-90 second sustains
+                silenceTime = 10 + Math.random() * 20; // 10-30 second silence
+                break;
+            case 'melodic':
+                // Melodic: medium cycles, main voice
+                fadeTime = 8 + Math.random() * 12; // 8-20 second fades
+                sustainTime = 15 + Math.random() * 25; // 15-40 second sustains
+                silenceTime = 5 + Math.random() * 15; // 5-20 second silence
+                break;
+            case 'harmonic':
+                // Harmonic: shorter, more active cycles
+                fadeTime = 5 + Math.random() * 8; // 5-13 second fades
+                sustainTime = 10 + Math.random() * 20; // 10-30 second sustains
+                silenceTime = 3 + Math.random() * 12; // 3-15 second silence
+                break;
+            case 'textural':
+                // Textural: very long, ambient cycles
+                fadeTime = 20 + Math.random() * 20; // 20-40 second fades
+                sustainTime = 45 + Math.random() * 75; // 45-120 second sustains
+                silenceTime = 15 + Math.random() * 30; // 15-45 second silence
+                break;
+            default:
+                // Default behavior (legacy)
+                fadeTime = 8 + Math.random() * 12;
+                sustainTime = 15 + Math.random() * 25;
+                silenceTime = 5 + Math.random() * 15;
+        }
         
         switch (layer.fadeDirection) {
             case 'in': {
@@ -935,95 +1229,379 @@ export class SoundManager {
     private startMelodicSequence(currentTime: number): void {
         if (!this.context || !this.ambientMasterGain) return;
         
-        // Define melodic progressions (frequencies in Hz) - lowered highest notes
-        const progressions = [
-            // Simple ascent: C4→D4→E4→F4
-            [261.6, 293.7, 329.6, 349.2],
-            // Pentatonic rise: C4→D4→G4→A4  
-            [261.6, 293.7, 392.0, 440.0],
-            // Mid ethereal: C4→D4→G4→C5 (lowered from C6 to C5)
-            [261.6, 293.7, 392.0, 523.3],
-            // Gentle rise: G3→C4→E4→G4
-            [196.0, 261.6, 329.6, 392.0],
-            // Warm ascent: F3→G3→C4→D4 (new, stays in comfortable range)
-            [174.6, 196.0, 261.6, 293.7]
+        // Modal scale system for emotional variety
+        interface ModalScale {
+            name: string;
+            intervals: number[]; // Semitone intervals from root
+            emotion: 'mysterious' | 'dreamy' | 'vast' | 'alien';
+            description: string;
+        }
+        
+        const modalScales: ModalScale[] = [
+            {
+                name: 'Dorian',
+                intervals: [0, 2, 3, 5, 7, 9, 10, 12], // Natural minor with raised 6th
+                emotion: 'mysterious',
+                description: 'Mysterious hope - minor with bright sixth'
+            },
+            {
+                name: 'Mixolydian', 
+                intervals: [0, 2, 4, 5, 7, 9, 10, 12], // Major with flat 7th
+                emotion: 'dreamy',
+                description: 'Dreamy float - major with subtle melancholy'
+            },
+            {
+                name: 'Aeolian',
+                intervals: [0, 2, 3, 5, 7, 8, 10, 12], // Natural minor
+                emotion: 'vast',
+                description: 'Vast emptiness - pure minor tonality'
+            },
+            {
+                name: 'Lydian',
+                intervals: [0, 2, 4, 6, 7, 9, 11, 12], // Major with raised 4th
+                emotion: 'alien',
+                description: 'Alien beauty - major with ethereal fourth'
+            }
         ];
         
-        // Randomly select a progression
-        const selectedProgression = progressions[Math.floor(Math.random() * progressions.length)];
+        // Generate frequencies for a modal scale from a root frequency
+        const generateModalFrequencies = (rootFreq: number, scale: ModalScale): number[] => {
+            return scale.intervals.map(interval => rootFreq * Math.pow(2, interval / 12));
+        };
+
+        // Define harmonic progressions with intervals, chords, movement patterns, and modal scales
+        interface HarmonicProgression {
+            name: string;
+            notes: Array<{
+                root: number;
+                harmonies?: number[];
+                intervalType?: 'perfect5th' | 'minor3rd' | 'major7th' | 'sus4';
+            }>;
+            emotion: 'spacious' | 'melancholy' | 'ethereal' | 'mysterious' | 'contemplative' | 'dreamy' | 'vast' | 'alien';
+            movement: 'ascending' | 'descending' | 'arch' | 'meandering' | 'pendulum';
+            mode?: string; // Optional modal scale identifier
+        }
         
-        // Create sequence with staggered timing
+        const harmonicProgressions: HarmonicProgression[] = [
+            // Perfect 5ths - Open, spacious cosmic feel
+            {
+                name: 'Cosmic Fifths Ascent',
+                emotion: 'spacious',
+                movement: 'ascending',
+                notes: [
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }, // C4 + G4
+                    { root: 293.7, harmonies: [440.0], intervalType: 'perfect5th' }, // D4 + A4
+                    { root: 329.6, harmonies: [493.9], intervalType: 'perfect5th' }, // E4 + B4
+                    { root: 349.2, harmonies: [523.3], intervalType: 'perfect5th' }  // F4 + C5
+                ]
+            },
+            {
+                name: 'Deep Space Descent',
+                emotion: 'spacious', 
+                movement: 'descending',
+                notes: [
+                    { root: 293.7, harmonies: [440.0], intervalType: 'perfect5th' }, // D4 + A4
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }, // C4 + G4
+                    { root: 220.0, harmonies: [329.6], intervalType: 'perfect5th' }, // A3 + E4
+                    { root: 196.0, harmonies: [293.7], intervalType: 'perfect5th' }  // G3 + D4
+                ]
+            },
+            {
+                name: 'Cosmic Arch',
+                emotion: 'spacious',
+                movement: 'arch',
+                notes: [
+                    { root: 196.0, harmonies: [293.7], intervalType: 'perfect5th' }, // G3 + D4 (start low)
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }, // C4 + G4 (rise)
+                    { root: 329.6, harmonies: [493.9], intervalType: 'perfect5th' }, // E4 + B4 (peak)
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }  // C4 + G4 (fall back)
+                ]
+            },
+            // Minor 3rds - Melancholy, mysterious undertones
+            {
+                name: 'Melancholy Rise',
+                emotion: 'melancholy',
+                movement: 'ascending',
+                notes: [
+                    { root: 261.6, harmonies: [311.1], intervalType: 'minor3rd' }, // C4 + Eb4
+                    { root: 293.7, harmonies: [349.2], intervalType: 'minor3rd' }, // D4 + F4
+                    { root: 329.6, harmonies: [392.0], intervalType: 'minor3rd' }, // E4 + G4
+                    { root: 349.2, harmonies: [415.3], intervalType: 'minor3rd' }  // F4 + Ab4
+                ]
+            },
+            {
+                name: 'Contemplative Descent', 
+                emotion: 'contemplative',
+                movement: 'descending',
+                notes: [
+                    { root: 392.0, harmonies: [466.2], intervalType: 'minor3rd' }, // G4 + Bb4
+                    { root: 349.2, harmonies: [415.3], intervalType: 'minor3rd' }, // F4 + Ab4
+                    { root: 293.7, harmonies: [349.2], intervalType: 'minor3rd' }, // D4 + F4
+                    { root: 261.6, harmonies: [311.1], intervalType: 'minor3rd' }  // C4 + Eb4
+                ]
+            },
+            // Major 7ths - Ethereal, floating quality
+            {
+                name: 'Ethereal Suspension',
+                emotion: 'ethereal',
+                movement: 'ascending',
+                notes: [
+                    { root: 261.6, harmonies: [493.9], intervalType: 'major7th' }, // C4 + B4
+                    { root: 293.7, harmonies: [554.4], intervalType: 'major7th' }, // D4 + C#5
+                    { root: 329.6, harmonies: [622.3], intervalType: 'major7th' }, // E4 + D#5
+                    { root: 349.2, harmonies: [659.3], intervalType: 'major7th' }  // F4 + E5
+                ]
+            },
+            {
+                name: 'Floating Descent',
+                emotion: 'ethereal',
+                movement: 'descending',
+                notes: [
+                    { root: 349.2, harmonies: [659.3], intervalType: 'major7th' }, // F4 + E5
+                    { root: 329.6, harmonies: [622.3], intervalType: 'major7th' }, // E4 + D#5
+                    { root: 293.7, harmonies: [554.4], intervalType: 'major7th' }, // D4 + C#5
+                    { root: 261.6, harmonies: [493.9], intervalType: 'major7th' }  // C4 + B4
+                ]
+            },
+            // Suspended 4ths - Unresolved tension
+            {
+                name: 'Cosmic Suspension',
+                emotion: 'mysterious',
+                movement: 'ascending',
+                notes: [
+                    { root: 261.6, harmonies: [349.2, 392.0], intervalType: 'sus4' }, // C4 + F4 + G4
+                    { root: 293.7, harmonies: [392.0, 440.0], intervalType: 'sus4' }, // D4 + G4 + A4
+                    { root: 329.6, harmonies: [440.0, 493.9], intervalType: 'sus4' }, // E4 + A4 + B4
+                    { root: 349.2, harmonies: [466.2, 523.3], intervalType: 'sus4' }  // F4 + Bb4 + C5
+                ]
+            },
+            // Meandering patterns - Wandering, exploratory feel
+            {
+                name: 'Stellar Wandering',
+                emotion: 'mysterious',
+                movement: 'meandering',
+                notes: [
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }, // C4 + G4 (start)
+                    { root: 329.6, harmonies: [493.9], intervalType: 'perfect5th' }, // E4 + B4 (jump up)
+                    { root: 293.7, harmonies: [440.0], intervalType: 'perfect5th' }, // D4 + A4 (step back)
+                    { root: 349.2, harmonies: [523.3], intervalType: 'perfect5th' }  // F4 + C5 (wander up)
+                ]
+            },
+            {
+                name: 'Cosmic Drift',
+                emotion: 'contemplative',
+                movement: 'meandering',
+                notes: [
+                    { root: 293.7, harmonies: [349.2], intervalType: 'minor3rd' }, // D4 + F4 (start mid)
+                    { root: 220.0, harmonies: [261.6], intervalType: 'minor3rd' }, // A3 + C4 (drift low)
+                    { root: 329.6, harmonies: [392.0], intervalType: 'minor3rd' }, // E4 + G4 (rise up)
+                    { root: 261.6, harmonies: [311.1], intervalType: 'minor3rd' }  // C4 + Eb4 (settle)
+                ]
+            },
+            // Pendulum patterns - Back and forth motion
+            {
+                name: 'Harmonic Pendulum',
+                emotion: 'mysterious',
+                movement: 'pendulum',
+                notes: [
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }, // C4 + G4 (center)
+                    { root: 329.6, harmonies: [493.9], intervalType: 'perfect5th' }, // E4 + B4 (swing high)
+                    { root: 261.6, harmonies: [392.0], intervalType: 'perfect5th' }, // C4 + G4 (back to center)
+                    { root: 196.0, harmonies: [293.7], intervalType: 'perfect5th' }  // G3 + D4 (swing low)
+                ]
+            },
+            {
+                name: 'Ethereal Swing',
+                emotion: 'ethereal',
+                movement: 'pendulum',
+                notes: [
+                    { root: 293.7, harmonies: [554.4], intervalType: 'major7th' }, // D4 + C#5 (center)
+                    { root: 349.2, harmonies: [659.3], intervalType: 'major7th' }, // F4 + E5 (swing high)
+                    { root: 293.7, harmonies: [554.4], intervalType: 'major7th' }, // D4 + C#5 (center)
+                    { root: 261.6, harmonies: [493.9], intervalType: 'major7th' }  // C4 + B4 (swing low)
+                ]
+            },
+            // Legacy single-note progressions (enhanced with movement patterns)
+            {
+                name: 'Simple Melodic Ascent',
+                emotion: 'contemplative',
+                movement: 'ascending',
+                notes: [
+                    { root: 261.6 }, // C4
+                    { root: 293.7 }, // D4
+                    { root: 329.6 }, // E4
+                    { root: 349.2 }  // F4
+                ]
+            }
+        ];
+        
+        // Generate additional modal progressions dynamically
+        const createModalProgressions = (): HarmonicProgression[] => {
+            const modalProgressions: HarmonicProgression[] = [];
+            const baseFreq = 261.6; // C4 as root
+            
+            modalScales.forEach(scale => {
+                const scaleFreqs = generateModalFrequencies(baseFreq, scale);
+                
+                // Create ascending modal progression
+                modalProgressions.push({
+                    name: `${scale.name} Ascent`,
+                    emotion: scale.emotion,
+                    movement: 'ascending',
+                    mode: scale.name,
+                    notes: [
+                        { root: scaleFreqs[0], harmonies: [scaleFreqs[4]], intervalType: 'perfect5th' }, // Root + 5th
+                        { root: scaleFreqs[2], harmonies: [scaleFreqs[6]], intervalType: 'perfect5th' }, // 3rd + 7th  
+                        { root: scaleFreqs[4], harmonies: [scaleFreqs[1]], intervalType: 'perfect5th' }, // 5th + 2nd (octave)
+                        { root: scaleFreqs[6], harmonies: [scaleFreqs[3]], intervalType: 'perfect5th' }  // 7th + 4th (octave)
+                    ]
+                });
+                
+                // Create descending modal progression  
+                modalProgressions.push({
+                    name: `${scale.name} Descent`,
+                    emotion: scale.emotion,
+                    movement: 'descending', 
+                    mode: scale.name,
+                    notes: [
+                        { root: scaleFreqs[6], harmonies: [scaleFreqs[3]], intervalType: 'perfect5th' }, // 7th + 4th (octave)
+                        { root: scaleFreqs[4], harmonies: [scaleFreqs[1]], intervalType: 'perfect5th' }, // 5th + 2nd (octave)
+                        { root: scaleFreqs[2], harmonies: [scaleFreqs[6]], intervalType: 'perfect5th' }, // 3rd + 7th
+                        { root: scaleFreqs[0], harmonies: [scaleFreqs[4]], intervalType: 'perfect5th' }  // Root + 5th
+                    ]
+                });
+                
+                // Create arch modal progression
+                modalProgressions.push({
+                    name: `${scale.name} Arch`,
+                    emotion: scale.emotion,
+                    movement: 'arch',
+                    mode: scale.name, 
+                    notes: [
+                        { root: scaleFreqs[0], harmonies: [scaleFreqs[4]], intervalType: 'perfect5th' }, // Root + 5th (start)
+                        { root: scaleFreqs[4], harmonies: [scaleFreqs[1]], intervalType: 'perfect5th' }, // 5th + 2nd (rise)
+                        { root: scaleFreqs[7], harmonies: [scaleFreqs[3]], intervalType: 'perfect5th' }, // Octave + 4th (peak)
+                        { root: scaleFreqs[2], harmonies: [scaleFreqs[6]], intervalType: 'perfect5th' }  // 3rd + 7th (fall)
+                    ]
+                });
+            });
+            
+            return modalProgressions;
+        };
+        
+        // Combine traditional and modal progressions
+        const allProgressions = [...harmonicProgressions, ...createModalProgressions()];
+        
+        // Randomly select from all available progressions (traditional + modal)
+        const selectedProgression = allProgressions[Math.floor(Math.random() * allProgressions.length)];
+        
+        // Create sequence with staggered timing and harmonic intervals
         const sequence = [];
         let noteStartTime = currentTime + 0.2; // Small initial delay
         
-        for (let i = 0; i < selectedProgression.length; i++) {
-            const frequency = selectedProgression[i];
+        for (let i = 0; i < selectedProgression.notes.length; i++) {
+            const noteData = selectedProgression.notes[i];
             const duration = 3 + Math.random() * 3; // 3-6 seconds per note - longer for more droning
             const fadeInTime = 1.2 + Math.random() * 0.8; // 1.2-2 second gentle fade in
             const fadeOutTime = 1.5 + Math.random() * 1; // 1.5-2.5 second gentle fade out
             
-            try {
-                const oscillator = this.context.createOscillator();
-                const gain = this.context.createGain();
-                
-                // Configure oscillator for more ethereal quality
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, noteStartTime);
-                
-                // Add subtle frequency drift for organic droning feel
-                const driftAmount = frequency * 0.002; // Very subtle drift (0.2%)
-                oscillator.frequency.linearRampToValueAtTime(
-                    frequency + driftAmount * (Math.random() - 0.5) * 2, 
-                    noteStartTime + duration
-                );
-                
-                // Configure envelope with much longer, more gradual fades
-                const peakVolume = 0.25 + Math.random() * 0.15; // 0.25-0.4 with variation
-                gain.gain.setValueAtTime(0, noteStartTime);
-                gain.gain.linearRampToValueAtTime(peakVolume, noteStartTime + fadeInTime); // Slow fade in
-                
-                // Sustain phase with slight volume breathing
-                const sustainStart = noteStartTime + fadeInTime;
-                const sustainEnd = noteStartTime + duration - fadeOutTime;
-                gain.gain.setValueAtTime(peakVolume, sustainStart);
-                
-                // Add subtle volume breathing during sustain
-                if (sustainEnd > sustainStart) {
-                    const midSustain = sustainStart + (sustainEnd - sustainStart) * 0.5;
-                    const breatheVolume = peakVolume * (0.85 + Math.random() * 0.1); // Subtle variation
-                    gain.gain.linearRampToValueAtTime(breatheVolume, midSustain);
-                    gain.gain.linearRampToValueAtTime(peakVolume, sustainEnd);
-                }
-                
-                // Very gradual fade out - no sharp cutoff
-                gain.gain.linearRampToValueAtTime(0, noteStartTime + duration);
-                
-                // Connect and start
-                oscillator.connect(gain);
-                gain.connect(this.ambientMasterGain);
-                oscillator.start(noteStartTime);
-                oscillator.stop(noteStartTime + duration + 0.1); // Small buffer to avoid clicks
-                
-                sequence.push({
-                    oscillator,
-                    gain,
-                    frequency,
-                    startTime: noteStartTime,
-                    duration: duration + 0.1
-                });
-                
-                // Next note starts with more substantial overlap for droning blend
-                noteStartTime += duration * 0.5; // 50% overlap between notes for more droning effect
-                
-            } catch (error) {
-                console.warn('Failed to create melodic note:', error);
+            // Create array of all frequencies for this chord/interval
+            const allFrequencies = [noteData.root];
+            if (noteData.harmonies) {
+                allFrequencies.push(...noteData.harmonies);
             }
+            
+            // Create oscillators for each frequency in the chord/interval
+            for (let freqIndex = 0; freqIndex < allFrequencies.length; freqIndex++) {
+                const frequency = allFrequencies[freqIndex];
+                
+                try {
+                    const oscillator = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    
+                    // Configure oscillator for more ethereal quality
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(frequency, noteStartTime);
+                    
+                    // Add subtle frequency drift for organic droning feel
+                    const driftAmount = frequency * 0.002; // Very subtle drift (0.2%)
+                    oscillator.frequency.linearRampToValueAtTime(
+                        frequency + driftAmount * (Math.random() - 0.5) * 2, 
+                        noteStartTime + duration
+                    );
+                    
+                    // Configure envelope with volume balancing for harmonic intervals
+                    let baseVolume: number;
+                    if (freqIndex === 0) {
+                        // Root frequency - full volume
+                        baseVolume = 0.25 + Math.random() * 0.15; // 0.25-0.4 with variation
+                    } else if (noteData.intervalType === 'perfect5th') {
+                        // Perfect 5th - strong but not overpowering (60% of root)
+                        baseVolume = (0.25 + Math.random() * 0.15) * 0.6;
+                    } else if (noteData.intervalType === 'minor3rd') {
+                        // Minor 3rd - subtle melancholy (40% of root)  
+                        baseVolume = (0.25 + Math.random() * 0.15) * 0.4;
+                    } else if (noteData.intervalType === 'major7th') {
+                        // Major 7th - ethereal whisper (30% of root)
+                        baseVolume = (0.25 + Math.random() * 0.15) * 0.3;
+                    } else if (noteData.intervalType === 'sus4') {
+                        // Suspended chord voices - balanced (45% of root)
+                        baseVolume = (0.25 + Math.random() * 0.15) * 0.45;
+                    } else {
+                        // Default harmony - moderate (50% of root)
+                        baseVolume = (0.25 + Math.random() * 0.15) * 0.5;
+                    }
+                    
+                    gain.gain.setValueAtTime(0, noteStartTime);
+                    gain.gain.linearRampToValueAtTime(baseVolume, noteStartTime + fadeInTime); // Slow fade in
+                    
+                    // Sustain phase with slight volume breathing
+                    const sustainStart = noteStartTime + fadeInTime;
+                    const sustainEnd = noteStartTime + duration - fadeOutTime;
+                    gain.gain.setValueAtTime(baseVolume, sustainStart);
+                    
+                    // Add subtle volume breathing during sustain
+                    if (sustainEnd > sustainStart) {
+                        const midSustain = sustainStart + (sustainEnd - sustainStart) * 0.5;
+                        const breatheVolume = baseVolume * (0.85 + Math.random() * 0.1); // Subtle variation
+                        gain.gain.linearRampToValueAtTime(breatheVolume, midSustain);
+                        gain.gain.linearRampToValueAtTime(baseVolume, sustainEnd);
+                    }
+                    
+                    // Very gradual fade out - no sharp cutoff
+                    gain.gain.linearRampToValueAtTime(0, noteStartTime + duration);
+                    
+                    // Connect and start
+                    oscillator.connect(gain);
+                    gain.connect(this.ambientMasterGain);
+                    oscillator.start(noteStartTime);
+                    oscillator.stop(noteStartTime + duration + 0.1); // Small buffer to avoid clicks
+                    
+                    sequence.push({
+                        oscillator,
+                        gain,
+                        frequency,
+                        startTime: noteStartTime,
+                        duration: duration + 0.1
+                    });
+                    
+                } catch (error) {
+                    console.warn('Failed to create harmonic oscillator:', error);
+                }
+            }
+            
+            // Next chord/interval starts with substantial overlap for droning blend
+            noteStartTime += duration * 0.5; // 50% overlap between chords for more droning effect
         }
         
         this.melodicState.currentSequence = sequence;
         this.melodicState.isPlaying = true;
         
-        console.log(`Started melodic sequence with ${sequence.length} notes`);
+        // Log progression info for debugging
+        const harmonicCount = selectedProgression.notes.filter(n => n.harmonies && n.harmonies.length > 0).length;
+        const harmonicInfo = harmonicCount > 0 ? ` with ${harmonicCount} harmonic intervals` : '';
+        const modalInfo = selectedProgression.mode ? ` in ${selectedProgression.mode} mode` : '';
+        console.log(`Started "${selectedProgression.name}" (${selectedProgression.emotion}, ${selectedProgression.movement})${modalInfo} sequence with ${sequence.length} total oscillators${harmonicInfo}`);
     }
 
     /**
