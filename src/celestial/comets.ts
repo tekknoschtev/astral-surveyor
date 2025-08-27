@@ -869,8 +869,8 @@ export class Comet extends CelestialObject {
         // Render nucleus (bright core)
         this.renderNucleus(renderer, screenX, screenY);
         
-        // Render discovery indicator if discovered - only for high LOD
-        if (this.discovered && this.currentLODLevel === 'high') {
+        // Render discovery indicator if discovered (consistent with all other celestial objects)
+        if (this.discovered) {
             this.renderDiscoveryIndicator(renderer, screenX, screenY);
         }
         

@@ -1135,6 +1135,23 @@ export class StellarMap {
         }
     }
 
+    calculateCometSize(): number {
+        // Comets should be similar size to planets - small celestial objects
+        // Match the planet size range of ~1.2-2.6 pixels
+        const baseSize = 1.5; // Same base as planets
+        
+        if (this.zoomLevel <= 0.2) {
+            // Galactic/Sector View: minimal size
+            return Math.max(1, baseSize * 0.8); // ~1.2
+        } else if (this.zoomLevel <= 1.0) {
+            // Regional View: small but visible  
+            return Math.max(1, baseSize * 1.0); // ~1.5
+        } else {
+            // Local/Detail View: cap at planet size range
+            return Math.max(1.5, Math.min(2.6, baseSize * (0.8 + this.zoomLevel * 0.3))); // Range: 1.5-2.6
+        }
+    }
+
     renderDiscoveredPlanets(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredPlanets: PlanetLike[]): void {
         if (!discoveredPlanets) return;
 
@@ -2686,9 +2703,8 @@ export class StellarMap {
 
             ctx.save();
 
-            // Calculate comet size based on zoom level
-            const baseSize = 3;
-            const cometSize = Math.max(1.5, baseSize * Math.sqrt(this.zoomLevel));
+            // Calculate comet size based on zoom level (similar to star sizing)
+            const cometSize = this.calculateCometSize();
             
             // Render elliptical orbit if zoom level is high enough and we have orbit data
             if (this.zoomLevel > 1.5 && comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
@@ -2708,8 +2724,8 @@ export class StellarMap {
             ctx.arc(cometMapX, cometMapY, cometSize * 0.5, 0, Math.PI * 2);
             ctx.fill();
 
-            // Render stylized tail pointing away from parent star (if we have parent star data)
-            if (comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
+            // Render stylized tail at medium zoom levels and above (like other detailed features)
+            if (this.zoomLevel > 0.5) {
                 this.renderCometTail(ctx, cometMapX, cometMapY, scale, comet);
             }
 
@@ -2750,8 +2766,8 @@ export class StellarMap {
         const starMapY = mapY + ((comet.parentStarY - this.centerY) * scale) + mapHeight / 2;
 
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // Semi-transparent white
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#444444'; // Subtle dark gray (same as planet orbits)
+        ctx.lineWidth = 0.5; // Thin line (same as planet orbits)
         ctx.setLineDash([2, 3]); // Dashed line for orbit
 
         // If we have orbit data, render actual ellipse
@@ -2796,43 +2812,91 @@ export class StellarMap {
     }
 
     renderCometTail(ctx: CanvasRenderingContext2D, cometMapX: number, cometMapY: number, scale: number, comet: CometLike): void {
-        if (!comet.parentStarX || !comet.parentStarY) return;
+        // Calculate tail direction - if we have parent star data, use it, otherwise use a default direction
+        let tailDirection: { x: number, y: number };
+        if (comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
+            // Calculate direction from parent star to comet (tail points away from star)
+            const dx = comet.x - comet.parentStarX;
+            const dy = comet.y - comet.parentStarY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance === 0) return;
+            tailDirection = { x: dx / distance, y: dy / distance };
+        } else {
+            // Default tail direction (pointing roughly away from galactic center)
+            tailDirection = { x: 0.7, y: 0.7 }; // Default northeast direction
+        }
 
-        // Calculate direction from parent star to comet (tail points away from star)
-        const dx = comet.x - comet.parentStarX;
-        const dy = comet.y - comet.parentStarY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance === 0) return;
-
-        const tailDirection = { x: dx / distance, y: dy / distance };
-        const tailLength = Math.min(20 * Math.sqrt(this.zoomLevel), 30); // Scale with zoom
-
-        // Calculate tail end position
-        const tailEndX = cometMapX + tailDirection.x * tailLength;
-        const tailEndY = cometMapY + tailDirection.y * tailLength;
+        const tailLength = Math.min(15 * Math.sqrt(this.zoomLevel), 25); // Scale with zoom, smaller than before
+        const tailColors = comet.cometType?.tailColors || ['#87CEEB', '#B0E0E6', '#E0FFFF'];
 
         ctx.save();
         
-        // Create gradient for tail
-        const gradient = ctx.createLinearGradient(cometMapX, cometMapY, tailEndX, tailEndY);
-        const tailColors = comet.cometType?.tailColors || ['#87CEEB', '#B0E0E6', '#E0FFFF'];
+        // Render particle streams instead of single line (similar to main game)
+        const streamCount = Math.max(2, Math.floor(this.zoomLevel * 2)); // 2-6 streams based on zoom
+        const maxSpreadAngle = 0.3; // Fixed maximum spread angle in radians (~17 degrees total)
         
-        gradient.addColorStop(0, tailColors[0] + 'CC'); // 80% opacity at base
-        gradient.addColorStop(0.5, tailColors[1] + '80'); // 50% opacity at middle
-        gradient.addColorStop(1, tailColors[2] + '33'); // 20% opacity at tip
-
-        // Draw tail as thick line
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = Math.max(2, 4 * Math.sqrt(this.zoomLevel));
-        ctx.lineCap = 'round';
+        for (let stream = 0; stream < streamCount; stream++) {
+            // Distribute streams evenly within fixed angular spread
+            const spreadFraction = streamCount > 1 ? stream / (streamCount - 1) : 0.5; // 0 to 1
+            const spreadAngle = (spreadFraction - 0.5) * maxSpreadAngle; // Center around 0
+            const streamAngle = Math.atan2(tailDirection.y, tailDirection.x) + spreadAngle;
+            const streamDirX = Math.cos(streamAngle);
+            const streamDirY = Math.sin(streamAngle);
+            
+            // Vary length slightly per stream
+            const streamLength = tailLength * (0.8 + Math.random() * 0.4);
+            const streamEndX = cometMapX + streamDirX * streamLength;
+            const streamEndY = cometMapY + streamDirY * streamLength;
+            
+            // Create gradient for this stream
+            const gradient = ctx.createLinearGradient(cometMapX, cometMapY, streamEndX, streamEndY);
+            gradient.addColorStop(0, tailColors[0] + 'AA'); // 67% opacity at base
+            gradient.addColorStop(0.5, tailColors[1] + '66'); // 40% opacity at middle  
+            gradient.addColorStop(1, tailColors[2] + '22'); // 13% opacity at tip
+            
+            // Draw stream as tapered line
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = Math.max(1, 2 * Math.sqrt(this.zoomLevel) / streamCount); // Thinner per stream
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(cometMapX, cometMapY);
+            ctx.lineTo(streamEndX, streamEndY);
+            ctx.stroke();
+        }
         
-        ctx.beginPath();
-        ctx.moveTo(cometMapX, cometMapY);
-        ctx.lineTo(tailEndX, tailEndY);
-        ctx.stroke();
+        // Add subtle particle effects at higher zoom levels
+        if (this.zoomLevel > 2.0) {
+            this.renderCometParticles(ctx, cometMapX, cometMapY, tailDirection, tailLength, tailColors);
+        }
 
         ctx.restore();
+    }
+
+    // Add particle effects for detailed comet tail rendering
+    renderCometParticles(ctx: CanvasRenderingContext2D, cometMapX: number, cometMapY: number, tailDirection: { x: number, y: number }, tailLength: number, tailColors: string[]): void {
+        const particleCount = Math.floor(tailLength / 3); // Fewer particles for map view
+        
+        for (let i = 0; i < particleCount; i++) {
+            const t = i / particleCount; // 0 to 1 along tail
+            const particleX = cometMapX + tailDirection.x * tailLength * t;
+            const particleY = cometMapY + tailDirection.y * tailLength * t;
+            
+            // Random offset for particle scatter
+            const scatter = 2;
+            const offsetX = particleX + (Math.random() - 0.5) * scatter;
+            const offsetY = particleY + (Math.random() - 0.5) * scatter;
+            
+            // Fade opacity along tail
+            const opacity = Math.floor((1 - t) * 100).toString(16).padStart(2, '0');
+            const colorIndex = Math.floor(t * (tailColors.length - 1));
+            
+            ctx.fillStyle = tailColors[colorIndex] + opacity;
+            ctx.beginPath();
+            ctx.arc(offsetX, offsetY, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     renderCometLabel(ctx: CanvasRenderingContext2D, comet: CometLike, mapX: number, mapY: number): void {
