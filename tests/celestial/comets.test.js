@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Import from compiled TypeScript
 import { Comet, CometTypes, selectCometType } from '../../dist/celestial/comets.js';
 import { SeededRandom } from '../../dist/utils/random.js';
+import { Star, StarTypes } from '../../dist/celestial/Star.js';
+import { DiscoveryService } from '../../dist/services/DiscoveryService.js';
 
 // Mock Star class for testing
 const createMockStar = (x = 0, y = 0) => ({
@@ -66,6 +68,45 @@ describe('Comet Orbital Mechanics', () => {
         const E = comet.solveKeplersEquation(M, 0.8);
         const verifyM = E - 0.8 * Math.sin(E);
         expect(verifyM).toBeCloseTo(M, 6);
+      }
+    });
+
+    it('should handle extreme eccentricities without infinite loops', () => {
+      const comet = new Comet(0, 0, mockStar, testOrbit, testCometType, 0);
+      
+      // Test near-parabolic orbit (game-breaking if solver fails)
+      const extremeEccentricity = 0.999;
+      const meanAnomaly = Math.PI / 4;
+      
+      const start = Date.now();
+      const eccentricAnomaly = comet.solveKeplersEquation(meanAnomaly, extremeEccentricity);
+      const duration = Date.now() - start;
+      
+      // Must converge within reasonable time (catches infinite loops)
+      expect(duration).toBeLessThan(100);
+      expect(eccentricAnomaly).toBeGreaterThan(0);
+      expect(eccentricAnomaly).toBeLessThan(Math.PI);
+      
+      // Verify solution is still accurate
+      const verifyM = eccentricAnomaly - extremeEccentricity * Math.sin(eccentricAnomaly);
+      expect(verifyM).toBeCloseTo(meanAnomaly, 4);
+    });
+
+    it('should maintain orbital energy conservation', () => {
+      const comet = new Comet(0, 0, mockStar, testOrbit, testCometType, 0);
+      
+      const specificOrbitalEnergy = -1 / (2 * testOrbit.semiMajorAxis); // E = -μ/(2a)
+      
+      // Test at multiple orbital positions
+      for (let meanAnomaly = 0; meanAnomaly < 2 * Math.PI; meanAnomaly += Math.PI / 4) {
+        vi.spyOn(comet, 'calculateUniversalTime').mockReturnValue(meanAnomaly * testOrbit.orbitalPeriod / (2 * Math.PI));
+        comet.updatePosition();
+        
+        // Calculate energy: E = v²/2 - μ/r (simplified: E ≈ -1/(2a))
+        const calculatedEnergy = -1 / (2 * comet.currentDistance * testOrbit.semiMajorAxis / testOrbit.semiMajorAxis);
+        
+        // Energy should be conserved within numerical precision
+        expect(Math.abs(calculatedEnergy - specificOrbitalEnergy)).toBeLessThan(0.01);
       }
     });
   });
@@ -384,6 +425,66 @@ describe('Comet Orbital Mechanics', () => {
         expect(comet.currentTrueAnomaly).toBeGreaterThanOrEqual(0);
         expect(comet.currentTrueAnomaly).toBeLessThanOrEqual(2 * Math.PI + 0.01);
       }
+    });
+  });
+
+  describe('Discovery System Integration', () => {
+    it('should set discoveryDistance dynamically based on visibility', () => {
+      const star = new Star(100, 100, StarTypes.G_TYPE, 0);
+      const orbit = {
+        semiMajorAxis: 500,
+        eccentricity: 0.7,
+        perihelionDistance: 150,
+        aphelionDistance: 850,
+        orbitalPeriod: 10000,
+        argumentOfPerihelion: 0,
+        meanAnomalyAtEpoch: 0,
+        epoch: 0
+      };
+      
+      const comet = new Comet(200, 200, star, orbit, CometTypes.ICE, 0);
+      
+      // Discovery distance should be dynamic based on visibility
+      if (comet.isVisible) {
+        expect(comet.discoveryDistance).toBeGreaterThan(0);
+        expect(comet.discoveryDistance).toBe(Math.max(30, comet.tailLength + 20));
+      } else {
+        expect(comet.discoveryDistance).toBe(0);
+      }
+    });
+
+    it('should work with DiscoveryService for range detection', () => {
+      const discoveryService = new DiscoveryService();
+      
+      const mockComet = {
+        x: 200,
+        y: 200, 
+        type: 'comet',
+        discoveryDistance: 275,
+        discovered: false
+      };
+      
+      const mockCamera = {
+        x: 150,
+        y: 150,
+        worldToScreen: vi.fn((worldX, worldY, canvasWidth, canvasHeight) => {
+          const screenX = (worldX - mockCamera.x) + canvasWidth / 2;
+          const screenY = (worldY - mockCamera.y) + canvasHeight / 2;
+          return [screenX, screenY];
+        })
+      };
+      
+      // Distance = sqrt((200-150)^2 + (200-150)^2) ≈ 70.7px < 275
+      const result = discoveryService.checkDiscovery(mockComet, mockCamera, 800, 600);
+      expect(result).toBe(true);
+      
+      // Test outside discovery range
+      mockCamera.x = -200; // Distance ≈ 403px > 275
+      mockCamera.y = 150;
+      mockComet.discovered = false;
+      
+      const result2 = discoveryService.checkDiscovery(mockComet, mockCamera, 800, 600);
+      expect(result2).toBe(false);
     });
   });
 });

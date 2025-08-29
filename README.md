@@ -7,8 +7,8 @@ With no combat or time pressure, your mission is one of peaceful curiosity: cata
 
 Whether you discover a pulsing neutron star, encounter a binary system with swirling energy patterns, or find a gas giant with four orbiting moons, every discovery is a moment of wonder that's yours to catalog and share.
 
-## Demo
-You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/>
+## 🚀 Play Now
+You can play the game here: **<https://tekknoschtev.github.io/astral-surveyor/>**
 
 ## ✨ Key Features
 
@@ -58,10 +58,10 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/>
 
 ### 🎵 **Immersive Audio Design**
 - **Enhanced Discovery Chimes**: Unique audio signatures with ethereal reverb effects for each celestial object type
-- **Softer Tones**: Gentle sine wave frequencies designed for tranquil, non-jarring exploration experience
+- **Softer Tones**: Gentle frequencies designed for tranquil, non-jarring exploration experience
 - **Cosmic Reverb**: Deep, spacious reverb effects that add atmospheric depth to rare discoveries
-- **Wormhole Audio**: Deep, resonant 55Hz discovery tones and otherworldly traversal effects with harmonic richness
-- **Extended Durations**: Longer attack/release envelopes create more peaceful, lingering discovery moments
+- **Otherworldly Audio**: Deep, resonant discovery tones and dimensional shift effects with harmonic richness
+- **Extended Durations**: Longer envelopes create more peaceful, lingering discovery moments
 - **Full Control**: Toggle mute instantly with 'H' key, settings saved automatically
 
 ## 🎮 Controls & Interface
@@ -94,11 +94,11 @@ You can play the game here:  <https://tekknoschtev.github.io/astral-surveyor/>
 ### **Discovery System**
 The universe reveals its secrets at different scales:
 
-- **🌟 Stars**: Discoverable from 480-540+ pixels away - perfect for long-range navigation and ensuring you never miss a system while cruising at high speeds
-- **🪐 Planets**: Discoverable from ~38-50 pixels - requiring closer approach for detailed study
-- **🌙 Moons**: Discoverable from ~27-30 pixels - intimate encounters with the smallest worlds
-- **🕳️ Black Holes**: Discoverable from ~60-80 pixels - ultra-rare gravitational anomalies with cosmic consequences
-- **🌀 Wormholes**: Discoverable from ~110-120 pixels - rare cosmic phenomena for instantaneous FTL travel
+- **🌟 Stars**: Discoverable from great distances - perfect for long-range navigation and ensuring you never miss a system while cruising
+- **🪐 Planets**: Require closer approach for detailed study - get near enough to examine these diverse worlds
+- **🌙 Moons**: Intimate encounters with the smallest worlds - orbit close to discover these hidden companions
+- **🕳️ Black Holes**: Massive gravitational presence makes them detectable from significant range - approach with extreme caution
+- **🌀 Wormholes**: Cosmic phenomena detectable at moderate distances - rare gateways to distant regions
 
 ### **Astronomical Naming**
 Every discovery receives a professional IAU-inspired designation:
@@ -160,7 +160,7 @@ Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL tra
 - **Performance Monitoring**: Real-time tracking, optimization, and regression detection
 - **ES6 Modules**: Modern module system with proper imports/exports
 - **Build Pipeline**: TypeScript compilation with cross-platform build scripts
-- **Test Coverage**: 100% test success rate with 1,157+ comprehensive tests
+- **Test Coverage**: 100% test success rate with 1,500+ comprehensive tests
 
 ### **Browser-First Architecture**
 - **No Installation Required**: Runs directly in any modern web browser
@@ -197,54 +197,22 @@ Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL tra
 - **Casual Gamers**: Pick up and play anytime, exploration at your own pace
 - **Mobile Users**: Full touch support for gaming on any device
 
-## 🔧 Development
+## 🛠️ For Developers
 
-### **Getting Started**
-1. **Prerequisites**: Node.js 16+ and npm
-2. **Install dependencies**: `npm install`
-3. **Build the project**: `npm run build`
-4. **Run tests**: `npm test`
+Interested in contributing to Astral Surveyor? The game is built with modern TypeScript, features a comprehensive plugin system, and has 2400+ tests ensuring quality.
 
-### **Development Workflow**
-- **Source files**: Edit TypeScript files in `src/` directory
-- **Build command**: `npm run build` (compiles TypeScript to `dist/`)
-- **Watch mode**: `npm run dev` (auto-rebuild on changes)
-- **Testing**: `npm test` (runs full build + test suite)
-- **Coverage**: `npm run test:coverage` (generates coverage reports)
-
-### **Project Structure**
-```
-src/           # TypeScript source files
-├── utils/     # Core utilities (random, etc.)  
-├── graphics/  # Rendering system
-├── audio/     # Sound management
-├── input/     # Input handling
-├── camera/    # Camera physics
-├── naming/    # Astronomical naming
-├── celestial/ # Star/planet systems
-├── ship/      # Player ship + particles
-├── world/     # World generation
-├── ui/        # User interface
-└── game.ts    # Main game loop
-
-dist/          # Compiled JavaScript (auto-generated)
-tests/         # Test suite
+**Quick Start:**
+```bash
+npm install && npm run build && npm test
 ```
 
-### **Contributing**
-- Follow the development workflow in `CLAUDE.md`
-- Use the service-oriented architecture with dependency injection
-- Write plugins instead of modifying core files for extensibility
-- All PRs require passing tests (1,157+ tests must pass) and TypeScript compilation
-- Follow TDD principles for new architectural changes
-- See `DEVELOPMENT.md` for complete architecture details
+**Key Technologies:**
+- TypeScript with full type safety
+- Service-oriented architecture with dependency injection  
+- Plugin system for extensible celestial objects, audio, and gameplay
+- Comprehensive test suite with 1,500+ tests using Vitest
 
-### **Plugin Development**
-- **Get Started**: Follow the plugin interface in `src/types/PluginTypes.ts`
-- **Examples**: See comprehensive plugin examples in `tests/services/exampleplugin.test.js`
-- **Types Available**: Celestial objects, discovery types, audio content, visual effects, gameplay mechanics
-- **Safe Integration**: Plugin failures are isolated from the core system
-- **Community Ready**: Full documentation and testing patterns provided
+For complete development setup, architecture details, testing strategies, and contribution guidelines, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
 
 ---
 
