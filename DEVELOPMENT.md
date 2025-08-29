@@ -1,4 +1,6 @@
-a# Astral Surveyor - Developer Guide
+# Astral Surveyor - Developer Guide
+
+*Complete technical documentation for developers, contributors, and architects*
 
 ## 🏗️ Architecture Overview
 
@@ -93,21 +95,29 @@ tests/                  # Test suite (imports from dist/)
 └── ... (domain-organized tests)
 ```
 
-## 🔧 Development Workflow
+## 🚀 Quick Start
 
-### **Setup**
+### **Prerequisites**
+- Node.js 16+ and npm
+- Modern web browser for testing
+- Git for version control
+
+### **Initial Setup**
 ```bash
+git clone <repository-url>
+cd astral-surveyor
 npm install            # Install dependencies
 npm run build          # Initial build
-npm test              # Verify everything works
+npm test              # Verify everything works (1,500+ tests)
 ```
 
-### **Daily Development**
+### **Daily Development Workflow**
 ```bash
 npm run dev           # Start TypeScript watch mode
-# Edit files in src/
+# Edit files in src/ directory
 npm run build         # Build when ready to test
 npm test              # Run full test suite
+npm run serve         # Test locally on localhost:3000
 ```
 
 ### **Available Commands**
@@ -139,7 +149,7 @@ npm run serve         # Start local development server on port 3000
 ### **Test Architecture**
 - Tests import from compiled JavaScript in `dist/`
 - **Coverage targets**: 80%+ on critical systems
-- **Current test count**: 2,400+ comprehensive tests covering all major systems
+- **Current test count**: 1,500+ comprehensive tests covering all major systems
 - **Coverage**: High coverage on core logic (naming, random utilities, services)
 
 ### **Test Organization**
@@ -285,10 +295,132 @@ tests/
 2. Asset copying: `game.html` → `dist/index.html`, `css/` → `dist/css/`
 3. Cross-platform scripts use Node.js APIs for Windows/Unix compatibility
 
-## 🔗 Key References
+## 🤝 Contributing Guidelines
 
-- **CLAUDE.md**: Core development values and updated workflows
-- **tsconfig.json**: TypeScript compilation configuration
-- **vitest.config.js**: Test framework configuration with coverage settings
+### **Development Philosophy**
+Follow the principles outlined in `CLAUDE.md`:
+- **Testability First**: Structure code for easy unit and integration testing
+- **TDD Approach**: Think through test cases before coding critical systems
+- **Service Architecture**: Use dependency injection for modularity and testability
+- **Plugin System**: Extend functionality through plugins rather than modifying core files
+
+### **Code Quality Standards**
+```bash
+npm run lint          # Check for code quality issues
+npm run lint:fix      # Auto-fix linting problems
+npm run format        # Format code with Prettier
+npm run format:check  # Verify formatting compliance
+```
+
+All code must pass linting and formatting checks before merge - enforced by CI.
+
+### **Pull Request Process**
+1. **Branch Strategy**: Create feature branch from main (`git checkout -b feature/your-feature`)
+2. **Development**: Make changes in `src/` directory only (never edit `dist/`)
+3. **Testing**: Write tests first for new services or architectural changes (TDD)
+4. **Validation**: Run `npm run build && npm test && npm run lint` (all 1,500+ tests must pass)
+5. **Commit**: Exclude `dist/` from commits (it's auto-generated)
+6. **PR Creation**: GitHub Actions will verify build + tests automatically
+7. **Review**: Consider performance impact and update documentation if needed
+
+### **Git Workflow Best Practices**
+```bash
+# Start new feature
+git checkout main && git pull origin main
+git checkout -b feature/your-feature
+
+# During development
+npm run build && npm test  # Validate before committing
+git add src/               # Only add source files
+git commit -m "descriptive message"
+
+# Before PR
+npm run lint              # Ensure code quality
+git push -u origin feature/your-feature
+gh pr create             # Create pull request
+```
+
+## 📦 Plugin Development
+
+### **Plugin System Architecture**
+Astral Surveyor features an extensible plugin system that allows developers to add new celestial objects, discovery types, audio content, visual effects, and gameplay mechanics without modifying core files.
+
+### **Plugin Types Supported**
+- **Celestial**: New celestial object types (custom stars, planets, exotic phenomena)
+- **Discovery**: Custom discovery conditions and lore content
+- **Audio**: Soundscapes and ambient audio for specific zones or discoveries
+- **Visual**: Rendering effects and visual enhancements
+- **Gameplay**: New mechanics and interactions
+- **Data**: Save/load formats and data processing extensions
+
+### **Creating a Plugin**
+1. **Interface**: Implement the plugin interface in `src/types/PluginTypes.ts`
+2. **Lifecycle**: Handle registration, activation, deactivation, and cleanup properly
+3. **Error Handling**: Ensure graceful failure without crashing the core system
+4. **Testing**: Write comprehensive tests following patterns in `tests/services/exampleplugin.test.js`
+5. **Documentation**: Document plugin APIs and provide usage examples
+
+### **Plugin Integration Guidelines**
+- Use dependency injection to access core services safely
+- Follow event-driven patterns for loose coupling
+- Maintain service boundaries and avoid tight coupling with core systems
+- Use the ServiceOrchestrator for cross-service coordination when needed
+- Test plugin integration thoroughly with both success and failure scenarios
+
+### **Example Plugin Structure**
+```typescript
+export class MyCustomPlugin implements CelestialPlugin {
+  name = "my-custom-plugin";
+  version = "1.0.0";
+  
+  register(api: PluginAPI): void {
+    // Plugin registration logic
+  }
+  
+  unregister(): void {
+    // Cleanup logic
+  }
+  
+  // Plugin-specific methods
+}
+```
+
+## 🌐 Deployment & Distribution
+
+### **Browser-First Architecture**
+- **No Installation**: Runs directly in any modern web browser
+- **Cross-Platform**: Works on desktop, tablet, and mobile devices
+- **Offline Capable**: All universe generation happens client-side
+- **No Backend**: Completely serverless architecture for maximum accessibility
+- **Performance**: 60fps target with optimized rendering and memory management
+
+### **GitHub Pages Deployment**
+- Game deploys from `dist/` directory after successful build
+- `game.html` becomes `index.html` in distribution
+- CSS and assets are copied directly with cross-platform build scripts
+- No server-side processing required - purely static deployment
+
+### **Build Process Details**
+1. **TypeScript Compilation**: `src/*.ts` → `dist/*.js` with full type checking
+2. **Asset Pipeline**: `game.html` → `dist/index.html`, `css/` → `dist/css/`
+3. **Cross-Platform**: Build scripts use Node.js APIs for Windows/Unix compatibility
+4. **Optimization**: Production builds are optimized for size and performance
+
+### **Performance & Scalability**
+- **Infinite Universe**: Chunk-based loading system supports unlimited exploration
+- **Memory Efficient**: Automatic unloading of distant areas to maintain performance  
+- **Responsive Controls**: Smooth animations and 60fps target across all devices
+- **Optimized Rendering**: Only draws visible objects to maintain high framerates
+
+## 🔗 Key References & Configuration
+
+- **README.md**: Player-focused game features and gameplay information
+- **CLAUDE.md**: Core development values, principles, and team guidelines
+- **package.json**: Node.js dependencies, scripts, and project metadata
+- **tsconfig.json**: TypeScript compilation configuration and build settings
+- **vitest.config.js**: Test framework configuration with coverage settings and test organization
+- **game.html**: Main HTML entry point (becomes index.html in dist)
 
 ---
+
+*For game features, controls, and player information, see [README.md](README.md)*
