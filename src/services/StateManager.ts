@@ -420,8 +420,8 @@ export class StateManager {
             this.gameStartingPosition.x = camera.x;
             this.gameStartingPosition.y = camera.y;
             
-            // Force chunk regeneration at new location
-            chunkManager.clearAllChunks();
+            // Force chunk regeneration at new location (clear everything for cosmic rebirth)
+            chunkManager.clearAllChunksAndDiscoveries();
             chunkManager.updateActiveChunks(camera.x, camera.y);
             
             // Restore discovery history (cosmic knowledge persists across rebirths)

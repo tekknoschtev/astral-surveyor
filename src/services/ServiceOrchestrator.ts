@@ -28,7 +28,14 @@ export const GameEvents = {
     // UI events
     UI_NOTIFICATION: 'ui.notification',
     UI_MAP_TOGGLED: 'ui.map.toggled',
-    UI_LOGBOOK_TOGGLED: 'ui.logbook.toggled'
+    UI_LOGBOOK_TOGGLED: 'ui.logbook.toggled',
+    
+    // Save/Load events
+    SAVE_GAME_REQUESTED: 'save.game.requested',
+    LOAD_GAME_REQUESTED: 'load.game.requested',
+    NEW_GAME_REQUESTED: 'new.game.requested',
+    GAME_SAVED: 'game.saved',
+    GAME_LOADED: 'game.loaded'
 } as const;
 
 // Event data interfaces for type safety

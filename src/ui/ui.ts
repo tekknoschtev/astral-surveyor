@@ -93,9 +93,16 @@ export class DiscoveryDisplay {
     }
 
     renderDiscoveries(renderer: Renderer): void {
+        // Save context state
+        renderer.ctx.save();
+        
         const padding = 20;
         const lineHeight = 24;
         const startY = renderer.canvas.height - padding - (this.discoveries.length * lineHeight);
+        
+        // Ensure left-aligned text
+        renderer.ctx.textAlign = 'left';
+        renderer.ctx.textBaseline = 'alphabetic';
         
         for (let i = 0; i < this.discoveries.length; i++) {
             const discovery = this.discoveries[i];
@@ -122,6 +129,9 @@ export class DiscoveryDisplay {
             renderer.ctx.font = '12px "Courier New", monospace';
             renderer.ctx.fillText(discovery.message, padding, y);
         }
+        
+        // Restore context state
+        renderer.ctx.restore();
     }
 
     renderNotifications(renderer: Renderer): void {
@@ -161,6 +171,9 @@ export class DiscoveryDisplay {
     }
 
     renderCoordinates(renderer: Renderer, camera: Camera): void {
+        // Save context state
+        renderer.ctx.save();
+        
         const padding = 20;
         const x = Math.round(camera.x);
         const y = Math.round(camera.y);
@@ -170,6 +183,8 @@ export class DiscoveryDisplay {
         
         // Set up font to match game UI (Courier New, 12px)
         renderer.ctx.font = '12px "Courier New", monospace';
+        renderer.ctx.textAlign = 'left';
+        renderer.ctx.textBaseline = 'alphabetic';
         
         // Calculate widths for right alignment
         const coordWidth = renderer.ctx.measureText(coordText).width;
@@ -185,6 +200,9 @@ export class DiscoveryDisplay {
         renderer.ctx.fillText(coordText, rightX, padding + 10);
         renderer.ctx.fillText(distanceText, rightX, padding + 25); // 15px below coordinates
         renderer.ctx.fillText(speedText, rightX, padding + 40); // 15px below distance
+        
+        // Restore context state
+        renderer.ctx.restore();
     }
 }
 

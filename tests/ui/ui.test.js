@@ -21,7 +21,9 @@ describe('DiscoveryDisplay System', () => {
         textBaseline: 'top',
         fillText: vi.fn(),
         fillRect: vi.fn(),
-        measureText: vi.fn(() => ({ width: 100 }))
+        measureText: vi.fn(() => ({ width: 100 })),
+        save: vi.fn(),
+        restore: vi.fn()
       },
       canvas: {
         width: 800,

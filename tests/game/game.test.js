@@ -69,6 +69,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       addEventListener: vi.fn(),
       innerWidth: 1024,
       innerHeight: 768,
+      setInterval: vi.fn(),
+      clearInterval: vi.fn(),
       location: {
         origin: 'http://localhost',
         pathname: '/game.html',
@@ -1351,6 +1353,7 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       
       // Mock chunk manager
       game.chunkManager.clearAllChunks = vi.fn();
+      game.chunkManager.clearAllChunksAndDiscoveries = vi.fn();
       game.chunkManager.updateActiveChunks = vi.fn();
       
       // Mock camera
@@ -1381,7 +1384,7 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       expect(game.camera.y).toBe(0);
       expect(game.camera.velocityX).toBe(0);
       expect(game.camera.velocityY).toBe(0);
-      expect(game.chunkManager.clearAllChunks).toHaveBeenCalled();
+      expect(game.chunkManager.clearAllChunksAndDiscoveries).toHaveBeenCalled();
       expect(game.discoveryLogbook.addDiscovery).toHaveBeenCalledTimes(2); // Two discoveries restored
     });
 

@@ -22,6 +22,10 @@ import { CommandRegistry } from './debug/CommandRegistry.js';
 import { AudioService } from './services/AudioService.js';
 import { SettingsService } from './services/SettingsService.js';
 import { SettingsMenu } from './ui/SettingsMenu.js';
+import { StorageService } from './services/StorageService.js';
+import { SaveLoadService } from './services/SaveLoadService.js';
+import { EventDispatcher } from './services/EventSystem.js';
+import { ConfirmationDialog } from './ui/ConfirmationDialog.js';
 // Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
@@ -100,6 +104,10 @@ export class Game {
     developerConsole: DeveloperConsole;
     audioService: AudioService;
     settingsService: SettingsService;
+    storageService: StorageService;
+    saveLoadService: SaveLoadService;
+    eventSystem: EventDispatcher;
+    confirmationDialog: ConfirmationDialog;
     
     // Performance optimization: Cache active objects between update and render phases
     private cachedActiveObjects?: ActiveObjects;
@@ -162,6 +170,18 @@ export class Game {
         this.settingsService = new SettingsService(this.audioService);
         this.settingsMenu = new SettingsMenu(this.settingsService);
         
+        // Initialize save/load services
+        this.storageService = new StorageService();
+        this.saveLoadService = new SaveLoadService(
+            this.storageService,
+            this.stateManager,
+            this.camera,
+            this.discoveryLogbook,
+            this.chunkManager,
+            this.settingsService
+        );
+        this.confirmationDialog = new ConfirmationDialog();
+        
         // Skip audio sync for now to avoid initialization issues
         
         // Set up callbacks for data management features
@@ -214,6 +234,16 @@ export class Game {
         // Initialize state manager with starting position
         this.stateManager = new StateManager(startingPosition);
         
+        // Initialize event system and set up global access
+        this.eventSystem = new EventDispatcher();
+        (window as any).gameEventSystem = this.eventSystem;
+        
+        // Set up save/load event handlers
+        this.setupSaveLoadEventHandlers();
+        
+        // Enable auto-save (5-minute intervals)
+        this.saveLoadService.enableAutoSave(5);
+        
         // Log lifetime distance traveled
         const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
         if (lifetimeDistance !== '0 km') {
@@ -234,7 +264,62 @@ export class Game {
     }
 
     start(): void {
+        // Check for existing save and prompt user
+        this.checkForExistingSave();
         this.gameLoop(0);
+    }
+
+    /**
+     * Check for existing save game and prompt user to load it
+     */
+    private async checkForExistingSave(): Promise<void> {
+        try {
+            const saveInfo = await this.saveLoadService.getSaveGameInfo();
+            
+            if (saveInfo.exists && saveInfo.timestamp) {
+                const saveDate = new Date(saveInfo.timestamp).toLocaleString();
+                this.confirmationDialog.show({
+                    title: 'Continue Journey',
+                    message: `Found saved game from ${saveDate}. Would you like to continue your exploration?`,
+                    confirmText: 'Continue',
+                    cancelText: 'New Game',
+                    onConfirm: async () => {
+                        const result = await this.saveLoadService.loadGame();
+                        if (result.success) {
+                            // Force chunk reload at loaded position
+                            this.chunkManager.clearAllChunks();
+                            this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+                            
+                            // Restore discovery state for newly loaded objects
+                            const activeObjects = this.chunkManager.getAllActiveObjects();
+                            const flattenedObjects = [
+                                ...activeObjects.stars,
+                                ...activeObjects.planets, 
+                                ...activeObjects.moons,
+                                ...activeObjects.nebulae,
+                                ...activeObjects.asteroidGardens,
+                                ...activeObjects.wormholes,
+                                ...activeObjects.blackholes,
+                                ...activeObjects.comets
+                            ].filter(obj => obj.hasOwnProperty('discovered'));
+                            this.chunkManager.restoreDiscoveryState(flattenedObjects);
+                            
+                            // Center stellar map on loaded position
+                            this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
+                            
+                            this.discoveryDisplay.addNotification('💾 Welcome back, explorer!');
+                        } else {
+                            this.discoveryDisplay.addNotification(`❌ Load failed: ${result.error}`);
+                        }
+                    },
+                    onCancel: () => {
+                        this.discoveryDisplay.addNotification('🌟 Starting fresh exploration!');
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('Failed to check for existing save:', error);
+        }
     }
 
     gameLoop = (currentTime: number): void => {
@@ -256,6 +341,12 @@ export class Game {
 
     update(deltaTime: number): void {
         this.input.update(deltaTime);
+        
+        // Handle confirmation dialog input first (highest priority)
+        if (this.confirmationDialog.handleInput(this.input)) {
+            this.input.clearFrameState();
+            return;
+        }
         
         // Debug: Check initial state
         if (!this.stateManager) {
@@ -815,6 +906,9 @@ export class Game {
             this.settingsMenu.render(this.renderer.ctx, this.renderer.canvas);
         }
         
+        // Render confirmation dialog (on top of settings menu)
+        this.confirmationDialog.render(this.renderer.ctx, this.renderer.canvas);
+        
         // Render developer console (on top of everything else)
         this.developerConsole.render(this.renderer);
         
@@ -1188,6 +1282,128 @@ export class Game {
                obj.x - padding <= screenBounds.right &&
                obj.y + padding >= screenBounds.top &&
                obj.y - padding <= screenBounds.bottom;
+    }
+
+    /**
+     * Set up event handlers for save/load functionality
+     */
+    private setupSaveLoadEventHandlers(): void {
+        this.eventSystem.on('save.game.requested', async () => {
+            // Check for existing save and confirm overwrite
+            const saveInfo = await this.saveLoadService.getSaveGameInfo();
+            
+            if (saveInfo.exists) {
+                const saveDate = new Date(saveInfo.timestamp!).toLocaleString();
+                this.confirmationDialog.show({
+                    title: 'Confirm Save',
+                    message: `Overwrite existing save from ${saveDate}?`,
+                    confirmText: 'Overwrite',
+                    cancelText: 'Cancel',
+                    onConfirm: async () => {
+                        const result = await this.saveLoadService.saveGame();
+                        if (result.success) {
+                            this.discoveryDisplay.addNotification('💾 Game saved successfully');
+                        } else {
+                            this.discoveryDisplay.addNotification(`❌ Save failed: ${result.error}`);
+                        }
+                    },
+                    onCancel: () => {
+                        this.discoveryDisplay.addNotification('💾 Save cancelled');
+                    }
+                });
+            } else {
+                // No existing save, save directly
+                const result = await this.saveLoadService.saveGame();
+                if (result.success) {
+                    this.discoveryDisplay.addNotification('💾 Game saved successfully');
+                } else {
+                    this.discoveryDisplay.addNotification(`❌ Save failed: ${result.error}`);
+                }
+            }
+        });
+
+        this.eventSystem.on('load.game.requested', async () => {
+            const result = await this.saveLoadService.loadGame();
+            if (result.success) {
+                // Force chunk reload at new position
+                this.chunkManager.clearAllChunks();
+                this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+                
+                // Restore discovery state for newly loaded objects
+                const activeObjects = this.chunkManager.getAllActiveObjects();
+                const flattenedObjects = [
+                    ...activeObjects.stars,
+                    ...activeObjects.planets, 
+                    ...activeObjects.moons,
+                    ...activeObjects.nebulae,
+                    ...activeObjects.asteroidGardens,
+                    ...activeObjects.wormholes,
+                    ...activeObjects.blackholes,
+                    ...activeObjects.comets
+                ].filter(obj => obj.hasOwnProperty('discovered'));
+                this.chunkManager.restoreDiscoveryState(flattenedObjects);
+                
+                // Center stellar map on loaded position
+                this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
+                
+                this.discoveryDisplay.addNotification('💾 Game loaded successfully');
+            } else {
+                this.discoveryDisplay.addNotification(`❌ Load failed: ${result.error}`);
+            }
+        });
+
+        this.eventSystem.on('new.game.requested', () => {
+            this.confirmationDialog.show({
+                title: 'Start New Game',
+                message: 'Start a new game? This will reset your current progress and discoveries.',
+                confirmText: 'New Game',
+                cancelText: 'Cancel',
+                onConfirm: () => {
+                    this.startNewGame();
+                },
+                onCancel: () => {
+                    this.discoveryDisplay.addNotification('🌟 New game cancelled');
+                }
+            });
+        });
+
+        // Auto-save on discoveries
+        this.eventSystem.on('object.discovered', async () => {
+            await this.saveLoadService.saveOnDiscovery();
+        });
+    }
+
+    /**
+     * Start a new game by resetting state and position
+     */
+    private startNewGame(): void {
+        // Clear saved game
+        this.saveLoadService.deleteSavedGame();
+        
+        // Reset discovery history
+        this.discoveryLogbook.clearHistory();
+        this.chunkManager.clearDiscoveryHistory();
+        
+        // Reset camera position to starting coordinates
+        const startingCoords = getStartingCoordinates();
+        if (startingCoords) {
+            this.camera.x = startingCoords.x;
+            this.camera.y = startingCoords.y;
+        }
+        this.camera.velocityX = 0;
+        this.camera.velocityY = 0;
+        
+        // Reset state manager
+        this.stateManager.reset();
+        
+        // Force chunk regeneration
+        this.chunkManager.clearAllChunks();
+        this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+        
+        // Center stellar map
+        this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
+        
+        this.discoveryDisplay.addNotification('🌟 New game started - welcome to the cosmos!');
     }
 
     // Removed syncInitialAudioSettings to avoid audio issues
