@@ -7,6 +7,7 @@ import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
 import type { Camera } from '../camera/camera.js';
 import type { SettingsService } from './SettingsService.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
+import type { DiscoveryManager } from './DiscoveryManager.js';
 import { getUniverseSeed, setUniverseSeed, getUniverseResetCount } from '../utils/random.js';
 
 // Serializable game state structure
@@ -29,12 +30,18 @@ export interface SaveGameData {
         universeResetCount: number;
     };
     
-    // Discovery progress
+    // Discovery progress (enhanced)
     discoveries: Array<{
         name: string;
         type: string;
         timestamp: number;
     }>;
+    
+    // Enhanced discovery manager data
+    discoveryManager?: {
+        discoveries: any[]; // DiscoveryEntry[]
+        idCounter: number;
+    };
     
     // ChunkManager discovery state
     discoveredObjects: Array<{
@@ -75,8 +82,16 @@ export class SaveLoadService implements ISaveLoadService {
         private camera: Camera,
         private discoveryLogbook: DiscoveryLogbook,
         private chunkManager: ChunkManager,
+        private discoveryManager?: DiscoveryManager,
         private settingsService?: SettingsService
     ) {}
+
+    /**
+     * Set the discovery manager after initialization
+     */
+    setDiscoveryManager(discoveryManager: DiscoveryManager): void {
+        this.discoveryManager = discoveryManager;
+    }
 
     /**
      * Save complete game state to localStorage
@@ -221,6 +236,9 @@ export class SaveLoadService implements ISaveLoadService {
             discoveries: discoveries,
             discoveredObjects: discoveredObjects,
             
+            // Enhanced discovery manager data
+            discoveryManager: this.discoveryManager ? this.discoveryManager.exportDiscoveryData() : undefined,
+            
             stats: {
                 sessionStartTime: sessionStart,
                 totalPlayTime: this.getTotalPlayTime() + sessionDuration,
@@ -261,6 +279,11 @@ export class SaveLoadService implements ISaveLoadService {
         saveData.discoveredObjects.forEach(({ objectId, discoveryData }) => {
             (this.chunkManager as any).discoveredObjects.set(objectId, discoveryData);
         });
+
+        // Restore enhanced discovery manager data
+        if (this.discoveryManager && saveData.discoveryManager) {
+            this.discoveryManager.importDiscoveryData(saveData.discoveryManager);
+        }
 
         // Update session tracking
         this.setSessionStartTime(Date.now() - (saveData.stats.totalPlayTime || 0));

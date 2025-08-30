@@ -178,6 +178,7 @@ export class Game {
             this.camera,
             this.discoveryLogbook,
             this.chunkManager,
+            undefined, // DiscoveryManager - will be set after initialization
             this.settingsService
         );
         this.confirmationDialog = new ConfirmationDialog();
@@ -204,6 +205,9 @@ export class Game {
             this.discoveryLogbook,
             this.namingService
         );
+
+        // Connect DiscoveryManager to SaveLoadService for persistence
+        this.saveLoadService.setDiscoveryManager(this.discoveryManager);
         
         // Initialize developer console
         this.commandRegistry = new CommandRegistry();
