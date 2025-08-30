@@ -95,7 +95,6 @@ export class SettingsMenu {
         this.visible = true;
         this.currentTab = 'audio'; // Reset to audio tab when shown
         this.needsRedrawFlag = true;
-        console.log('🎨 SHOW: Settings menu opened, needsRedrawFlag set to true');
     }
 
     hide(): void {
@@ -189,7 +188,6 @@ export class SettingsMenu {
         }
 
         this.errorBoundary.wrapComponent('SettingsMenu.render', () => {
-            console.log('🎨 RENDER: Settings menu render called, needsRedrawFlag:', this.needsRedrawFlag);
             // Always render for now - the optimization was causing issues
             // if (!this.needsRedrawFlag) {
             //     return;
@@ -309,7 +307,6 @@ export class SettingsMenu {
         
         // Ambient mute checkbox
         const ambientMuted = this.settingsService.isAmbientMuted();
-        console.log('🔲 VISUAL DEBUG: About to render Ambient checkbox with muted state:', ambientMuted, 'from SettingsService instance:', (this.settingsService as any).instanceId);
         this.renderCheckbox(ctx, startX + contentWidth - 60, currentY + 2, ambientMuted);
         ctx.fillText('Mute', startX + contentWidth - 10, currentY + 10);
         
@@ -476,7 +473,6 @@ export class SettingsMenu {
     }
 
     private renderCheckbox(ctx: CanvasRenderingContext2D, x: number, y: number, checked: boolean): void {
-        console.log('🔲 VISUAL DEBUG: renderCheckbox called with checked:', checked, 'at position:', x, y);
         const size = this.touchMode ? 20 : 16;
         
         // Checkbox background - more contrasting colors
@@ -490,7 +486,6 @@ export class SettingsMenu {
         
         // Checkmark - amber like headers
         if (checked) {
-            console.log('🔲 VISUAL DEBUG: Drawing checkmark at', x, y);
             ctx.strokeStyle = '#d4a574';
             ctx.lineWidth = 3; // Thicker for better visibility
             ctx.beginPath();
@@ -499,7 +494,6 @@ export class SettingsMenu {
             ctx.lineTo(x + size - 4, y + 4);
             ctx.stroke();
         } else {
-            console.log('🔲 VISUAL DEBUG: NOT drawing checkmark (unchecked)');
         }
     }
 
@@ -612,11 +606,8 @@ export class SettingsMenu {
         const startX = x + 20;
         let currentY = contentY + 30;
         
-        console.log('🔲 CHECKBOX DEBUG: Dimensions - x:', x, 'contentY:', contentY, 'width:', width);
-        console.log('🔲 CHECKBOX DEBUG: Calculated - contentWidth:', contentWidth, 'startX:', startX, 'currentY:', currentY);
         
         const checkboxSize = this.touchMode ? 20 : 16;
-        console.log('🔲 CHECKBOX DEBUG: checkboxSize:', checkboxSize, 'touchMode:', this.touchMode);
         
         // Calculate actual checkbox positions to match rendering
         // Ambient checkbox
@@ -624,9 +615,6 @@ export class SettingsMenu {
         const ambientCheckboxX = startX + contentWidth - 60;
         const ambientCheckboxY = currentY + 2;
         
-        console.log('🔲 CHECKBOX DEBUG: Ambient checkbox bounds:', 
-            'X:', ambientCheckboxX, '-', ambientCheckboxX + checkboxSize, 
-            'Y:', ambientCheckboxY, '-', ambientCheckboxY + checkboxSize);
         
         if (mouseX >= ambientCheckboxX && mouseX <= ambientCheckboxX + checkboxSize &&
             mouseY >= ambientCheckboxY && mouseY <= ambientCheckboxY + checkboxSize) {
@@ -640,15 +628,10 @@ export class SettingsMenu {
         const discoveryCheckboxX = startX + contentWidth - 60;
         const discoveryCheckboxY = currentY + 2;
         
-        console.log('🔲 CHECKBOX DEBUG: Discovery checkbox bounds:', 
-            'X:', discoveryCheckboxX, '-', discoveryCheckboxX + checkboxSize, 
-            'Y:', discoveryCheckboxY, '-', discoveryCheckboxY + checkboxSize);
         
         if (mouseX >= discoveryCheckboxX && mouseX <= discoveryCheckboxX + checkboxSize &&
             mouseY >= discoveryCheckboxY && mouseY <= discoveryCheckboxY + checkboxSize) {
-            console.log('🔲 CHECKBOX DEBUG: Discovery checkbox CLICKED! Current state:', this.settingsService.isDiscoveryMuted());
             this.settingsService.setDiscoveryMuted(!this.settingsService.isDiscoveryMuted());
-            console.log('🔲 CHECKBOX DEBUG: Discovery checkbox new state:', this.settingsService.isDiscoveryMuted());
             return;
         }
         
@@ -657,19 +640,13 @@ export class SettingsMenu {
         const masterCheckboxX = startX + contentWidth - 60;
         const masterCheckboxY = currentY + 2;
         
-        console.log('🔲 CHECKBOX DEBUG: Master checkbox bounds:', 
-            'X:', masterCheckboxX, '-', masterCheckboxX + checkboxSize, 
-            'Y:', masterCheckboxY, '-', masterCheckboxY + checkboxSize);
         
         if (mouseX >= masterCheckboxX && mouseX <= masterCheckboxX + checkboxSize &&
             mouseY >= masterCheckboxY && mouseY <= masterCheckboxY + checkboxSize) {
-            console.log('🔲 CHECKBOX DEBUG: Master checkbox CLICKED! Current state:', this.settingsService.isMasterMuted());
             this.settingsService.setMasterMuted(!this.settingsService.isMasterMuted());
-            console.log('🔲 CHECKBOX DEBUG: Master checkbox new state:', this.settingsService.isMasterMuted());
             return;
         }
         
-        console.log('🔲 CHECKBOX DEBUG: No checkbox was clicked - mouse outside all bounds');
     }
 
     private handleDisplayTabClick(mouseX: number, mouseY: number): void {

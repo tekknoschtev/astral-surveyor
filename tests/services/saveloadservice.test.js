@@ -265,20 +265,19 @@ describe('SaveLoadService', () => {
 
     describe('auto-save functionality', () => {
         it('should enable auto-save with custom interval', () => {
-            const consoleSpy = vi.spyOn(console, 'log');
-            
+            // Test that auto-save is enabled without console output
             saveLoadService.enableAutoSave(2); // 2 minutes
             
-            expect(consoleSpy).toHaveBeenCalledWith('🔄 Auto-save enabled: every 2 minutes');
+            // Verify auto-save is enabled by checking internal state
+            expect(saveLoadService.autoSaveTimer).toBeDefined();
         });
 
         it('should disable auto-save and clear timer', () => {
-            const consoleSpy = vi.spyOn(console, 'log');
-            
             saveLoadService.enableAutoSave(1);
             saveLoadService.disableAutoSave();
             
-            expect(consoleSpy).toHaveBeenCalledWith('🔄 Auto-save disabled');
+            // Verify auto-save is disabled by checking internal state
+            expect(saveLoadService.autoSaveTimer).toBeUndefined();
         });
 
         it('should handle discovery auto-save', async () => {
