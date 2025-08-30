@@ -347,7 +347,6 @@ export class AudioService implements IAudioService {
         try {
             if (this.soundManager.startSpaceDrone) {
                 this.soundManager.startSpaceDrone();
-                console.log('Atmospheric space drone started');
             }
         } catch (error) {
             console.warn('Failed to start space drone:', error);
@@ -466,13 +465,10 @@ export class AudioService implements IAudioService {
     }
     
     setMasterMuted(muted: boolean): void {
-        console.log('🔊 AUDIO DEBUG: AudioService.setMasterMuted called with:', muted);
         this.ensureNotDisposed();
         if (this.soundManager.setMasterMuted && typeof this.soundManager.setMasterMuted === 'function') {
-            console.log('🔊 AUDIO DEBUG: Calling soundManager.setMasterMuted');
             this.soundManager.setMasterMuted(muted);
         } else {
-            console.log('🔊 AUDIO DEBUG: soundManager.setMasterMuted not available');
         }
     }
     
@@ -484,13 +480,10 @@ export class AudioService implements IAudioService {
     }
     
     setAmbientMuted(muted: boolean): void {
-        console.log('🔊 AUDIO DEBUG: AudioService.setAmbientMuted called with:', muted);
         this.ensureNotDisposed();
         if (this.soundManager.setAmbientMuted && typeof this.soundManager.setAmbientMuted === 'function') {
-            console.log('🔊 AUDIO DEBUG: Calling soundManager.setAmbientMuted');
             this.soundManager.setAmbientMuted(muted);
         } else {
-            console.log('🔊 AUDIO DEBUG: soundManager.setAmbientMuted not available');
         }
     }
     
@@ -502,13 +495,10 @@ export class AudioService implements IAudioService {
     }
     
     setDiscoveryMuted(muted: boolean): void {
-        console.log('🔊 AUDIO DEBUG: AudioService.setDiscoveryMuted called with:', muted);
         this.ensureNotDisposed();
         if (this.soundManager.setEffectsMuted && typeof this.soundManager.setEffectsMuted === 'function') {
-            console.log('🔊 AUDIO DEBUG: Calling soundManager.setEffectsMuted');
             this.soundManager.setEffectsMuted(muted);
         } else {
-            console.log('🔊 AUDIO DEBUG: soundManager.setEffectsMuted not available');
         }
     }
 

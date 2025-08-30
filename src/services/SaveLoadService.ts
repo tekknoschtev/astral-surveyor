@@ -368,16 +368,12 @@ export class SaveLoadService implements ISaveLoadService {
             try {
                 const result = await this.saveGame();
                 if (result.success) {
-                    console.log('🔄 Auto-save completed successfully');
                 } else {
-                    console.warn('🔄 Auto-save failed:', result.error);
                 }
             } catch (error) {
-                console.warn('🔄 Auto-save error:', error);
             }
         }, this.autoSaveInterval);
         
-        console.log(`🔄 Auto-save enabled: every ${intervalMinutes} minutes`);
     }
 
     /**
@@ -387,7 +383,6 @@ export class SaveLoadService implements ISaveLoadService {
         if (this.autoSaveTimer) {
             window.clearInterval(this.autoSaveTimer);
             this.autoSaveTimer = undefined;
-            console.log('🔄 Auto-save disabled');
         }
     }
 
@@ -398,12 +393,9 @@ export class SaveLoadService implements ISaveLoadService {
         try {
             const result = await this.saveGame();
             if (result.success) {
-                console.log('🌟 Discovery auto-save completed');
             } else {
-                console.warn('🌟 Discovery auto-save failed:', result.error);
             }
         } catch (error) {
-            console.warn('🌟 Discovery auto-save error:', error);
         }
     }
 }
