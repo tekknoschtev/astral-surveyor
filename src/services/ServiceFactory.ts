@@ -6,6 +6,8 @@ import { ConfigService } from '../config/ConfigService.js';
 import { DiscoveryService } from './DiscoveryService.js';
 import { WorldService } from './WorldService.js';
 import { CelestialService } from './CelestialService.js';
+import { StorageService } from './StorageService.js';
+import { SaveLoadService } from './SaveLoadService.js';
 
 export class ServiceFactory {
     private static instance: ServiceFactory | null = null;
@@ -70,6 +72,11 @@ export class ServiceFactory {
      * Register all core game services with proper dependencies
      */
     private registerCoreServices(): void {
+        // Storage Service (no dependencies)
+        this.container.registerSingleton('storage', () => {
+            return new StorageService();
+        });
+
         // Configuration Service (no dependencies)
         this.container.registerSingleton('config', () => {
             const configService = new ConfigService();

@@ -239,12 +239,11 @@ export class SettingsMenu {
     private renderTabs(ctx: CanvasRenderingContext2D): void {
         const { x, y, width, tabHeight } = this.dimensions;
         
-        // Currently only Audio tab is implemented - Display and Data tabs disabled for now
+        // Available tabs
         const tabs: { name: TabName; label: string }[] = [
-            { name: 'audio', label: 'Audio' }
-            // Future tabs (framework preserved):
-            // { name: 'display', label: 'Display' },
-            // { name: 'data', label: 'Data' }
+            { name: 'audio', label: 'Audio' },
+            { name: 'display', label: 'Display' },
+            { name: 'data', label: 'Data' }
         ];
         
         const tabWidth = width / tabs.length;
@@ -278,13 +277,12 @@ export class SettingsMenu {
             case 'audio':
                 this.renderAudioTab(ctx);
                 break;
-            // Future tab renderers (framework preserved):
-            // case 'display':
-            //     this.renderDisplayTab(ctx);
-            //     break;
-            // case 'data':
-            //     this.renderDataTab(ctx);
-            //     break;
+            case 'display':
+                this.renderDisplayTab(ctx);
+                break;
+            case 'data':
+                this.renderDataTab(ctx);
+                break;
         }
     }
 
@@ -394,13 +392,25 @@ export class SettingsMenu {
         ctx.font = this.touchMode ? '14px "Courier New", monospace' : '12px "Courier New", monospace';
         ctx.textAlign = 'center';
         
-        // Export Save Data button - subtle colors
-        this.renderButton(ctx, startX, currentY, width - 40, 40, 'Export Save Data', '#2a3a4a');
+        // Save Game button - positive action
+        this.renderButton(ctx, startX, currentY, width - 40, 40, 'Save Game', '#2a4a2a');
+        currentY += 50;
+        
+        // Load Game button - neutral action
+        this.renderButton(ctx, startX, currentY, width - 40, 40, 'Load Game', '#2a3a4a');
+        currentY += 50;
+        
+        // New Game button - caution colors
+        this.renderButton(ctx, startX, currentY, width - 40, 40, 'New Game', '#4a2a1a');
         currentY += 70;
+        
+        // Export Save Data button - utility action
+        this.renderButton(ctx, startX, currentY, width - 40, 40, 'Export Save Data', '#2a3a4a');
+        currentY += 50;
         
         // Reset Distance Traveled button
         this.renderButton(ctx, startX, currentY, width - 40, 40, 'Reset Distance Traveled', '#3a2a1a');
-        currentY += 70;
+        currentY += 50;
         
         // Clear Discovery History button
         this.renderButton(ctx, startX, currentY, width - 40, 40, 'Clear Discovery History', '#3a1a1a');
@@ -554,9 +564,9 @@ export class SettingsMenu {
             return;
         }
         
-        // Handle tab clicks (currently only Audio tab available)
+        // Handle tab clicks
         if (mouseY >= y && mouseY <= y + tabHeight) {
-            const tabs: TabName[] = ['audio']; // Future tabs: 'display', 'data'
+            const tabs: TabName[] = ['audio', 'display', 'data'];
             const tabWidth = width / tabs.length;
             const tabIndex = Math.floor((mouseX - x) / tabWidth);
             
@@ -576,13 +586,12 @@ export class SettingsMenu {
                 case 'audio':
                     this.handleAudioTabClick(mouseX, mouseY);
                     break;
-                // Future tab handlers (framework preserved):
-                // case 'display':
-                //     this.handleDisplayTabClick(mouseX, mouseY);
-                //     break;
-                // case 'data':
-                //     this.handleDataTabClick(mouseX, mouseY);
-                //     break;
+                case 'display':
+                    this.handleDisplayTabClick(mouseX, mouseY);
+                    break;
+                case 'data':
+                    this.handleDataTabClick(mouseX, mouseY);
+                    break;
             }
         } catch (error) {
             console.warn('Error handling content click:', error);
@@ -678,19 +687,71 @@ export class SettingsMenu {
     }
 
     private handleDataTabClick(mouseX: number, mouseY: number): void {
-        const { x, width } = this.dimensions;
+        const { x, contentY, width } = this.dimensions;
         const buttonWidth = width - 40;
         const buttonX = x + 20;
+        const buttonHeight = 40;
         
         if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth) {
-            if (mouseY >= 330 && mouseY <= 370) { // Export button
+            let currentY = contentY + 50;
+            
+            // Save Game button
+            if (mouseY >= currentY && mouseY <= currentY + buttonHeight) {
+                this.handleSaveGameClick();
+                return;
+            }
+            currentY += 50;
+            
+            // Load Game button
+            if (mouseY >= currentY && mouseY <= currentY + buttonHeight) {
+                this.handleLoadGameClick();
+                return;
+            }
+            currentY += 50;
+            
+            // New Game button
+            if (mouseY >= currentY && mouseY <= currentY + buttonHeight) {
+                this.handleNewGameClick();
+                return;
+            }
+            currentY += 70;
+            
+            // Export Save Data button
+            if (mouseY >= currentY && mouseY <= currentY + buttonHeight) {
                 this.handleExportClick();
-            } else if (mouseY >= 400 && mouseY <= 440) { // Reset distance button
+                return;
+            }
+            currentY += 50;
+            
+            // Reset Distance Traveled button
+            if (mouseY >= currentY && mouseY <= currentY + buttonHeight) {
                 this.settingsService.resetDistanceTraveled();
-            } else if (mouseY >= 470 && mouseY <= 510) { // Clear history button
+                return;
+            }
+            currentY += 50;
+            
+            // Clear Discovery History button
+            if (mouseY >= currentY && mouseY <= currentY + buttonHeight) {
                 this.settingsService.clearDiscoveryHistory();
+                return;
             }
         }
+    }
+
+    private handleSaveGameClick(): void {
+        // Emit save game event for the Game class to handle
+        this.emitGameEvent('save.game.requested', {});
+    }
+
+    private handleLoadGameClick(): void {
+        // Emit load game event for the Game class to handle
+        this.emitGameEvent('load.game.requested', {});
+    }
+
+    private handleNewGameClick(): void {
+        // Emit new game event for the Game class to handle
+        // This should prompt for confirmation due to data loss
+        this.emitGameEvent('new.game.requested', {});
     }
 
     private handleExportClick(): void {
@@ -711,6 +772,15 @@ export class SettingsMenu {
             }
         } catch (error) {
             console.warn('Failed to export save data:', error);
+        }
+    }
+
+    /**
+     * Emit game events via global event system
+     */
+    private emitGameEvent(eventType: string, data: any): void {
+        if (typeof window !== 'undefined' && (window as any).gameEventSystem) {
+            (window as any).gameEventSystem.emit(eventType, data);
         }
     }
 

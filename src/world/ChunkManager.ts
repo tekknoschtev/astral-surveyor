@@ -789,7 +789,7 @@ export class ChunkManager {
         return this.discoveredObjects.has(objId);
     }
 
-    restoreDiscoveryState(objects: (Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole)[]): void {
+    restoreDiscoveryState(objects: (Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole | any)[]): void {
         for (const obj of objects) {
             if (this.isObjectDiscovered(obj)) {
                 obj.discovered = true;
@@ -1980,11 +1980,17 @@ export class ChunkManager {
         console.log(`🕳️ BLACK HOLE generated successfully at (${centerX.toFixed(0)}, ${centerY.toFixed(0)}) - Type: ${blackHole.blackHoleTypeName}`);
     }
 
-    // Clear all chunks and discovered objects (for universe reset)
+    // Clear all chunks but preserve discovered objects (for game loading)
     clearAllChunks(): void {
         this.activeChunks.clear();
+        console.log('🌌 All chunks cleared (discoveries preserved)');
+    }
+    
+    // Clear all chunks and discovered objects (for universe reset)
+    clearAllChunksAndDiscoveries(): void {
+        this.activeChunks.clear();
         this.discoveredObjects.clear();
-        console.log('🌌 All chunks cleared for universe regeneration');
+        console.log('🌌 All chunks and discoveries cleared for universe regeneration');
     }
 
     // Clear only discovery history (preserves chunks)

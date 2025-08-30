@@ -332,12 +332,12 @@ describe('SettingsMenu UI Component', () => {
 
         it('should handle tab switching clicks', () => {
             mockInput.wasClicked.mockReturnValue(true);
-            mockInput.getMouseX.mockReturnValue(512); // Audio tab area (only tab available)
+            mockInput.getMouseX.mockReturnValue(312); // Audio tab area (first tab: 212-412, middle at 312)
             mockInput.getMouseY.mockReturnValue(154); // Tab area Y coordinate
             
             settingsMenu.handleInput(mockInput);
             
-            // Should remain on audio tab since it's the only available tab
+            // Should stay on audio tab when clicking audio tab
             expect(settingsMenu.getCurrentTab()).toBe('audio');
         });
 
