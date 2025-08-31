@@ -8,6 +8,58 @@ import { DiscoveryLogbook } from '../ui/discoverylogbook.js';
 import { NamingService } from '../naming/naming.js';
 import { generateShareableURL } from '../utils/random.js';
 
+// Enhanced discovery data structure with metadata
+export interface DiscoveryEntry {
+    id: string;
+    name: string;
+    type: string;
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    coordinates: {
+        x: number;
+        y: number;
+    };
+    timestamp: number;
+    rarity: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
+    notes?: string;
+    shareableURL: string;
+    metadata: {
+        starTypeName?: string;
+        planetTypeName?: string;
+        nebulaType?: string;
+        gardenType?: string;
+        blackHoleTypeName?: string;
+        isNotable: boolean;
+        discoveryRadius?: number;
+    };
+}
+
+// Discovery categories for filtering
+export type DiscoveryCategory = 'all' | 'stellar' | 'planetary' | 'exotic' | 'rare' | 'notable';
+
+// Discovery statistics interface
+export interface DiscoveryStatistics {
+    totalDiscoveries: number;
+    byType: Record<string, number>;
+    byRarity: Record<string, number>;
+    byCategory: Record<DiscoveryCategory, number>;
+    rareDiscoveryCount: number;
+    notableDiscoveryCount: number;
+    firstDiscoveryTimestamp?: number;
+    lastDiscoveryTimestamp?: number;
+}
+
+// Discovery filter options
+export interface DiscoveryFilter {
+    category?: DiscoveryCategory;
+    rarity?: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
+    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    hasNotes?: boolean;
+    dateRange?: {
+        start: number;
+        end: number;
+    };
+}
+
 // Interface for celestial objects in discovery context
 interface CelestialObject {
     type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
@@ -45,6 +97,10 @@ export class DiscoveryManager {
     private discoveryLogbook: DiscoveryLogbook;
     private namingService: NamingService;
     
+    // Enhanced discovery tracking
+    private discoveries: Map<string, DiscoveryEntry> = new Map();
+    private discoveryIdCounter: number = 0;
+    
     // Black hole warning tracking
     private lastBlackHoleWarnings: Map<string, BlackHoleWarning> = new Map();
     private readonly warningCooldown: number = 2.0; // 2 seconds between warnings
@@ -67,8 +123,16 @@ export class DiscoveryManager {
     processDiscovery(obj: CelestialObject, camera: Camera, chunkManager: any): void {
         const objectName = this.namingService.generateDisplayName(obj);
         const objectType = this.getObjectType(obj);
+        const isNotable = this.namingService.isNotableDiscovery(obj);
+        const shareableURL = generateShareableURL(camera.x, camera.y);
         
-        // Add to UI displays
+        // Create enhanced discovery entry
+        const discoveryEntry = this.createDiscoveryEntry(obj, objectName, objectType, camera, isNotable, shareableURL);
+        
+        // Store in persistent discovery list
+        this.discoveries.set(discoveryEntry.id, discoveryEntry);
+        
+        // Add to UI displays (maintain backward compatibility)
         this.discoveryDisplay.addDiscovery(objectName, objectType || 'Unknown');
         this.discoveryLogbook.addDiscovery(objectName, objectType || 'Unknown');
         chunkManager.markObjectDiscovered(obj, objectName);
@@ -78,11 +142,95 @@ export class DiscoveryManager {
         
         // Handle rare discovery logging
         if (this.isRareDiscovery(obj)) {
-            const shareableURL = generateShareableURL(camera.x, camera.y);
-            const isNotable = this.namingService.isNotableDiscovery(obj);
             const logPrefix = isNotable ? '🌟 RARE DISCOVERY!' : '⭐ Discovery!';
             console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
         }
+    }
+
+    /**
+     * Create a detailed discovery entry from a celestial object
+     */
+    private createDiscoveryEntry(
+        obj: CelestialObject, 
+        objectName: string, 
+        objectType: string, 
+        camera: Camera, 
+        isNotable: boolean, 
+        shareableURL: string
+    ): DiscoveryEntry {
+        const timestamp = Date.now();
+        const rarity = this.determineRarity(obj);
+        
+        return {
+            id: this.generateDiscoveryId(),
+            name: objectName,
+            type: objectType,
+            objectType: obj.type,
+            coordinates: { x: obj.x, y: obj.y },
+            timestamp,
+            rarity,
+            shareableURL,
+            metadata: {
+                starTypeName: obj.starTypeName,
+                planetTypeName: obj.planetTypeName,
+                nebulaType: obj.nebulaType,
+                gardenType: obj.gardenType,
+                blackHoleTypeName: obj.blackHoleTypeName,
+                isNotable,
+                discoveryRadius: this.calculateDiscoveryRadius(obj, camera)
+            }
+        };
+    }
+
+    /**
+     * Generate unique discovery ID
+     */
+    private generateDiscoveryId(): string {
+        return `discovery_${++this.discoveryIdCounter}_${Date.now()}`;
+    }
+
+    /**
+     * Determine rarity level for a celestial object
+     */
+    private determineRarity(obj: CelestialObject): 'common' | 'uncommon' | 'rare' | 'ultra-rare' {
+        if (obj.type === 'blackhole' || obj.type === 'wormhole') {
+            return 'ultra-rare';
+        }
+        if (obj.type === 'nebula' || obj.type === 'comet') {
+            return 'rare';
+        }
+        if (obj.type === 'moon') {
+            return 'uncommon';
+        }
+        if (obj.type === 'star') {
+            const starType = obj.starTypeName;
+            if (starType === 'Neutron Star') return 'ultra-rare';
+            if (starType === 'White Dwarf' || starType === 'Blue Giant') return 'rare';
+            if (starType === 'Red Giant') return 'uncommon';
+            return 'common';
+        }
+        if (obj.type === 'planet') {
+            const planetType = obj.planetTypeName;
+            if (planetType === 'Exotic World') return 'ultra-rare';
+            if (planetType === 'Volcanic World' || planetType === 'Frozen World') return 'rare';
+            return 'common';
+        }
+        if (obj.type === 'asteroids') {
+            const gardenType = obj.gardenType;
+            if (gardenType === 'rare_minerals' || gardenType === 'crystalline' || gardenType === 'icy') {
+                return 'rare';
+            }
+            return 'uncommon';
+        }
+        return 'common';
+    }
+
+    /**
+     * Calculate approximate discovery radius for metadata
+     */
+    private calculateDiscoveryRadius(obj: CelestialObject, camera: Camera): number {
+        const distance = Math.sqrt((obj.x - camera.x) ** 2 + (obj.y - camera.y) ** 2);
+        return Math.round(distance * 100) / 100; // Round to 2 decimal places
     }
 
     /**
@@ -208,6 +356,174 @@ export class DiscoveryManager {
                 time: currentTime,
                 level: warningLevel
             });
+        }
+    }
+
+    // === Discovery List Management ===
+
+    /**
+     * Get all discoveries, optionally filtered
+     */
+    getDiscoveries(filter?: DiscoveryFilter): DiscoveryEntry[] {
+        let discoveries = Array.from(this.discoveries.values());
+
+        if (!filter) {
+            return discoveries.sort((a, b) => b.timestamp - a.timestamp);
+        }
+
+        // Apply filters
+        if (filter.category && filter.category !== 'all') {
+            discoveries = discoveries.filter(d => this.matchesCategory(d, filter.category!));
+        }
+
+        if (filter.rarity) {
+            discoveries = discoveries.filter(d => d.rarity === filter.rarity);
+        }
+
+        if (filter.objectType) {
+            discoveries = discoveries.filter(d => d.objectType === filter.objectType);
+        }
+
+        if (filter.hasNotes !== undefined) {
+            discoveries = discoveries.filter(d => filter.hasNotes ? !!d.notes : !d.notes);
+        }
+
+        if (filter.dateRange) {
+            discoveries = discoveries.filter(d => 
+                d.timestamp >= filter.dateRange!.start && 
+                d.timestamp <= filter.dateRange!.end
+            );
+        }
+
+        return discoveries.sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    /**
+     * Get discovery statistics
+     */
+    getStatistics(): DiscoveryStatistics {
+        const discoveries = Array.from(this.discoveries.values());
+        const stats: DiscoveryStatistics = {
+            totalDiscoveries: discoveries.length,
+            byType: {},
+            byRarity: {},
+            byCategory: {
+                all: discoveries.length,
+                stellar: 0,
+                planetary: 0,
+                exotic: 0,
+                rare: 0,
+                notable: 0
+            },
+            rareDiscoveryCount: 0,
+            notableDiscoveryCount: 0
+        };
+
+        if (discoveries.length > 0) {
+            stats.firstDiscoveryTimestamp = Math.min(...discoveries.map(d => d.timestamp));
+            stats.lastDiscoveryTimestamp = Math.max(...discoveries.map(d => d.timestamp));
+        }
+
+        // Calculate statistics
+        for (const discovery of discoveries) {
+            // By type
+            stats.byType[discovery.type] = (stats.byType[discovery.type] || 0) + 1;
+            
+            // By rarity
+            stats.byRarity[discovery.rarity] = (stats.byRarity[discovery.rarity] || 0) + 1;
+            
+            // By category
+            const category = this.getDiscoveryCategory(discovery);
+            if (category !== 'all') {
+                stats.byCategory[category]++;
+            }
+
+            // Rare and notable counts
+            if (discovery.rarity === 'rare' || discovery.rarity === 'ultra-rare') {
+                stats.rareDiscoveryCount++;
+            }
+            
+            if (discovery.metadata.isNotable) {
+                stats.notableDiscoveryCount++;
+            }
+        }
+
+        return stats;
+    }
+
+    /**
+     * Add or update notes for a discovery
+     */
+    addDiscoveryNotes(discoveryId: string, notes: string): boolean {
+        const discovery = this.discoveries.get(discoveryId);
+        if (discovery) {
+            discovery.notes = notes;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get discovery by ID
+     */
+    getDiscoveryById(discoveryId: string): DiscoveryEntry | undefined {
+        return this.discoveries.get(discoveryId);
+    }
+
+    /**
+     * Check if a discovery matches a category
+     */
+    private matchesCategory(discovery: DiscoveryEntry, category: DiscoveryCategory): boolean {
+        switch (category) {
+            case 'all':
+                return true;
+            case 'stellar':
+                return discovery.objectType === 'star';
+            case 'planetary':
+                return discovery.objectType === 'planet' || discovery.objectType === 'moon';
+            case 'exotic':
+                return discovery.objectType === 'nebula' || discovery.objectType === 'asteroids' || 
+                       discovery.objectType === 'wormhole' || discovery.objectType === 'blackhole' || 
+                       discovery.objectType === 'comet';
+            case 'rare':
+                return discovery.rarity === 'rare' || discovery.rarity === 'ultra-rare';
+            case 'notable':
+                return discovery.metadata.isNotable;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Get the primary category for a discovery
+     */
+    private getDiscoveryCategory(discovery: DiscoveryEntry): DiscoveryCategory {
+        if (discovery.metadata.isNotable) return 'notable';
+        if (discovery.rarity === 'rare' || discovery.rarity === 'ultra-rare') return 'rare';
+        if (discovery.objectType === 'star') return 'stellar';
+        if (discovery.objectType === 'planet' || discovery.objectType === 'moon') return 'planetary';
+        return 'exotic';
+    }
+
+    /**
+     * Export discovery data for save/load integration
+     */
+    exportDiscoveryData(): { discoveries: DiscoveryEntry[], idCounter: number } {
+        return {
+            discoveries: Array.from(this.discoveries.values()),
+            idCounter: this.discoveryIdCounter
+        };
+    }
+
+    /**
+     * Import discovery data from save/load system
+     */
+    importDiscoveryData(data: { discoveries: DiscoveryEntry[], idCounter: number }): void {
+        this.discoveries.clear();
+        this.discoveryIdCounter = data.idCounter || 0;
+        
+        for (const discovery of data.discoveries) {
+            this.discoveries.set(discovery.id, discovery);
         }
     }
 }

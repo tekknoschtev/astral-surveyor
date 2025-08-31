@@ -11,6 +11,7 @@ describe('SaveLoadService', () => {
     let mockCamera;
     let mockDiscoveryLogbook;
     let mockChunkManager;
+    let mockDiscoveryManager;
     let mockSettingsService;
 
     beforeEach(() => {
@@ -63,6 +64,27 @@ describe('SaveLoadService', () => {
             restoreDiscoveryState: vi.fn()
         };
 
+        // Mock discovery manager
+        mockDiscoveryManager = {
+            exportDiscoveryData: vi.fn(() => ({
+                discoveries: [
+                    {
+                        id: 'discovery_1',
+                        name: 'ASV-001 G',
+                        type: 'G-Type Star',
+                        objectType: 'star',
+                        coordinates: { x: 1000, y: 2000 },
+                        timestamp: 1640000000000,
+                        rarity: 'common',
+                        shareableURL: 'http://example.com/share/1000,2000',
+                        metadata: { starTypeName: 'G-Type Star', isNotable: false }
+                    }
+                ],
+                idCounter: 1
+            })),
+            importDiscoveryData: vi.fn()
+        };
+
         // Mock settings service
         mockSettingsService = {};
 
@@ -72,6 +94,7 @@ describe('SaveLoadService', () => {
             mockCamera,
             mockDiscoveryLogbook,
             mockChunkManager,
+            mockDiscoveryManager,
             mockSettingsService
         );
     });
@@ -104,6 +127,10 @@ describe('SaveLoadService', () => {
                         { name: 'ASV-001 G', type: 'star', timestamp: 1640000000000 },
                         { name: 'ASV-002 b', type: 'planet', timestamp: 1640000001000 }
                     ],
+                    discoveryManager: expect.objectContaining({
+                        discoveries: expect.any(Array),
+                        idCounter: expect.any(Number)
+                    }),
                     stats: expect.objectContaining({
                         sessionStartTime: expect.any(Number),
                         totalPlayTime: expect.any(Number)
@@ -146,6 +173,22 @@ describe('SaveLoadService', () => {
                     { name: 'ASV-100 G', type: 'star', timestamp: 1640000000000 }
                 ],
                 discoveredObjects: [],
+                discoveryManager: {
+                    discoveries: [
+                        {
+                            id: 'discovery_1',
+                            name: 'ASV-100 G',
+                            type: 'G-Type Star',
+                            objectType: 'star',
+                            coordinates: { x: 5000, y: 6000 },
+                            timestamp: 1640000000000,
+                            rarity: 'common',
+                            shareableURL: 'http://example.com/share/5000,6000',
+                            metadata: { starTypeName: 'G-Type Star', isNotable: false }
+                        }
+                    ],
+                    idCounter: 1
+                },
                 stats: {
                     sessionStartTime: 1640000000000,
                     totalPlayTime: 120000,
@@ -172,6 +215,10 @@ describe('SaveLoadService', () => {
             expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledWith(
                 'ASV-100 G', 'star', 1640000000000
             );
+            expect(mockDiscoveryManager.importDiscoveryData).toHaveBeenCalledWith({
+                discoveries: expect.any(Array),
+                idCounter: 1
+            });
         });
 
         it('should handle missing save data', async () => {
