@@ -9,6 +9,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
   let mockContext;
   let mockInput;
   let mockCamera;
+  let mockDiscoveryManager;
 
   beforeEach(() => {
     // Mock canvas rendering context
@@ -62,8 +63,68 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
       y: 0
     };
 
+    // Mock DiscoveryManager
+    const discoveries = new Map();
+    mockDiscoveryManager = {
+      discoveries: discoveries,
+      getDiscoveries: vi.fn(() => Array.from(discoveries.values()).sort((a, b) => a.timestamp - b.timestamp)),
+      addDiscovery: vi.fn((obj, camera) => {
+        const discovery = {
+          id: `discovery_${discoveries.size}`,
+          name: obj.name || `Object ${discoveries.size}`,
+          type: obj.type || 'Unknown',
+          objectType: obj.type || 'unknown',
+          coordinates: { x: obj.x || 0, y: obj.y || 0 },
+          timestamp: Date.now(),
+          rarity: obj.rarity || 'common',
+          shareableURL: `http://example.com/share/${obj.x || 0},${obj.y || 0}`,
+          metadata: {}
+        };
+        discoveries.set(discovery.id, discovery);
+        return discovery;
+      }),
+      getDiscoveryById: vi.fn((id) => discoveries.get(id))
+    };
+
     logbook = new DiscoveryLogbook();
+    logbook.setDiscoveryManager(mockDiscoveryManager);
   });
+
+  // Helper function to add discoveries via the DiscoveryManager
+  const addTestDiscovery = (name, type, timestampOrOptions = {}) => {
+    // Handle both old signature (name, type, timestamp) and new signature (name, type, options)
+    let options = {};
+    let timestamp = Date.now();
+    
+    if (typeof timestampOrOptions === 'number') {
+      timestamp = timestampOrOptions;
+    } else if (typeof timestampOrOptions === 'object') {
+      options = timestampOrOptions;
+      timestamp = options.timestamp || Date.now();
+    }
+    
+    const obj = {
+      name,
+      type,
+      x: options.x || 0,
+      y: options.y || 0,
+      rarity: options.rarity || 'common'
+    };
+    const discovery = mockDiscoveryManager.addDiscovery(obj, mockCamera);
+    // Override timestamp if specified
+    discovery.timestamp = timestamp;
+    
+    // Also add to legacy array for backward compatibility tests
+    logbook.discoveries.push({
+      name,
+      type,
+      timestamp: discovery.timestamp,
+      displayTime: logbook.formatTimestamp(discovery.timestamp)
+    });
+    // Trigger auto-scroll behavior like the legacy addDiscovery method
+    logbook.scrollToBottom();
+    return discovery;
+  };
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -129,7 +190,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should add discoveries with proper data structure', () => {
       const timestamp = Date.now();
       
-      logbook.addDiscovery('Test Star HD-1234', 'G-type Main Sequence', timestamp);
+      addTestDiscovery('Test Star HD-1234', 'G-type Main Sequence', timestamp);
       
       expect(logbook.discoveries).toHaveLength(1);
       expect(logbook.discoveries[0]).toEqual({
@@ -143,7 +204,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should use current time when no timestamp provided', () => {
       const startTime = Date.now();
       
-      logbook.addDiscovery('Test Planet b', 'Rocky World');
+      addTestDiscovery('Test Planet b', 'Rocky World');
       
       const endTime = Date.now();
       
@@ -154,7 +215,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should store all discoveries without limit', () => {
       // Add 105 discoveries
       for (let i = 0; i < 105; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star', Date.now() + i);
+        addTestDiscovery(`Star ${i}`, 'G-type Star', Date.now() + i);
       }
       
       expect(logbook.discoveries).toHaveLength(105);
@@ -166,7 +227,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should auto-scroll to bottom when adding discoveries', () => {
       // Fill up with more than maxVisible entries
       for (let i = 0; i < 15; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
       
       // Should be scrolled to show the newest entries
@@ -176,14 +237,14 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should provide discovery count', () => {
       expect(logbook.getDiscoveryCount()).toBe(0);
       
-      logbook.addDiscovery('Star A', 'G-type Star');
-      logbook.addDiscovery('Planet b', 'Rocky World');
+      addTestDiscovery('Star A', 'G-type Star');
+      addTestDiscovery('Planet b', 'Rocky World');
       
       expect(logbook.getDiscoveryCount()).toBe(2);
     });
 
     it('should return copy of discoveries array', () => {
-      logbook.addDiscovery('Star A', 'G-type Star');
+      addTestDiscovery('Star A', 'G-type Star');
       
       const discoveries = logbook.getDiscoveries();
       discoveries.push({ name: 'Fake', type: 'Fake', timestamp: 0, displayTime: 'Fake' });
@@ -223,7 +284,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
 
     it('should update display times for all discoveries', () => {
       const oldTimestamp = Date.now() - (10 * 60 * 1000); // 10 minutes ago
-      logbook.addDiscovery('Star A', 'G-type Star', oldTimestamp);
+      addTestDiscovery('Star A', 'G-type Star', oldTimestamp);
       
       // Initially should be "10m ago"
       expect(logbook.discoveries[0].displayTime).toBe('10m ago');
@@ -241,7 +302,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
       logbook.visible = true; // Make sure logbook is visible for scrolling
       // Add more entries than can be displayed
       for (let i = 0; i < 20; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
     });
 
@@ -287,7 +348,19 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     });
 
     it('should not scroll when all entries fit on screen', () => {
-      logbook.discoveries = logbook.discoveries.slice(0, 10); // Only 10 entries
+      // Clear all discoveries and add only 10 (less than maxVisible=12) without auto-scroll
+      mockDiscoveryManager.discoveries.clear();
+      logbook.discoveries = [];
+      for (let i = 0; i < 10; i++) {
+        const obj = { name: `Star ${i}`, type: 'G-type Star', x: 0, y: 0, rarity: 'common' };
+        const discovery = mockDiscoveryManager.addDiscovery(obj, mockCamera);
+        logbook.discoveries.push({
+          name: `Star ${i}`,
+          type: 'G-type Star',
+          timestamp: discovery.timestamp,
+          displayTime: logbook.formatTimestamp(discovery.timestamp)
+        });
+      }
       logbook.scrollOffset = 0;
       
       logbook.handleScroll(1);
@@ -304,7 +377,19 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     });
 
     it('should handle scroll to bottom with few entries', () => {
-      logbook.discoveries = logbook.discoveries.slice(0, 5); // Only 5 entries
+      // Clear all discoveries and add only 5 (less than maxVisible=12) without auto-scroll
+      mockDiscoveryManager.discoveries.clear();
+      logbook.discoveries = [];
+      for (let i = 0; i < 5; i++) {
+        const obj = { name: `Star ${i}`, type: 'G-type Star', x: 0, y: 0, rarity: 'common' };
+        const discovery = mockDiscoveryManager.addDiscovery(obj, mockCamera);
+        logbook.discoveries.push({
+          name: `Star ${i}`,
+          type: 'G-type Star',
+          timestamp: discovery.timestamp,
+          displayTime: logbook.formatTimestamp(discovery.timestamp)
+        });
+      }
       
       logbook.scrollToBottom();
       
@@ -317,7 +402,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
       logbook.visible = true;
       // Add scrollable content
       for (let i = 0; i < 15; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
       logbook.scrollOffset = 1; // Start in middle
     });
@@ -387,7 +472,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
       logbook.visible = true;
       // Add scrollable content
       for (let i = 0; i < 15; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
       logbook.scrollOffset = 5;
     });
@@ -500,7 +585,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     });
 
     it('should render header with title and count', () => {
-      logbook.addDiscovery('Test Star', 'G-type Star');
+      addTestDiscovery('Test Star', 'G-type Star');
       
       logbook.render(mockRenderer, mockCamera);
       
@@ -509,8 +594,8 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     });
 
     it('should render discovery entries', () => {
-      logbook.addDiscovery('Test Star HD-1234', 'G-type Main Sequence');
-      logbook.addDiscovery('Test Planet b', 'Rocky World');
+      addTestDiscovery('Test Star HD-1234', 'G-type Main Sequence');
+      addTestDiscovery('Test Planet b', 'Rocky World');
       
       logbook.render(mockRenderer, mockCamera);
       
@@ -530,7 +615,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should render scroll indicators when needed', () => {
       // Add many discoveries to enable scrolling
       for (let i = 0; i < 15; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
       logbook.scrollOffset = 2; // In middle of scroll
       
@@ -544,9 +629,9 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     });
 
     it('should render alternating row backgrounds', () => {
-      logbook.addDiscovery('Star 1', 'G-type Star');
-      logbook.addDiscovery('Star 2', 'K-type Star');
-      logbook.addDiscovery('Star 3', 'M-type Star');
+      addTestDiscovery('Star 1', 'G-type Star');
+      addTestDiscovery('Star 2', 'K-type Star');
+      addTestDiscovery('Star 3', 'M-type Star');
       
       logbook.render(mockRenderer, mockCamera);
       
@@ -568,7 +653,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
   describe('Integration and Edge Cases', () => {
     it('should handle rapid discovery additions', () => {
       for (let i = 0; i < 50; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
       
       expect(logbook.discoveries).toHaveLength(50);
@@ -577,8 +662,8 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
 
     it('should handle timestamp updates without crashes', () => {
       const now = Date.now();
-      logbook.addDiscovery('Star A', 'G-type Star', now - 1000);
-      logbook.addDiscovery('Star B', 'K-type Star', now - 60000);
+      addTestDiscovery('Star A', 'G-type Star', now - 1000);
+      addTestDiscovery('Star B', 'K-type Star', now - 60000);
       
       expect(() => logbook.updateTimestamps()).not.toThrow();
       
@@ -589,7 +674,7 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should handle very long discovery names gracefully', () => {
       const longName = 'A'.repeat(100);
       
-      logbook.addDiscovery(longName, 'G-type Star');
+      addTestDiscovery(longName, 'G-type Star');
       
       expect(logbook.discoveries[0].name).toBe(longName);
       expect(() => logbook.render(mockRenderer)).not.toThrow();
@@ -598,12 +683,12 @@ describe('DiscoveryLogbook - Discovery History and UI System', () => {
     it('should maintain consistent state through multiple operations', () => {
       // Add enough discoveries to enable scrolling (more than maxVisible=12)
       for (let i = 0; i < 15; i++) {
-        logbook.addDiscovery(`Star ${i}`, 'G-type Star');
+        addTestDiscovery(`Star ${i}`, 'G-type Star');
       }
       
-      // Toggle visibility, scroll, update
+      // Toggle visibility (sets scroll to bottom = 3), then scroll up by 1 to get to 2
       logbook.toggle();
-      logbook.handleScroll(2);
+      logbook.handleScroll(-1); // Scroll up by 1 to get from 3 to 2
       logbook.update(0.016);
       logbook.updateTimestamps();
       

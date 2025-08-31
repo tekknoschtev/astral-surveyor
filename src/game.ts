@@ -209,6 +209,12 @@ export class Game {
         // Connect DiscoveryManager to SaveLoadService for persistence
         this.saveLoadService.setDiscoveryManager(this.discoveryManager);
         
+        // Connect DiscoveryManager to DiscoveryLogbook for enhanced UI
+        this.discoveryLogbook.setDiscoveryManager(this.discoveryManager);
+        
+        // Connect DiscoveryDisplay to DiscoveryLogbook for notifications
+        this.discoveryLogbook.setDiscoveryDisplay(this.discoveryDisplay);
+        
         // Initialize developer console
         this.commandRegistry = new CommandRegistry();
         this.developerConsole = new DeveloperConsole(
@@ -459,6 +465,20 @@ export class Game {
                     this.stellarMap.resetPanState();
                 }
                 
+                // Check if discovery logbook handled the click first
+                if (this.discoveryLogbook.isVisible()) {
+                    const logbookHandled = this.discoveryLogbook.handleClick(
+                        this.input.getMouseX(), 
+                        this.input.getMouseY(), 
+                        this.renderer.canvas.width, 
+                        this.renderer.canvas.height,
+                        this.camera
+                    );
+                    if (logbookHandled) {
+                        this.input.consumeTouch();
+                    }
+                }
+                
                 // Check if touch hit any TouchUI buttons first
                 const touchAction = this.touchUI.handleTouch(this.input.getMouseX(), this.input.getMouseY());
                 if (touchAction) {
@@ -489,6 +509,16 @@ export class Game {
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);
+        }
+
+        // Handle discovery logbook hover effects
+        if (this.discoveryLogbook.isVisible()) {
+            this.discoveryLogbook.handleMouseMove(
+                this.input.getMouseX(), 
+                this.input.getMouseY(), 
+                this.renderer.canvas.width, 
+                this.renderer.canvas.height
+            );
         }
         
         // Pinch zoom is now handled in stellarMap.update() via input system
