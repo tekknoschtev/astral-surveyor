@@ -253,22 +253,25 @@ export class RenderCache {
     // Private helper methods
 
     private evictLRU(): void {
-        // Find entry with oldest timestamp and lowest hit count
-        let oldestKey: string | null = null;
-        let oldestTime = Infinity;
-        let lowestHits = Infinity;
+        // Find entry with lowest priority score (considers both age and hit count)
+        let worstKey: string | null = null;
+        let worstScore = Infinity;
 
         for (const [key, entry] of this.cache) {
-            if (entry.timestamp < oldestTime || 
-                (entry.timestamp === oldestTime && entry.hitCount < lowestHits)) {
-                oldestKey = key;
-                oldestTime = entry.timestamp;
-                lowestHits = entry.hitCount;
+            // Calculate priority score: lower is worse (more likely to evict)
+            // Heavily weight hit count to keep frequently accessed items
+            const ageScore = Date.now() - entry.timestamp;
+            const hitScore = entry.hitCount * 10000; // Heavy weight for hits
+            const priorityScore = hitScore - ageScore; // Higher hits = higher score
+            
+            if (priorityScore < worstScore) {
+                worstKey = key;
+                worstScore = priorityScore;
             }
         }
 
-        if (oldestKey) {
-            this.cache.delete(oldestKey);
+        if (worstKey) {
+            this.cache.delete(worstKey);
         }
     }
 

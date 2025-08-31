@@ -280,7 +280,7 @@ export class Game {
     }
 
     /**
-     * Check for existing save game and prompt user to load it
+     * Check for existing save game and auto-load it for seamless experience
      */
     private async checkForExistingSave(): Promise<void> {
         try {
@@ -288,47 +288,45 @@ export class Game {
             
             if (saveInfo.exists && saveInfo.timestamp) {
                 const saveDate = new Date(saveInfo.timestamp).toLocaleString();
-                this.confirmationDialog.show({
-                    title: 'Continue Journey',
-                    message: `Found saved game from ${saveDate}. Would you like to continue your exploration?`,
-                    confirmText: 'Continue',
-                    cancelText: 'New Game',
-                    onConfirm: async () => {
-                        const result = await this.saveLoadService.loadGame();
-                        if (result.success) {
-                            // Force chunk reload at loaded position
-                            this.chunkManager.clearAllChunks();
-                            this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
-                            
-                            // Restore discovery state for newly loaded objects
-                            const activeObjects = this.chunkManager.getAllActiveObjects();
-                            const flattenedObjects = [
-                                ...activeObjects.stars,
-                                ...activeObjects.planets, 
-                                ...activeObjects.moons,
-                                ...activeObjects.nebulae,
-                                ...activeObjects.asteroidGardens,
-                                ...activeObjects.wormholes,
-                                ...activeObjects.blackholes,
-                                ...activeObjects.comets
-                            ].filter(obj => obj.hasOwnProperty('discovered'));
-                            this.chunkManager.restoreDiscoveryState(flattenedObjects);
-                            
-                            // Center stellar map on loaded position
-                            this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
-                            
-                            this.discoveryDisplay.addNotification('💾 Welcome back, explorer!');
-                        } else {
-                            this.discoveryDisplay.addNotification(`❌ Load failed: ${result.error}`);
-                        }
-                    },
-                    onCancel: () => {
-                        this.discoveryDisplay.addNotification('🌟 Starting fresh exploration!');
-                    }
-                });
+                const result = await this.saveLoadService.loadGame();
+                
+                if (result.success) {
+                    // Force chunk reload at loaded position
+                    this.chunkManager.clearAllChunks();
+                    this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
+                    
+                    // Restore discovery state for newly loaded objects
+                    const activeObjects = this.chunkManager.getAllActiveObjects();
+                    const flattenedObjects = [
+                        ...activeObjects.stars,
+                        ...activeObjects.planets, 
+                        ...activeObjects.moons,
+                        ...activeObjects.nebulae,
+                        ...activeObjects.asteroidGardens,
+                        ...activeObjects.wormholes,
+                        ...activeObjects.blackholes,
+                        ...activeObjects.comets
+                    ].filter(obj => obj.hasOwnProperty('discovered'));
+                    this.chunkManager.restoreDiscoveryState(flattenedObjects);
+                    
+                    // Center stellar map on loaded position
+                    this.stellarMap.centerOnPosition(this.camera.x, this.camera.y);
+                    
+                    // Show subtle welcome back message with save info
+                    this.discoveryDisplay.addNotification(`💾 Welcome back, explorer! (Restored from ${saveDate})`);
+                } else {
+                    // Graceful fallback to new game on load failure
+                    console.warn('Auto-load failed, starting fresh:', result.error);
+                    this.discoveryDisplay.addNotification('🌟 Starting fresh exploration!');
+                }
+            } else {
+                // No save exists, start new game silently
+                this.discoveryDisplay.addNotification('🌟 Welcome to the cosmos, explorer!');
             }
         } catch (error) {
             console.warn('Failed to check for existing save:', error);
+            // Graceful fallback - start new game on any error
+            this.discoveryDisplay.addNotification('🌟 Starting fresh exploration!');
         }
     }
 

@@ -1637,4 +1637,155 @@ describe('Game System - Main Game Loop and Orchestration', () => {
       expect(() => game.render()).not.toThrow();
     });
   });
+
+  describe('Auto-Load Save Game System', () => {
+    beforeEach(() => {
+      game = new Game(mockCanvas);
+      
+      // Mock save/load service methods
+      game.saveLoadService.getSaveGameInfo = vi.fn();
+      game.saveLoadService.loadGame = vi.fn();
+      
+      // Mock chunk manager and other systems needed for restore
+      game.chunkManager.clearAllChunks = vi.fn();
+      game.chunkManager.updateActiveChunks = vi.fn();
+      game.chunkManager.getAllActiveObjects = vi.fn().mockReturnValue({
+        stars: [],
+        planets: [],
+        moons: [],
+        celestialStars: [],
+        nebulae: [],
+        asteroidGardens: [],
+        wormholes: [],
+        blackholes: [],
+        comets: []
+      });
+      game.chunkManager.restoreDiscoveryState = vi.fn();
+      
+      // Mock stellar map and discovery display
+      game.stellarMap.centerOnPosition = vi.fn();
+      game.discoveryDisplay.addNotification = vi.fn();
+      
+      // Mock camera position
+      game.camera.x = 1000;
+      game.camera.y = 2000;
+    });
+
+    it('should auto-load existing save without prompting', async () => {
+      const mockSaveInfo = {
+        exists: true,
+        timestamp: 1640000000000,
+        version: '1.0.0'
+      };
+      
+      game.saveLoadService.getSaveGameInfo.mockResolvedValue(mockSaveInfo);
+      game.saveLoadService.loadGame.mockResolvedValue({ success: true });
+      
+      await game.checkForExistingSave();
+      
+      expect(game.saveLoadService.getSaveGameInfo).toHaveBeenCalled();
+      expect(game.saveLoadService.loadGame).toHaveBeenCalled();
+      expect(game.chunkManager.clearAllChunks).toHaveBeenCalled();
+      expect(game.chunkManager.updateActiveChunks).toHaveBeenCalledWith(1000, 2000);
+      expect(game.stellarMap.centerOnPosition).toHaveBeenCalledWith(1000, 2000);
+      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith(
+        expect.stringMatching(/💾 Welcome back, explorer! \(Restored from.*\)/)
+      );
+    });
+
+    it('should show welcome message for new players with no save', async () => {
+      const mockSaveInfo = {
+        exists: false
+      };
+      
+      game.saveLoadService.getSaveGameInfo.mockResolvedValue(mockSaveInfo);
+      
+      await game.checkForExistingSave();
+      
+      expect(game.saveLoadService.getSaveGameInfo).toHaveBeenCalled();
+      expect(game.saveLoadService.loadGame).not.toHaveBeenCalled();
+      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('🌟 Welcome to the cosmos, explorer!');
+    });
+
+    it('should gracefully fallback on load failure', async () => {
+      const mockSaveInfo = {
+        exists: true,
+        timestamp: 1640000000000,
+        version: '1.0.0'
+      };
+      
+      game.saveLoadService.getSaveGameInfo.mockResolvedValue(mockSaveInfo);
+      game.saveLoadService.loadGame.mockResolvedValue({ 
+        success: false, 
+        error: 'Corrupted save data' 
+      });
+      
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      await game.checkForExistingSave();
+      
+      expect(game.saveLoadService.loadGame).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith('Auto-load failed, starting fresh:', 'Corrupted save data');
+      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('🌟 Starting fresh exploration!');
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle getSaveGameInfo errors gracefully', async () => {
+      game.saveLoadService.getSaveGameInfo.mockRejectedValue(new Error('Storage access denied'));
+      
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      await game.checkForExistingSave();
+      
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to check for existing save:', expect.any(Error));
+      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('🌟 Starting fresh exploration!');
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should restore discovery state for loaded objects', async () => {
+      const mockSaveInfo = {
+        exists: true,
+        timestamp: 1640000000000,
+        version: '1.0.0'
+      };
+      
+      const mockDiscoveredObject = { type: 'star', discovered: true };
+      const mockUndiscoveredObject = { type: 'planet' }; // No discovered property
+      
+      game.saveLoadService.getSaveGameInfo.mockResolvedValue(mockSaveInfo);
+      game.saveLoadService.loadGame.mockResolvedValue({ success: true });
+      game.chunkManager.getAllActiveObjects.mockReturnValue({
+        stars: [],
+        planets: [mockDiscoveredObject, mockUndiscoveredObject],
+        moons: [],
+        celestialStars: [],
+        nebulae: [],
+        asteroidGardens: [],
+        wormholes: [],
+        blackholes: [],
+        comets: []
+      });
+      
+      await game.checkForExistingSave();
+      
+      expect(game.chunkManager.restoreDiscoveryState).toHaveBeenCalledWith([mockDiscoveredObject]);
+    });
+
+    it('should handle save with missing timestamp gracefully', async () => {
+      const mockSaveInfo = {
+        exists: true,
+        // No timestamp
+        version: '1.0.0'
+      };
+      
+      game.saveLoadService.getSaveGameInfo.mockResolvedValue(mockSaveInfo);
+      
+      await game.checkForExistingSave();
+      
+      expect(game.saveLoadService.loadGame).not.toHaveBeenCalled();
+      expect(game.discoveryDisplay.addNotification).toHaveBeenCalledWith('🌟 Welcome to the cosmos, explorer!');
+    });
+  });
 });
