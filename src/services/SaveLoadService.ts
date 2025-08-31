@@ -263,6 +263,11 @@ export class SaveLoadService implements ISaveLoadService {
             this.camera.velocityY = saveData.player.velocityY;
         }
 
+        // Restore distance traveled
+        if (this.camera.sessionDistanceTraveled !== undefined) {
+            this.camera.sessionDistanceTraveled = saveData.player.distanceTraveled;
+        }
+
         // Restore world state
         if (saveData.world.currentSeed) {
             this.setCurrentSeed(saveData.world.currentSeed);
@@ -340,7 +345,7 @@ export class SaveLoadService implements ISaveLoadService {
 
     private getDistanceTraveled(): number {
         // Access distance from camera or separate tracking
-        return (this.camera as any).distanceTraveled || 0;
+        return this.camera.getSessionDistance();
     }
 
     private getCurrentSeed(): string {

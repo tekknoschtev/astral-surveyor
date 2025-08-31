@@ -34,7 +34,9 @@ describe('SaveLoadService', () => {
             y: 2000,
             velocityX: 5,
             velocityY: -3,
-            distanceTraveled: 15000
+            distanceTraveled: 15000,
+            sessionDistanceTraveled: 15000,
+            getSessionDistance: vi.fn(() => 15000)
         };
 
         // Mock discovery logbook
@@ -470,6 +472,63 @@ describe('SaveLoadService', () => {
                 'star_1000_2000', 
                 { timestamp: 1640000000000, type: 'star' }
             );
+        });
+
+        it('should save and restore distance traveled correctly', async () => {
+            // Set up camera with some distance traveled
+            const testDistance = 12345;
+            mockCamera.getSessionDistance.mockReturnValue(testDistance);
+            mockCamera.sessionDistanceTraveled = testDistance;
+            
+            // Save the game
+            const saveResult = await saveLoadService.saveGame();
+            expect(saveResult.success).toBe(true);
+            
+            // Verify the saved data includes correct distance
+            const saveCall = mockStorageService.setItem.mock.calls[0];
+            const savedData = saveCall[1];
+            expect(savedData.player.distanceTraveled).toBe(testDistance);
+            
+            // Reset camera distance to 0 to simulate loading into fresh state
+            mockCamera.sessionDistanceTraveled = 0;
+            
+            // Set up storage service to return the saved data
+            mockStorageService.getItem.mockReturnValue({
+                success: true,
+                data: savedData,
+                version: '1.0.0'
+            });
+            
+            // Load the game
+            const loadResult = await saveLoadService.loadGame();
+            expect(loadResult.success).toBe(true);
+            
+            // Verify distance was restored to camera
+            expect(mockCamera.sessionDistanceTraveled).toBe(testDistance);
+        });
+
+        it('should handle zero distance correctly', async () => {
+            // Test with zero distance
+            mockCamera.getSessionDistance.mockReturnValue(0);
+            mockCamera.sessionDistanceTraveled = 0;
+            
+            const saveResult = await saveLoadService.saveGame();
+            expect(saveResult.success).toBe(true);
+            
+            const saveCall = mockStorageService.setItem.mock.calls[0];
+            const savedData = saveCall[1];
+            expect(savedData.player.distanceTraveled).toBe(0);
+            
+            // Load and verify
+            mockStorageService.getItem.mockReturnValue({
+                success: true,
+                data: savedData,
+                version: '1.0.0'
+            });
+            
+            const loadResult = await saveLoadService.loadGame();
+            expect(loadResult.success).toBe(true);
+            expect(mockCamera.sessionDistanceTraveled).toBe(0);
         });
     });
 });
