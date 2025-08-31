@@ -6,6 +6,7 @@ import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 import type { Input } from '../input/input.js';
 import { NamingService } from '../naming/naming.js';
+import type { SeedInspectorService, CelestialObjectData } from '../debug/SeedInspectorService.js';
 
 // Interface definitions
 interface StarLike {
@@ -149,6 +150,13 @@ export class StellarMap {
     gridColor: string;
     currentPositionColor: string;
     starColors: Record<string, string>;
+    
+    // Inspector mode properties
+    inspectorMode: boolean;
+    inspectorSeed: number | null;
+    inspectorService: SeedInspectorService | null;
+    inspectorObjects: CelestialObjectData[];
+    inspectorZoomExtended: boolean; // Whether extended zoom is enabled
 
     constructor() {
         this.visible = false;
@@ -195,6 +203,13 @@ export class StellarMap {
             'White Dwarf': '#ffffff',
             'Neutron Star': '#ddddff'
         };
+        
+        // Initialize inspector mode properties
+        this.inspectorMode = false;
+        this.inspectorSeed = null;
+        this.inspectorService = null;
+        this.inspectorObjects = [];
+        this.inspectorZoomExtended = false;
     }
 
     private getLabelFont(): string {
@@ -212,6 +227,11 @@ export class StellarMap {
     centerOnPosition(x: number, y: number): void {
         this.centerX = x;
         this.centerY = y;
+        
+        // Refresh inspector data if in inspector mode
+        if (this.inspectorMode) {
+            this.refreshInspectorData();
+        }
     }
 
     update(deltaTime: number, camera: Camera, input?: Input): void {
@@ -897,11 +917,23 @@ export class StellarMap {
     }
 
     zoomIn(): void {
-        this.zoomLevel = Math.min(this.zoomLevel * 1.5, 10.0);
+        const maxZoom = this.inspectorZoomExtended ? 50.0 : 10.0; // Extended zoom for inspector mode
+        this.zoomLevel = Math.min(this.zoomLevel * 1.5, maxZoom);
+        
+        // Refresh inspector data on zoom changes
+        if (this.inspectorMode) {
+            this.refreshInspectorData();
+        }
     }
 
     zoomOut(): void {
-        this.zoomLevel = Math.max(this.zoomLevel / 1.5, 0.01);
+        const minZoom = this.inspectorZoomExtended ? 0.001 : 0.01; // Extended zoom out for wide patterns
+        this.zoomLevel = Math.max(this.zoomLevel / 1.5, minZoom);
+        
+        // Refresh inspector data on zoom changes  
+        if (this.inspectorMode) {
+            this.refreshInspectorData();
+        }
     }
 
     render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null): void {
@@ -976,6 +1008,11 @@ export class StellarMap {
         // Draw discovered comets (elliptical orbital objects with visible tails)
         if (discoveredComets && discoveredComets.length > 0) {
             this.renderDiscoveredComets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredComets);
+        }
+
+        // Draw inspector mode objects (all objects for seed analysis)
+        if (this.inspectorMode) {
+            this.renderInspectorObjects(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale);
         }
         
         // Draw origin (0,0) marker
@@ -3006,6 +3043,178 @@ export class StellarMap {
             console.warn('Failed to generate planet name:', error);
             return `Planet ${planet.planetIndex + 1}`;
         }
+    }
+
+    // === INSPECTOR MODE METHODS ===
+
+    /**
+     * Initialize inspector mode with seed inspector service
+     */
+    initInspectorMode(seedInspectorService: SeedInspectorService): void {
+        this.inspectorService = seedInspectorService;
+    }
+
+    /**
+     * Enable inspector mode with a specific seed
+     * @param seed - Universe seed to inspect
+     */
+    async enableInspectorMode(seed: number): Promise<void> {
+        if (!this.inspectorService) {
+            throw new Error('Inspector service not initialized. Call initInspectorMode() first.');
+        }
+
+        this.inspectorMode = true;
+        this.inspectorSeed = seed;
+        this.inspectorZoomExtended = true;
+
+        // Load objects for current view area
+        await this.refreshInspectorData();
+        console.log(`🔍 Inspector mode enabled for seed ${seed}`);
+    }
+
+    /**
+     * Disable inspector mode and return to discovered-only view
+     */
+    disableInspectorMode(): void {
+        this.inspectorMode = false;
+        this.inspectorSeed = null;
+        this.inspectorObjects = [];
+        this.inspectorZoomExtended = false;
+        console.log('🔍 Inspector mode disabled - showing discovered objects only');
+    }
+
+    /**
+     * Toggle between inspector mode and normal mode
+     */
+    toggleInspectorMode(): void {
+        if (this.inspectorMode) {
+            this.disableInspectorMode();
+        } else if (this.inspectorSeed) {
+            // Re-enable with last used seed
+            this.enableInspectorMode(this.inspectorSeed);
+        }
+    }
+
+    /**
+     * Check if inspector mode is active
+     */
+    isInspectorMode(): boolean {
+        return this.inspectorMode;
+    }
+
+    /**
+     * Refresh inspector data for current view area
+     */
+    private async refreshInspectorData(): Promise<void> {
+        if (!this.inspectorService || !this.inspectorSeed) return;
+
+        try {
+            // Calculate appropriate chunk radius based on zoom level
+            // Higher zoom = smaller area, lower zoom = larger area for pattern viewing
+            const baseRadius = 2; // Default 5x5 chunks
+            const zoomAdjustment = Math.max(1, Math.ceil(3 / this.zoomLevel)); // Larger area when zoomed out
+            const chunkRadius = Math.min(baseRadius + zoomAdjustment, 10); // Cap at reasonable size
+
+            this.inspectorObjects = await this.inspectorService.getRegionObjects(
+                this.inspectorSeed,
+                this.centerX,
+                this.centerY,
+                chunkRadius
+            );
+        } catch (error) {
+            console.warn('Failed to refresh inspector data:', error);
+            this.inspectorObjects = [];
+        }
+    }
+
+    /**
+     * Get inspector object color based on type and mode
+     */
+    private getInspectorObjectColor(objectType: string): string {
+        const colors = {
+            backgroundStar: '#666666',      // Dim gray for background stars
+            celestialStar: '#ffdd88',       // Bright yellow for discoverable stars  
+            planet: '#88aa88',              // Green for planets
+            moon: '#cccccc',                // Light gray for moons
+            nebula: '#ff88cc',              // Pink for nebulae
+            asteroidGarden: '#cc8844',      // Orange for asteroid gardens
+            wormhole: '#8844ff',            // Purple for wormholes
+            blackhole: '#ff0000',           // Red for black holes
+            comet: '#88ccff'                // Light blue for comets
+        };
+        return colors[objectType] || '#ffffff';
+    }
+
+    /**
+     * Render inspector mode objects (all objects, not just discovered)
+     */
+    private renderInspectorObjects(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number): void {
+        if (!this.inspectorMode || this.inspectorObjects.length === 0) return;
+
+        ctx.save();
+
+        // Render objects with inspector styling
+        for (const obj of this.inspectorObjects) {
+            const objMapX = mapX + ((obj.x - this.centerX) * scale) + mapWidth / 2;
+            const objMapY = mapY + ((obj.y - this.centerY) * scale) + mapHeight / 2;
+
+            // Skip objects outside visible area
+            if (objMapX < mapX - 20 || objMapX > mapX + mapWidth + 20 ||
+                objMapY < mapY - 20 || objMapY > mapY + mapHeight + 20) {
+                continue;
+            }
+
+            const color = this.getInspectorObjectColor(obj.type);
+            
+            // Render based on object type
+            if (obj.type === 'backgroundStar') {
+                // Small dots for background stars
+                ctx.fillStyle = color + '80'; // Semi-transparent
+                ctx.beginPath();
+                ctx.arc(objMapX, objMapY, 1, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Larger symbols for discoverable objects
+                const size = obj.type === 'blackhole' ? 4 : 
+                           obj.type === 'celestialStar' ? 3 : 2;
+                
+                // Different shapes for different object types
+                if (obj.type === 'wormhole') {
+                    // Diamond shape for wormholes
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(objMapX, objMapY - size);
+                    ctx.lineTo(objMapX + size, objMapY);
+                    ctx.lineTo(objMapX, objMapY + size);
+                    ctx.lineTo(objMapX - size, objMapY);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else if (obj.type === 'nebula') {
+                    // Larger circle with dashed border for nebulae
+                    ctx.strokeStyle = color + '60';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.arc(objMapX, objMapY, size * 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                } else {
+                    // Filled circles for other objects
+                    ctx.fillStyle = color + '90'; // Semi-transparent
+                    ctx.beginPath();
+                    ctx.arc(objMapX, objMapY, size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Add border for better visibility
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        ctx.restore();
     }
 }
 
