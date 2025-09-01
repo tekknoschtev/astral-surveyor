@@ -82,7 +82,9 @@ describe('DeveloperConsole', () => {
             
             expect(mockCommandRegistry.execute).toHaveBeenCalledWith('test command', {
                 camera: mockCamera,
-                chunkManager: mockChunkManager
+                chunkManager: mockChunkManager,
+                getCurrentSeed: expect.any(Function),
+                stellarMap: undefined
             });
         });
 

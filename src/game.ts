@@ -26,6 +26,7 @@ import { StorageService } from './services/StorageService.js';
 import { SaveLoadService } from './services/SaveLoadService.js';
 import { EventDispatcher } from './services/EventSystem.js';
 import { ConfirmationDialog } from './ui/ConfirmationDialog.js';
+import { SeedInspectorService } from './debug/SeedInspectorService.js';
 // Type imports will be cleaned up in Phase 2 when we extract celestial classes
 import { 
     initializeUniverseSeed, 
@@ -108,6 +109,7 @@ export class Game {
     saveLoadService: SaveLoadService;
     eventSystem: EventDispatcher;
     confirmationDialog: ConfirmationDialog;
+    seedInspectorService: SeedInspectorService;
     
     // Performance optimization: Cache active objects between update and render phases
     private cachedActiveObjects?: ActiveObjects;
@@ -220,7 +222,8 @@ export class Game {
         this.developerConsole = new DeveloperConsole(
             this.commandRegistry,
             this.camera,
-            this.chunkManager
+            this.chunkManager,
+            this.stellarMap
         );
         
         // Connect naming service to stellar map
@@ -247,6 +250,10 @@ export class Game {
         // Initialize event system and set up global access
         this.eventSystem = new EventDispatcher();
         (window as any).gameEventSystem = this.eventSystem;
+        
+        // Initialize seed inspector service for developer tools
+        this.seedInspectorService = new SeedInspectorService(this.chunkManager);
+        this.stellarMap.initInspectorMode(this.seedInspectorService);
         
         // Set up save/load event handlers
         this.setupSaveLoadEventHandlers();
@@ -484,9 +491,18 @@ export class Game {
                     // Prevent the touch from affecting ship movement
                     this.input.consumeTouch();
                 } else if (this.stellarMap.isVisible() && !this.input.isTouchConsumed()) {
-                    // Handle stellar map interactions (simplified) - only if not panning
-                    const discovered = this.getDiscoveredObjects();
-                    this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+                    // First check for statistics overlay clicks
+                    const overlayClicked = this.stellarMap.handleStatisticsOverlayClick(
+                        this.input.getMouseX(), 
+                        this.input.getMouseY(), 
+                        this.renderer.canvas
+                    );
+                    
+                    if (!overlayClicked) {
+                        // Handle stellar map interactions (simplified) - only if not panning
+                        const discovered = this.getDiscoveredObjects();
+                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+                    }
                 }
             }
         }
@@ -504,6 +520,9 @@ export class Game {
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
             this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+            
+            // Also update statistics overlay hover state
+            this.stellarMap.updateStatisticsOverlayHover(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas);
         } else {
             // Reset cursor when map is not visible
             this.stellarMap.updateCursor(this.renderer.canvas);

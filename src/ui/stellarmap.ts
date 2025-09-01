@@ -157,6 +157,22 @@ export class StellarMap {
     inspectorService: SeedInspectorService | null;
     inspectorObjects: CelestialObjectData[];
     inspectorZoomExtended: boolean; // Whether extended zoom is enabled
+    
+    // Statistics overlay properties
+    statisticsOverlayEnabled: boolean;
+    currentViewStatistics: {
+        objectCounts: Record<string, number>;
+        totalObjects: number;
+        density: number;
+        regionArea: number;
+    } | null;
+    objectTypeVisibility: Record<string, boolean>;
+    hoveredObjectTypeIndex: number;
+    showDiscoveredObjects: boolean;
+    
+    // Persistent revealed areas system
+    revealedChunks: Map<string, CelestialObjectData[]>;
+    revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
 
     constructor() {
         this.visible = false;
@@ -210,6 +226,27 @@ export class StellarMap {
         this.inspectorService = null;
         this.inspectorObjects = [];
         this.inspectorZoomExtended = false;
+        
+        // Initialize statistics overlay properties
+        this.statisticsOverlayEnabled = false;
+        this.currentViewStatistics = null;
+        this.objectTypeVisibility = {
+            'backgroundStar': true,
+            'celestialStar': true,
+            'planet': true,
+            'moon': true,
+            'nebula': true,
+            'asteroidGarden': true,
+            'wormhole': true,
+            'blackhole': true,
+            'comet': true
+        };
+        this.hoveredObjectTypeIndex = -1;
+        this.showDiscoveredObjects = true;
+        
+        // Initialize persistent revealed areas system
+        this.revealedChunks = new Map();
+        this.revealedChunksMetadata = new Map();
     }
 
     private getLabelFont(): string {
@@ -228,10 +265,8 @@ export class StellarMap {
         this.centerX = x;
         this.centerY = y;
         
-        // Refresh inspector data if in inspector mode
-        if (this.inspectorMode) {
-            this.refreshInspectorData();
-        }
+        // Note: Inspector mode now uses persistent revealed chunks
+        // No need to refresh data on position changes
     }
 
     update(deltaTime: number, camera: Camera, input?: Input): void {
@@ -920,20 +955,16 @@ export class StellarMap {
         const maxZoom = this.inspectorZoomExtended ? 50.0 : 10.0; // Extended zoom for inspector mode
         this.zoomLevel = Math.min(this.zoomLevel * 1.5, maxZoom);
         
-        // Refresh inspector data on zoom changes
-        if (this.inspectorMode) {
-            this.refreshInspectorData();
-        }
+        // Note: Inspector mode now uses persistent revealed chunks
+        // No need to refresh data on zoom changes
     }
 
     zoomOut(): void {
         const minZoom = this.inspectorZoomExtended ? 0.001 : 0.01; // Extended zoom out for wide patterns
         this.zoomLevel = Math.max(this.zoomLevel / 1.5, minZoom);
         
-        // Refresh inspector data on zoom changes  
-        if (this.inspectorMode) {
-            this.refreshInspectorData();
-        }
+        // Note: Inspector mode now uses persistent revealed chunks
+        // No need to refresh data on zoom changes
     }
 
     render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null): void {
@@ -977,13 +1008,16 @@ export class StellarMap {
         // Draw coordinate grid
         this.renderGrid(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale);
         
-        // Draw discovered stars
-        this.renderDiscoveredStars(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredStars);
-        
-        // Draw discovered planets (only in detail view)
-        if (this.zoomLevel > 3.0 && discoveredPlanets) {
-            this.renderDiscoveredPlanets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredPlanets);
+        // Draw discovered objects (conditionally in inspector mode)
+        if (!this.inspectorMode || this.showDiscoveredObjects) {
+            // Draw discovered stars
+            this.renderDiscoveredStars(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredStars);
         }
+        
+            // Draw discovered planets (only in detail view)
+            if (this.zoomLevel > 3.0 && discoveredPlanets) {
+                this.renderDiscoveredPlanets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredPlanets);
+            }
 
         // Draw discovered nebulae (larger scale objects, visible at all zoom levels)
         if (discoveredNebulae && discoveredNebulae.length > 0) {
@@ -1013,6 +1047,11 @@ export class StellarMap {
         // Draw inspector mode objects (all objects for seed analysis)
         if (this.inspectorMode) {
             this.renderInspectorObjects(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale);
+        }
+        
+        // Draw statistics overlay
+        if (this.statisticsOverlayEnabled && this.inspectorMode) {
+            this.renderStatisticsOverlay(ctx, mapX, mapY, mapWidth, mapHeight);
         }
         
         // Draw origin (0,0) marker
@@ -3066,9 +3105,15 @@ export class StellarMap {
         this.inspectorMode = true;
         this.inspectorSeed = seed;
         this.inspectorZoomExtended = true;
+        this.statisticsOverlayEnabled = true;
 
-        // Load objects for current view area
-        await this.refreshInspectorData();
+        // Reveal initial area around current position
+        const result = await this.revealChunks(seed, this.centerX, this.centerY, 2);
+        if (result.newChunks > 0) {
+            console.log(`📍 Revealed ${result.newChunks} new chunks (${result.totalChunks} total in area)`);
+        } else {
+            console.log(`📍 All ${result.totalChunks} chunks in area already revealed`);
+        }
         console.log(`🔍 Inspector mode enabled for seed ${seed}`);
     }
 
@@ -3103,28 +3148,361 @@ export class StellarMap {
     }
 
     /**
-     * Refresh inspector data for current view area
+     * Legacy method - now using persistent revealed chunks system
+     * This method is kept for backward compatibility but doesn't perform real-time generation
      */
     private async refreshInspectorData(): Promise<void> {
-        if (!this.inspectorService || !this.inspectorSeed) return;
+        // Inspector mode now uses persistent revealed chunks
+        // Statistics are updated when chunks are revealed
+        if (this.statisticsOverlayEnabled && this.inspectorSeed) {
+            await this.updateViewStatistics();
+        }
+    }
+
+    /**
+     * Enable statistics overlay
+     */
+    enableStatisticsOverlay(): void {
+        this.statisticsOverlayEnabled = true;
+        if (this.inspectorMode) {
+            this.updateViewStatistics();
+        }
+    }
+
+    /**
+     * Disable statistics overlay
+     */
+    disableStatisticsOverlay(): void {
+        this.statisticsOverlayEnabled = false;
+        this.currentViewStatistics = null;
+    }
+
+    /**
+     * Toggle statistics overlay on/off
+     */
+    toggleStatisticsOverlay(): void {
+        if (this.statisticsOverlayEnabled) {
+            this.disableStatisticsOverlay();
+        } else {
+            this.enableStatisticsOverlay();
+        }
+    }
+
+    /**
+     * Generate unique key for chunk identification
+     */
+    private getChunkKey(seed: number, chunkX: number, chunkY: number): string {
+        return `${seed}_${chunkX}_${chunkY}`;
+    }
+
+    /**
+     * Check if a specific chunk is already revealed
+     */
+    isChunkRevealed(seed: number, chunkX: number, chunkY: number): boolean {
+        return this.revealedChunks.has(this.getChunkKey(seed, chunkX, chunkY));
+    }
+
+    /**
+     * Add chunk data to revealed areas
+     */
+    private addRevealedChunk(seed: number, chunkX: number, chunkY: number, objects: CelestialObjectData[]): void {
+        const key = this.getChunkKey(seed, chunkX, chunkY);
+        this.revealedChunks.set(key, objects);
+        this.revealedChunksMetadata.set(key, {
+            timestamp: Date.now(),
+            seed: seed,
+            chunkX: chunkX,
+            chunkY: chunkY
+        });
+    }
+
+    /**
+     * Get all revealed objects for the current seed
+     */
+    private getRevealedObjects(seed: number): CelestialObjectData[] {
+        const objects: CelestialObjectData[] = [];
+        for (const [key, chunkObjects] of this.revealedChunks.entries()) {
+            const metadata = this.revealedChunksMetadata.get(key);
+            if (metadata && metadata.seed === seed) {
+                objects.push(...chunkObjects);
+            }
+        }
+        return objects;
+    }
+
+    /**
+     * Clear all revealed chunks for current or specified seed
+     */
+    clearRevealedChunks(seed?: number): void {
+        if (seed === undefined) {
+            // Clear all revealed chunks
+            this.revealedChunks.clear();
+            this.revealedChunksMetadata.clear();
+            console.log('🧹 Cleared all revealed chunks');
+        } else {
+            // Clear chunks for specific seed
+            const keysToDelete: string[] = [];
+            for (const [key, metadata] of this.revealedChunksMetadata.entries()) {
+                if (metadata.seed === seed) {
+                    keysToDelete.push(key);
+                }
+            }
+            
+            keysToDelete.forEach(key => {
+                this.revealedChunks.delete(key);
+                this.revealedChunksMetadata.delete(key);
+            });
+            
+            console.log(`🧹 Cleared ${keysToDelete.length} revealed chunks for seed ${seed}`);
+        }
+    }
+
+    /**
+     * Reveal chunks around a center position with specified radius
+     */
+    async revealChunks(seed: number, centerWorldX: number, centerWorldY: number, chunkRadius: number = 2): Promise<{ newChunks: number; totalChunks: number }> {
+        if (!this.inspectorService) {
+            throw new Error('Inspector service not initialized');
+        }
+
+        // Convert world coordinates to chunk coordinates
+        const chunkSize = 1000; // Each chunk is 1000x1000 world units
+        const centerChunkX = Math.floor(centerWorldX / chunkSize);
+        const centerChunkY = Math.floor(centerWorldY / chunkSize);
+
+        let newChunksRevealed = 0;
+        let totalChunksInArea = 0;
+
+        // Performance warning for large areas
+        const totalChunks = (chunkRadius * 2 + 1) * (chunkRadius * 2 + 1);
+        if (totalChunks > 1000) {
+            console.warn(`⚠️ Large reveal requested: ${totalChunks} chunks. This may take a while...`);
+        }
+
+        // Generate chunks in the specified radius
+        for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
+                const chunkX = centerChunkX + dx;
+                const chunkY = centerChunkY + dy;
+                totalChunksInArea++;
+
+                // Skip if chunk is already revealed
+                if (this.isChunkRevealed(seed, chunkX, chunkY)) {
+                    continue;
+                }
+
+                // Generate objects for this chunk
+                const chunkCenterX = chunkX * chunkSize + chunkSize / 2;
+                const chunkCenterY = chunkY * chunkSize + chunkSize / 2;
+                
+                try {
+                    // Generate single chunk (radius = 0 means just the center chunk)
+                    const chunkObjects = await this.inspectorService.getRegionObjects(
+                        seed,
+                        chunkCenterX,
+                        chunkCenterY,
+                        0
+                    );
+
+                    // Add to revealed chunks
+                    this.addRevealedChunk(seed, chunkX, chunkY, chunkObjects);
+                    newChunksRevealed++;
+                } catch (error) {
+                    console.warn('Failed to reveal chunks:', error);
+                    // Continue with other chunks even if one fails
+                }
+            }
+        }
+
+        // Update inspector objects to use all revealed chunks for current seed
+        this.inspectorObjects = this.getRevealedObjects(seed);
+
+        // Update statistics if new chunks were revealed
+        if (newChunksRevealed > 0 && this.statisticsOverlayEnabled) {
+            await this.updateViewStatistics();
+        }
+
+        return {
+            newChunks: newChunksRevealed,
+            totalChunks: totalChunksInArea
+        };
+    }
+
+    /**
+     * Handle clicks on the statistics overlay for toggling object types
+     */
+    handleStatisticsOverlayClick(mouseX: number, mouseY: number, canvas: HTMLCanvasElement): boolean {
+        if (!this.statisticsOverlayEnabled || !this.currentViewStatistics || !this.visible) {
+            return false;
+        }
+
+        const { mapX, mapY } = this.getMapBounds(canvas);
+        const overlayX = mapX + 15;
+        const overlayY = mapY + 15;
+        const lineHeight = 14;
+        const headerHeight = 35;
+        const padding = 12;
+
+        // Check if click is within overlay bounds
+        const overlayWidth = 280;
+        const objectTypes = Object.keys(this.currentViewStatistics.objectCounts);
+        const contentLines = 3 + objectTypes.length;
+        const overlayHeight = headerHeight + (contentLines * lineHeight) + padding * 2 + 25;
+
+        if (mouseX < overlayX - padding || mouseX > overlayX + overlayWidth - padding ||
+            mouseY < overlayY - padding || mouseY > overlayY + overlayHeight - padding) {
+            return false;
+        }
+
+        // Calculate which line was clicked (skip header and info lines)
+        const contentStartY = overlayY + headerHeight - padding;
+        const clickY = mouseY - contentStartY;
+        const headerInfoLines = 3; // seed + total + density
+        const discoveredToggleIndex = Math.floor((clickY - (headerInfoLines * lineHeight) - 5) / lineHeight);
+        
+        // Check if discovered objects toggle was clicked
+        if (discoveredToggleIndex === 0) {
+            this.showDiscoveredObjects = !this.showDiscoveredObjects;
+            console.log(`👁️ Discovered Objects: ${this.showDiscoveredObjects ? 'visible' : 'hidden'}`);
+            return true;
+        }
+        
+        // Check if object type was clicked (after discovered toggle + spacing)
+        const objectTypeIndex = Math.floor((clickY - (headerInfoLines * lineHeight) - 5 - (lineHeight + 3)) / lineHeight);
+        
+        if (objectTypeIndex >= 0 && objectTypeIndex < objectTypes.length) {
+            const objectType = objectTypes[objectTypeIndex];
+            this.objectTypeVisibility[objectType] = !this.objectTypeVisibility[objectType];
+            
+            const visible = this.objectTypeVisibility[objectType];
+            console.log(`👁️ ${objectType}: ${visible ? 'visible' : 'hidden'}`);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Handle hover over statistics overlay for visual feedback
+     */
+    updateStatisticsOverlayHover(mouseX: number, mouseY: number, canvas: HTMLCanvasElement): void {
+        if (!this.statisticsOverlayEnabled || !this.currentViewStatistics || !this.visible) {
+            this.hoveredObjectTypeIndex = -1;
+            return;
+        }
+
+        const { mapX, mapY } = this.getMapBounds(canvas);
+        const overlayX = mapX + 15;
+        const overlayY = mapY + 15;
+        const lineHeight = 14;
+        const headerHeight = 35;
+        const padding = 12;
+
+        // Check if mouse is within overlay bounds
+        const overlayWidth = 280;
+        const objectTypes = Object.keys(this.currentViewStatistics.objectCounts);
+        const contentLines = 3 + objectTypes.length;
+        const overlayHeight = headerHeight + (contentLines * lineHeight) + padding * 2 + 25;
+
+        if (mouseX < overlayX - padding || mouseX > overlayX + overlayWidth - padding ||
+            mouseY < overlayY - padding || mouseY > overlayY + overlayHeight - padding) {
+            this.hoveredObjectTypeIndex = -1;
+            return;
+        }
+
+        // Calculate which line is being hovered (skip header and info lines)
+        const contentStartY = overlayY + headerHeight - padding;
+        const clickY = mouseY - contentStartY;
+        const headerInfoLines = 3; // seed + total + density
+        const discoveredToggleIndex = Math.floor((clickY - (headerInfoLines * lineHeight) - 5) / lineHeight);
+        
+        // Check if hovering over discovered objects toggle
+        if (discoveredToggleIndex === 0) {
+            this.hoveredObjectTypeIndex = -2; // Special index for discovered objects
+        } else {
+            // Check if hovering over object type (after discovered toggle + spacing)
+            const objectTypeIndex = Math.floor((clickY - (headerInfoLines * lineHeight) - 5 - (lineHeight + 3)) / lineHeight);
+            
+            if (objectTypeIndex >= 0 && objectTypeIndex < objectTypes.length) {
+                this.hoveredObjectTypeIndex = objectTypeIndex;
+            } else {
+                this.hoveredObjectTypeIndex = -1;
+            }
+        }
+    }
+
+    /**
+     * Update statistics across all revealed chunks for current seed
+     */
+    private async updateViewStatistics(): Promise<void> {
+        if (!this.inspectorSeed) return;
 
         try {
-            // Calculate appropriate chunk radius based on zoom level
-            // Higher zoom = smaller area, lower zoom = larger area for pattern viewing
-            const baseRadius = 2; // Default 5x5 chunks
-            const zoomAdjustment = Math.max(1, Math.ceil(3 / this.zoomLevel)); // Larger area when zoomed out
-            const chunkRadius = Math.min(baseRadius + zoomAdjustment, 10); // Cap at reasonable size
+            // Get all revealed objects for current seed
+            const revealedObjects = this.getRevealedObjects(this.inspectorSeed);
+            
+            if (revealedObjects.length === 0) {
+                this.currentViewStatistics = null;
+                return;
+            }
 
-            this.inspectorObjects = await this.inspectorService.getRegionObjects(
-                this.inspectorSeed,
-                this.centerX,
-                this.centerY,
-                chunkRadius
-            );
+            // Count objects by type from revealed chunks
+            const objectCounts: Record<string, number> = {
+                'backgroundStar': 0,
+                'celestialStar': 0,
+                'planet': 0,
+                'moon': 0,
+                'nebula': 0,
+                'asteroidGarden': 0,
+                'wormhole': 0,
+                'blackhole': 0,
+                'comet': 0
+            };
+
+            // Count objects from revealed chunks
+            for (const obj of revealedObjects) {
+                if (objectCounts.hasOwnProperty(obj.type)) {
+                    objectCounts[obj.type]++;
+                } else {
+                    objectCounts[obj.type] = 1;
+                }
+            }
+
+            // Calculate total meaningful objects (exclude background stars for density)
+            const totalObjects = objectCounts.celestialStar + objectCounts.planet + 
+                               objectCounts.moon + objectCounts.nebula + 
+                               objectCounts.asteroidGarden + objectCounts.wormhole + 
+                               objectCounts.blackhole + objectCounts.comet;
+
+            // Calculate area from revealed chunks count
+            const revealedChunkCount = this.getRevealedChunkCount(this.inspectorSeed);
+            const regionArea = revealedChunkCount * 1000000; // Each chunk is 1000x1000 units
+
+            const density = totalObjects / (regionArea / 1000000); // Objects per million square units
+
+            this.currentViewStatistics = {
+                objectCounts,
+                totalObjects,
+                density,
+                regionArea
+            };
         } catch (error) {
-            console.warn('Failed to refresh inspector data:', error);
-            this.inspectorObjects = [];
+            console.warn('Failed to update view statistics:', error);
+            this.currentViewStatistics = null;
         }
+    }
+
+    /**
+     * Get count of revealed chunks for a specific seed
+     */
+    private getRevealedChunkCount(seed: number): number {
+        let count = 0;
+        for (const metadata of this.revealedChunksMetadata.values()) {
+            if (metadata.seed === seed) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
@@ -3153,8 +3531,12 @@ export class StellarMap {
 
         ctx.save();
 
-        // Render objects with inspector styling
+        // Render objects with inspector styling (filtered by visibility toggles)
         for (const obj of this.inspectorObjects) {
+            // Skip objects that are toggled off
+            if (!this.objectTypeVisibility[obj.type]) {
+                continue;
+            }
             const objMapX = mapX + ((obj.x - this.centerX) * scale) + mapWidth / 2;
             const objMapY = mapY + ((obj.y - this.centerY) * scale) + mapHeight / 2;
 
@@ -3213,6 +3595,130 @@ export class StellarMap {
                 }
             }
         }
+
+        ctx.restore();
+    }
+
+    /**
+     * Render statistics overlay showing object counts, density, and region info
+     */
+    private renderStatisticsOverlay(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number): void {
+        if (!this.statisticsOverlayEnabled || !this.currentViewStatistics) return;
+
+        ctx.save();
+
+        // Position overlay in top-left corner with padding
+        const overlayX = mapX + 15;
+        const overlayY = mapY + 15;
+        const lineHeight = 14;
+        const headerHeight = 35;
+        const padding = 12;
+
+        // Calculate overlay dimensions
+        const stats = this.currentViewStatistics;
+        const objectTypes = Object.keys(stats.objectCounts);
+        const contentLines = 3 + objectTypes.length; // seed + total + density + object counts
+        const overlayHeight = headerHeight + (contentLines * lineHeight) + padding * 2 + 25; // +25 for instruction text
+        const overlayWidth = 280;
+
+        // Draw main background (matching logbook style)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(overlayX - padding, overlayY - padding, overlayWidth, overlayHeight);
+
+        // Draw border (matching logbook style)
+        ctx.strokeStyle = '#888888';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(overlayX - padding, overlayY - padding, overlayWidth, overlayHeight);
+
+        // Header background (matching logbook style)
+        ctx.fillStyle = 'rgba(136, 136, 136, 0.25)'; // #888888 + 40 (semi-transparent)
+        ctx.fillRect(overlayX - padding, overlayY - padding, overlayWidth, headerHeight);
+
+        // Header text (centered, no emoji, proper case like logbook)
+        ctx.font = '14px "Courier New", monospace';
+        ctx.fillStyle = '#ffdd88';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('Seed Analysis', overlayX + overlayWidth/2 - padding, overlayY - 2);
+
+        // Content area
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#cccccc';
+        ctx.font = '11px "Courier New", monospace';
+        let currentY = overlayY + headerHeight - padding;
+
+        // Seed information
+        ctx.fillText(`Seed: ${this.inspectorSeed || 'Unknown'}`, overlayX, currentY);
+        currentY += lineHeight;
+
+        // Total objects and density
+        ctx.fillText(`Total Objects: ${stats.totalObjects}`, overlayX, currentY);
+        currentY += lineHeight;
+        ctx.fillText(`Density: ${stats.density.toFixed(2)}/M units²`, overlayX, currentY);
+        currentY += lineHeight + 5;
+
+        // Discovered objects toggle
+        const discoveredHovered = this.hoveredObjectTypeIndex === -2; // Use -2 for discovered objects toggle
+        let discoveredBgColor = 'rgba(255, 255, 255, 0.03)';
+        if (discoveredHovered) {
+            discoveredBgColor = 'rgba(255, 221, 136, 0.2)';
+        } else if (this.showDiscoveredObjects) {
+            discoveredBgColor = 'rgba(255, 255, 255, 0.08)';
+        } else {
+            discoveredBgColor = 'rgba(128, 128, 128, 0.15)';
+        }
+        
+        ctx.fillStyle = discoveredBgColor;
+        ctx.fillRect(overlayX - 8, currentY - 2, overlayWidth - 8, lineHeight);
+        
+        // Draw discovered objects toggle
+        if (this.showDiscoveredObjects) {
+            ctx.fillStyle = '#88dd88'; // Green for active
+            ctx.fillText('● Discovered Objects', overlayX, currentY);
+        } else {
+            ctx.fillStyle = '#666666';
+            ctx.fillText('○ Discovered Objects (hidden)', overlayX, currentY);
+        }
+        currentY += lineHeight + 3;
+
+        // Object counts by type (clickable toggles)
+        const renderObjectTypes = Object.keys(stats.objectCounts);
+        for (let i = 0; i < renderObjectTypes.length; i++) {
+            const type = renderObjectTypes[i];
+            const count = stats.objectCounts[type];
+            const isVisible = this.objectTypeVisibility[type];
+            const isHovered = this.hoveredObjectTypeIndex === i;
+            const color = this.getInspectorObjectColor(type);
+            
+            // Draw clickable background with hover effect
+            let bgColor = 'rgba(255, 255, 255, 0.03)'; // Default subtle background
+            if (isHovered) {
+                bgColor = 'rgba(255, 221, 136, 0.2)'; // Hover effect (matching header color)
+            } else if (isVisible) {
+                bgColor = 'rgba(255, 255, 255, 0.08)';
+            } else {
+                bgColor = 'rgba(128, 128, 128, 0.15)';
+            }
+            
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(overlayX - 8, currentY - 2, overlayWidth - 8, lineHeight);
+            
+            // Draw object type with visual state indicator
+            if (isVisible) {
+                ctx.fillStyle = color;
+                ctx.fillText(`● ${type}: ${count}`, overlayX, currentY);
+            } else {
+                ctx.fillStyle = '#666666';
+                ctx.fillText(`○ ${type}: ${count} (hidden)`, overlayX, currentY);
+            }
+            currentY += lineHeight;
+        }
+        
+        // Add instruction text
+        ctx.fillStyle = '#999999';
+        ctx.font = '10px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Click object types to toggle visibility', overlayX + overlayWidth/2 - padding, currentY + 8);
 
         ctx.restore();
     }

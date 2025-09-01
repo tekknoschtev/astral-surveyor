@@ -1705,30 +1705,38 @@ describe('StellarMap System', () => {
       expect(mockRenderer.ctx.stroke).toHaveBeenCalled(); // For wormhole diamonds and nebula borders
     });
 
-    it('should refresh inspector data when view changes', async () => {
+    it('should use cached revealed chunks when view changes', async () => {
       stellarMap.initInspectorMode(mockSeedInspectorService);
       stellarMap.inspectorMode = true;
       stellarMap.inspectorSeed = 12345;
-      mockSeedInspectorService.getRegionObjects.mockResolvedValue([]);
+      
+      // Add some revealed chunks to cache
+      stellarMap.revealedChunks.set('0,0', []);
+      stellarMap.revealedChunks.set('1,1', []);
       
       stellarMap.centerOnPosition(5000, 6000);
       
-      // Should call refresh
+      // Should NOT call service - uses cached data instead
       await new Promise(resolve => setTimeout(resolve, 0)); // Wait for async
-      expect(mockSeedInspectorService.getRegionObjects).toHaveBeenCalled();
+      expect(mockSeedInspectorService.getRegionObjects).not.toHaveBeenCalled();
+      expect(stellarMap.revealedChunks.size).toBe(2); // Cache should still exist
     });
 
-    it('should refresh inspector data on zoom changes', async () => {
+    it('should use cached revealed chunks on zoom changes', async () => {
       stellarMap.initInspectorMode(mockSeedInspectorService);
       stellarMap.inspectorMode = true;
       stellarMap.inspectorSeed = 12345;
-      mockSeedInspectorService.getRegionObjects.mockResolvedValue([]);
+      
+      // Add some revealed chunks to cache
+      stellarMap.revealedChunks.set('0,0', []);
+      stellarMap.revealedChunks.set('1,1', []);
       
       stellarMap.zoomIn();
       
-      // Should call refresh
+      // Should NOT call service - uses cached data instead
       await new Promise(resolve => setTimeout(resolve, 0)); // Wait for async
-      expect(mockSeedInspectorService.getRegionObjects).toHaveBeenCalled();
+      expect(mockSeedInspectorService.getRegionObjects).not.toHaveBeenCalled();
+      expect(stellarMap.revealedChunks.size).toBe(2); // Cache should still exist
     });
 
     it('should not render inspector objects when not in inspector mode', () => {
@@ -1762,27 +1770,31 @@ describe('StellarMap System', () => {
       
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       
-      await stellarMap.enableInspectorMode(12345);
+      const result = await stellarMap.revealChunks(12345, 0, 0, 2);
       
-      expect(stellarMap.inspectorObjects).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to refresh inspector data:', expect.any(Error));
+      expect(result.newChunks).toBe(0); // No chunks should be added on error
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to reveal chunks:', expect.any(Error));
       
       consoleSpy.mockRestore();
     });
 
-    it('should calculate appropriate chunk radius based on zoom level', async () => {
+    it('should reveal chunks with specified radius', async () => {
       stellarMap.initInspectorMode(mockSeedInspectorService);
       mockSeedInspectorService.getRegionObjects.mockResolvedValue([]);
       
-      // Test different zoom levels
-      stellarMap.zoomLevel = 0.1; // Very zoomed out
-      await stellarMap.enableInspectorMode(12345);
+      // Test revealing with custom radius - should generate individual chunks
+      const result = await stellarMap.revealChunks(12345, 0, 0, 2);
       
+      // Should generate (2*2+1)^2 = 25 individual chunk calls
+      expect(mockSeedInspectorService.getRegionObjects).toHaveBeenCalledTimes(25);
+      
+      // Each call should be for an individual chunk (radius 0)
       const lastCall = mockSeedInspectorService.getRegionObjects.mock.calls.slice(-1)[0];
       const chunkRadius = lastCall[3]; // 4th parameter
+      expect(chunkRadius).toBe(0); // Individual chunks use radius 0
       
-      expect(chunkRadius).toBeGreaterThan(2); // Should use larger radius when zoomed out
-      expect(chunkRadius).toBeLessThanOrEqual(10); // But capped at reasonable size
+      // Should report correct number of new chunks
+      expect(result.newChunks).toBe(25);
     });
 
     describe('Inspector Object Visual Differentiation', () => {
