@@ -351,14 +351,6 @@ export class CommandRegistry {
         });
 
 
-        this.register({
-            name: 'map-reset',
-            description: 'Return to normal discovered-only mode',
-            parameters: [],
-            execute: (params: string[], context: CommandContext) => {
-                this.mapReset(context);
-            }
-        });
 
         this.register({
             name: 'map-clear-revealed',
@@ -673,23 +665,6 @@ export class CommandRegistry {
 
 
 
-    /**
-     * Handle map-reset command
-     */
-    private mapReset(context: CommandContext): void {
-        if (!context.stellarMap) {
-            console.log('❌ Stellar map not available');
-            return;
-        }
-
-        try {
-            context.stellarMap.disableInspectorMode();
-            context.stellarMap.disableStatisticsOverlay();
-            console.log('🔄 Returned to normal discovered-only mode');
-        } catch (error) {
-            console.log(`❌ Failed to reset map mode: ${error.message}`);
-        }
-    }
 
     /**
      * Handle map-clear-revealed command

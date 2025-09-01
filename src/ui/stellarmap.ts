@@ -1012,36 +1012,36 @@ export class StellarMap {
         if (!this.inspectorMode || this.showDiscoveredObjects) {
             // Draw discovered stars
             this.renderDiscoveredStars(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredStars);
-        }
-        
+            
             // Draw discovered planets (only in detail view)
             if (this.zoomLevel > 3.0 && discoveredPlanets) {
                 this.renderDiscoveredPlanets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredPlanets);
             }
 
-        // Draw discovered nebulae (larger scale objects, visible at all zoom levels)
-        if (discoveredNebulae && discoveredNebulae.length > 0) {
-            this.renderDiscoveredNebulae(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredNebulae);
-        }
+            // Draw discovered nebulae (larger scale objects, visible at all zoom levels)
+            if (discoveredNebulae && discoveredNebulae.length > 0) {
+                this.renderDiscoveredNebulae(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredNebulae);
+            }
 
-        // Draw discovered wormholes (ultra-rare spacetime anomalies with pair connections)
-        if (discoveredWormholes && discoveredWormholes.length > 0) {
-            this.renderDiscoveredWormholes(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredWormholes);
-        }
+            // Draw discovered wormholes (ultra-rare spacetime anomalies with pair connections)
+            if (discoveredWormholes && discoveredWormholes.length > 0) {
+                this.renderDiscoveredWormholes(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredWormholes);
+            }
 
-        // Draw discovered asteroid gardens (scattered rock fields, visible at most zoom levels)
-        if (discoveredAsteroidGardens && discoveredAsteroidGardens.length > 0) {
-            this.renderDiscoveredAsteroidGardens(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredAsteroidGardens);
-        }
+            // Draw discovered asteroid gardens (scattered rock fields, visible at most zoom levels)
+            if (discoveredAsteroidGardens && discoveredAsteroidGardens.length > 0) {
+                this.renderDiscoveredAsteroidGardens(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredAsteroidGardens);
+            }
 
-        // Draw discovered black holes (gravitational anomalies with accretion discs)
-        if (discoveredBlackHoles && discoveredBlackHoles.length > 0) {
-            this.renderDiscoveredBlackHoles(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredBlackHoles);
-        }
+            // Draw discovered black holes (gravitational anomalies with accretion discs)
+            if (discoveredBlackHoles && discoveredBlackHoles.length > 0) {
+                this.renderDiscoveredBlackHoles(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredBlackHoles);
+            }
 
-        // Draw discovered comets (elliptical orbital objects with visible tails)
-        if (discoveredComets && discoveredComets.length > 0) {
-            this.renderDiscoveredComets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredComets);
+            // Draw discovered comets (elliptical orbital objects with visible tails)
+            if (discoveredComets && discoveredComets.length > 0) {
+                this.renderDiscoveredComets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredComets);
+            }
         }
 
         // Draw inspector mode objects (all objects for seed analysis)
