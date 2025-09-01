@@ -231,7 +231,6 @@ export class StellarMap {
         this.statisticsOverlayEnabled = false;
         this.currentViewStatistics = null;
         this.objectTypeVisibility = {
-            'backgroundStar': true,
             'celestialStar': true,
             'planet': true,
             'moon': true,
@@ -3448,7 +3447,6 @@ export class StellarMap {
 
             // Count objects by type from revealed chunks
             const objectCounts: Record<string, number> = {
-                'backgroundStar': 0,
                 'celestialStar': 0,
                 'planet': 0,
                 'moon': 0,
@@ -3510,7 +3508,6 @@ export class StellarMap {
      */
     private getInspectorObjectColor(objectType: string): string {
         const colors = {
-            backgroundStar: '#666666',      // Dim gray for background stars
             celestialStar: '#ffdd88',       // Bright yellow for discoverable stars  
             planet: '#88aa88',              // Green for planets
             moon: '#cccccc',                // Light gray for moons
@@ -3531,37 +3528,46 @@ export class StellarMap {
 
         ctx.save();
 
-        // Render objects with inspector styling (filtered by visibility toggles)
+        // Pre-filter objects for performance (avoid iterating through millions of background stars)
+        const viewportWorldLeft = this.centerX - (mapWidth / scale) / 2;
+        const viewportWorldRight = this.centerX + (mapWidth / scale) / 2;
+        const viewportWorldTop = this.centerY - (mapHeight / scale) / 2;
+        const viewportWorldBottom = this.centerY + (mapHeight / scale) / 2;
+        
+        
+        const filteredObjects: typeof this.inspectorObjects = [];
+        
+        // Pre-filter to reduce loop size dramatically
         for (const obj of this.inspectorObjects) {
             // Skip objects that are toggled off
             if (!this.objectTypeVisibility[obj.type]) {
                 continue;
             }
+            
+            
+            // Viewport culling in world space  
+            const buffer = 40 / scale; // Standard buffer for all discoverable objects
+            if (obj.x < viewportWorldLeft - buffer || obj.x > viewportWorldRight + buffer ||
+                obj.y < viewportWorldTop - buffer || obj.y > viewportWorldBottom + buffer) {
+                continue;
+            }
+            
+            filteredObjects.push(obj);
+        }
+        
+        // Now render the much smaller filtered set
+        for (const obj of filteredObjects) {
             const objMapX = mapX + ((obj.x - this.centerX) * scale) + mapWidth / 2;
             const objMapY = mapY + ((obj.y - this.centerY) * scale) + mapHeight / 2;
 
-            // Skip objects outside visible area
-            if (objMapX < mapX - 20 || objMapX > mapX + mapWidth + 20 ||
-                objMapY < mapY - 20 || objMapY > mapY + mapHeight + 20) {
-                continue;
-            }
-
             const color = this.getInspectorObjectColor(obj.type);
             
-            // Render based on object type
-            if (obj.type === 'backgroundStar') {
-                // Small dots for background stars
-                ctx.fillStyle = color + '80'; // Semi-transparent
-                ctx.beginPath();
-                ctx.arc(objMapX, objMapY, 1, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                // Larger symbols for discoverable objects
-                const size = obj.type === 'blackhole' ? 4 : 
-                           obj.type === 'celestialStar' ? 3 : 2;
+            // Render discoverable objects with appropriate symbols
+            const size = obj.type === 'blackhole' ? 4 : 
+                       obj.type === 'celestialStar' ? 3 : 2;
                 
-                // Different shapes for different object types
-                if (obj.type === 'wormhole') {
+            // Different shapes for different object types
+            if (obj.type === 'wormhole') {
                     // Diamond shape for wormholes
                     ctx.strokeStyle = color;
                     ctx.lineWidth = 1;
@@ -3593,7 +3599,6 @@ export class StellarMap {
                     ctx.lineWidth = 0.5;
                     ctx.stroke();
                 }
-            }
         }
 
         ctx.restore();

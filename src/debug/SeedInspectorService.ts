@@ -267,21 +267,7 @@ export class SeedInspectorService {
                     const chunkY = centerChunkY + dy;
                     const chunk = this.chunkManager.generateChunk(chunkX, chunkY);
 
-                    // Add background stars
-                    for (const star of chunk.stars) {
-                        objects.push({
-                            type: 'backgroundStar',
-                            x: star.x,
-                            y: star.y,
-                            chunkX,
-                            chunkY,
-                            properties: {
-                                brightness: star.brightness,
-                                size: star.size,
-                                color: star.color
-                            }
-                        });
-                    }
+                    // Skip background stars entirely in inspector mode - they're just visual noise for analysis
 
                     // Add celestial stars
                     for (const star of chunk.celestialStars) {
