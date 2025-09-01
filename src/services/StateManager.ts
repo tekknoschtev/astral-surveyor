@@ -9,6 +9,7 @@ import { resetUniverse, generateSafeSpawnPosition } from '../utils/random.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
 import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
 import type { SoundManager } from '../audio/soundmanager.js';
+import type { DiscoveryManager } from './DiscoveryManager.js';
 
 // Interface for wormhole traversal destination
 interface TraversalDestination {
@@ -57,9 +58,13 @@ export class StateManager {
     lastTime: number = 0;
     animationId: number = 0;
     gameStartingPosition: GameStartingPosition;
+    
+    // Discovery manager for processing beta wormhole discoveries
+    private discoveryManager?: DiscoveryManager;
 
-    constructor(gameStartingPosition: GameStartingPosition) {
+    constructor(gameStartingPosition: GameStartingPosition, discoveryManager?: DiscoveryManager) {
         this.gameStartingPosition = gameStartingPosition;
+        this.discoveryManager = discoveryManager;
         this.debugModeEnabled = this.checkDebugMode();
         
         // Ensure clean initial state
@@ -258,6 +263,12 @@ export class StateManager {
             // Generate proper wormhole name for discovery database
             const betaWormholeName = `${betaWormhole.wormholeId}-${betaWormhole.designation === 'alpha' ? 'α' : 'β'}`;
             chunkManager.markObjectDiscovered(betaWormhole, betaWormholeName);
+            
+            // GITHUB ISSUE #126 FIX: Process the beta wormhole discovery through DiscoveryManager
+            // This ensures the beta wormhole appears in the logbook, not just the chunk manager
+            if (this.discoveryManager) {
+                this.discoveryManager.processDiscovery(betaWormhole, camera, chunkManager);
+            }
         }
         
         // CRITICAL: Reset animation state to prevent rendering corruption

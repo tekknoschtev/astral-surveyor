@@ -244,8 +244,8 @@ export class Game {
             y: this.camera.y
         };
         
-        // Initialize state manager with starting position
-        this.stateManager = new StateManager(startingPosition);
+        // Initialize state manager with starting position and discovery manager
+        this.stateManager = new StateManager(startingPosition, this.discoveryManager);
         
         // Initialize event system and set up global access
         this.eventSystem = new EventDispatcher();
