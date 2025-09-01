@@ -1804,11 +1804,15 @@ describe('StellarMap System', () => {
       });
 
       it('should use different colors for different object types', () => {
-        expect(stellarMap.getInspectorObjectColor('backgroundStar')).toBe('#666666');
+        // Background stars no longer supported in inspector mode (removed for performance)
         expect(stellarMap.getInspectorObjectColor('celestialStar')).toBe('#ffdd88');
         expect(stellarMap.getInspectorObjectColor('planet')).toBe('#88aa88');
         expect(stellarMap.getInspectorObjectColor('wormhole')).toBe('#8844ff');
         expect(stellarMap.getInspectorObjectColor('blackhole')).toBe('#ff0000');
+        expect(stellarMap.getInspectorObjectColor('comet')).toBe('#88ccff');
+        expect(stellarMap.getInspectorObjectColor('nebula')).toBe('#ff88cc');
+        expect(stellarMap.getInspectorObjectColor('asteroidGarden')).toBe('#cc8844');
+        expect(stellarMap.getInspectorObjectColor('moon')).toBe('#cccccc');
       });
 
       it('should render different shapes for different object types', () => {

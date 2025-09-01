@@ -200,14 +200,7 @@ describe('SeedInspectorService', () => {
 
             const objects = await seedInspector.getRegionObjects(12345, 0, 0, 0);
 
-            expect(objects.length).toBe(3); // 1 background star + 1 celestial star + 1 planet
-
-            // Verify background star
-            const backgroundStar = objects.find(obj => obj.type === 'backgroundStar');
-            expect(backgroundStar).toBeDefined();
-            expect(backgroundStar.x).toBe(100);
-            expect(backgroundStar.y).toBe(200);
-            expect(backgroundStar.properties.brightness).toBe(0.8);
+            expect(objects.length).toBe(2); // 1 celestial star + 1 planet (background stars skipped for performance)
 
             // Verify celestial star
             const celestialStar = objects.find(obj => obj.type === 'celestialStar');
