@@ -2,6 +2,7 @@
 // Replaces query parameter debug system with extensible command interface
 
 import { CommandRegistry, CommandContext } from './CommandRegistry.js';
+import { getUniverseSeed } from '../utils/random.js';
 
 interface ConsoleMessage {
     text: string;
@@ -22,7 +23,8 @@ export class DeveloperConsole {
     constructor(
         private commandRegistry: CommandRegistry,
         private camera: any, // TODO: Import Camera type when available
-        private chunkManager: any // TODO: Import ChunkManager type when available
+        private chunkManager: any, // TODO: Import ChunkManager type when available
+        private stellarMap?: any // Optional StellarMap for inspector commands
     ) {
         // Capture console.log for output display
         this.interceptConsoleOutput();
@@ -104,7 +106,9 @@ export class DeveloperConsole {
         // Execute command
         const context: CommandContext = {
             camera: this.camera,
-            chunkManager: this.chunkManager
+            chunkManager: this.chunkManager,
+            stellarMap: this.stellarMap,
+            getCurrentSeed: getUniverseSeed
         };
         
         const result = this.commandRegistry.execute(command, context);

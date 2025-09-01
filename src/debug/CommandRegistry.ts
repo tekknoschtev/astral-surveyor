@@ -19,12 +19,15 @@ interface CommandDefinition {
     parameters: ParameterDefinition[];
     execute: (params: string[], context: CommandContext) => void;
     autocomplete?: (partial: string) => string[];
+    customValidation?: (params: string[]) => { isValid: boolean; error?: string };
 }
 
 export interface CommandContext {
     camera: Camera;
     chunkManager: ChunkManager;
     debugSpawner?: typeof DebugSpawner;
+    stellarMap?: any; // StellarMap instance for inspector commands
+    getCurrentSeed?: () => number; // Function to get current universe seed
 }
 
 interface ParsedCommand {
@@ -128,6 +131,11 @@ export class CommandRegistry {
     }
     
     private validateParameters(command: CommandDefinition, params: string[]): { isValid: boolean; error?: string } {
+        // Use custom validation if available
+        if (command.customValidation) {
+            return command.customValidation(params);
+        }
+        
         const requiredParams = command.parameters.filter(p => !p.optional);
         
         if (params.length < requiredParams.length) {
@@ -292,6 +300,66 @@ export class CommandRegistry {
                     return values.filter(value => value.startsWith(words[1]));
                 }
                 return [];
+            }
+        });
+
+        // Seed inspector commands
+        this.register({
+            name: 'seed-inspect',
+            description: 'Reveal inspector chunks. Usage: seed-inspect [seed] [-r radius]',
+            parameters: [
+                { name: 'seed', type: 'string', optional: true, description: 'Universe seed to inspect - text or number (defaults to current)' },
+                { name: '-r radius', type: 'string', optional: true, description: 'Specify radius: -r 10 (default: 5 chunks)' }
+            ],
+            customValidation: (params: string[]) => {
+                // Custom validation for flag-based parameters
+                let i = 0;
+                let foundSeed = false;
+                let foundRadius = false;
+                
+                while (i < params.length) {
+                    const param = params[i];
+                    
+                    if (param === '-r') {
+                        if (foundRadius) {
+                            return { isValid: false, error: 'Duplicate -r flag' };
+                        }
+                        if (i + 1 >= params.length) {
+                            return { isValid: false, error: '-r flag requires a radius value' };
+                        }
+                        const radius = parseInt(params[i + 1]);
+                        if (isNaN(radius) || radius < 0) {
+                            return { isValid: false, error: 'Invalid radius - must be a positive number' };
+                        }
+                        foundRadius = true;
+                        i += 2; // Skip both -r and radius value
+                    } else {
+                        if (foundSeed) {
+                            return { isValid: false, error: 'Multiple seed values provided' };
+                        }
+                        // Accept both text and numeric seeds
+                        foundSeed = true;
+                        i++;
+                    }
+                }
+                
+                return { isValid: true };
+            },
+            execute: (params: string[], context: CommandContext) => {
+                this.seedInspect(params, context);
+            }
+        });
+
+
+
+        this.register({
+            name: 'map-clear-revealed',
+            description: 'Clear all revealed inspector chunks',
+            parameters: [
+                { name: 'seed', type: 'number', optional: true, description: 'Clear only chunks for specific seed' }
+            ],
+            execute: (params: string[], context: CommandContext) => {
+                this.mapClearRevealed(params, context);
             }
         });
     }
@@ -503,5 +571,129 @@ export class CommandRegistry {
                     break;
             }
         });
+    }
+
+    /**
+     * Handle seed-inspect command with positional parameters: [seed] [radius]
+     */
+    private async seedInspect(params: string[], context: CommandContext): Promise<void> {
+        if (!context.stellarMap) {
+            console.log('❌ Stellar map not available');
+            return;
+        }
+
+        let seed: number;
+        let radius: number = 5; // Default radius (matches old system ~121 chunks)
+        
+        // Parse parameters with support for -r flag
+        let i = 0;
+        while (i < params.length) {
+            const param = params[i];
+            
+            if (param === '-r') {
+                // Next parameter should be the radius
+                if (i + 1 >= params.length) {
+                    console.log('❌ -r flag requires a radius value');
+                    return;
+                }
+                radius = parseInt(params[i + 1]);
+                if (isNaN(radius) || radius < 0) {
+                    console.log('❌ Invalid radius - must be a positive number');
+                    return;
+                }
+                i += 2; // Skip both -r and the radius value
+            } else {
+                // This should be the seed (text or number)
+                const parsedSeed = parseInt(param);
+                if (isNaN(parsedSeed)) {
+                    // Hash the string seed like the game does
+                    seed = 0;
+                    for (let j = 0; j < param.length; j++) {
+                        const char = param.charCodeAt(j);
+                        seed = ((seed << 5) - seed) + char;
+                        seed = seed & seed;
+                    }
+                    seed = Math.abs(seed);
+                } else {
+                    seed = parsedSeed;
+                }
+                i++;
+            }
+        }
+        
+        // If no seed was provided, use current game seed
+        if (seed === undefined) {
+            if (!context.getCurrentSeed) {
+                console.log('❌ Cannot access current game seed');
+                return;
+            }
+            seed = context.getCurrentSeed();
+        }
+
+        // Performance warning for large areas
+        if (radius > 20) {
+            const totalChunks = (radius * 2 + 1) * (radius * 2 + 1);
+            console.log(`⚠️ Large radius requested: ${totalChunks} chunks. This may take a while...`);
+        }
+
+        try {
+            // Enable inspector mode if not already active
+            if (!context.stellarMap.isInspectorMode() || context.stellarMap.inspectorSeed !== seed) {
+                await context.stellarMap.enableInspectorMode(seed);
+            }
+
+            // Reveal chunks around current position
+            const result = await context.stellarMap.revealChunks(
+                seed, 
+                context.camera.x, 
+                context.camera.y, 
+                radius
+            );
+
+            const seedSource = params.length >= 1 ? 'provided' : 'current game';
+            const totalChunks = (radius * 2 + 1) * (radius * 2 + 1);
+            console.log(`🔍 Revealed ${result.newChunks} new chunks for ${seedSource} seed ${seed}`);
+            console.log(`📊 ${radius}-chunk radius covers ${totalChunks} total chunks`);
+            
+            if (result.newChunks === 0) {
+                console.log('💡 All chunks in this area were already revealed');
+            }
+        } catch (error) {
+            console.log(`❌ Failed to reveal chunks: ${error.message}`);
+        }
+    }
+
+
+
+
+    /**
+     * Handle map-clear-revealed command
+     */
+    private mapClearRevealed(params: string[], context: CommandContext): void {
+        if (!context.stellarMap) {
+            console.log('❌ Stellar map not available');
+            return;
+        }
+
+        try {
+            let seed: number | undefined;
+            
+            if (params.length > 0) {
+                seed = parseInt(params[0]);
+                if (isNaN(seed)) {
+                    console.log('❌ Invalid seed number');
+                    return;
+                }
+            }
+
+            context.stellarMap.clearRevealedChunks(seed);
+            
+            // Clear inspector objects if clearing current seed
+            if (!seed || (context.stellarMap.inspectorSeed === seed)) {
+                context.stellarMap.inspectorObjects = [];
+            }
+        } catch (error) {
+            console.log(`❌ Failed to clear revealed chunks: ${error.message}`);
+        }
     }
 }

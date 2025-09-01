@@ -43,6 +43,7 @@ describe('StellarMap System', () => {
         beginPath: vi.fn(),
         moveTo: vi.fn(),
         lineTo: vi.fn(),
+        closePath: vi.fn(),
         stroke: vi.fn(),
         arc: vi.fn(),
         fill: vi.fn(),
@@ -1570,6 +1571,263 @@ describe('StellarMap System', () => {
         const name = stellarMap.generatePlanetDisplayName(planet);
         
         expect(name).toBe('Planet 1'); // planetIndex + 1
+      });
+    });
+  });
+
+  describe('Inspector Mode', () => {
+    let mockSeedInspectorService;
+
+    beforeEach(() => {
+      mockSeedInspectorService = {
+        getRegionObjects: vi.fn()
+      };
+    });
+
+    it('should initialize inspector mode with service', () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      
+      expect(stellarMap.inspectorService).toBe(mockSeedInspectorService);
+    });
+
+    it('should enable inspector mode with specific seed', async () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      mockSeedInspectorService.getRegionObjects.mockResolvedValue([]);
+      
+      await stellarMap.enableInspectorMode(12345);
+      
+      expect(stellarMap.inspectorMode).toBe(true);
+      expect(stellarMap.inspectorSeed).toBe(12345);
+      expect(stellarMap.inspectorZoomExtended).toBe(true);
+      expect(mockSeedInspectorService.getRegionObjects).toHaveBeenCalled();
+    });
+
+    it('should disable inspector mode', () => {
+      stellarMap.inspectorMode = true;
+      stellarMap.inspectorSeed = 12345;
+      stellarMap.inspectorObjects = [{ type: 'star', x: 0, y: 0 }];
+      stellarMap.inspectorZoomExtended = true;
+      
+      stellarMap.disableInspectorMode();
+      
+      expect(stellarMap.inspectorMode).toBe(false);
+      expect(stellarMap.inspectorSeed).toBe(null);
+      expect(stellarMap.inspectorObjects).toEqual([]);
+      expect(stellarMap.inspectorZoomExtended).toBe(false);
+    });
+
+    it('should toggle inspector mode', async () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      mockSeedInspectorService.getRegionObjects.mockResolvedValue([]);
+      stellarMap.inspectorSeed = 12345;
+      
+      // Toggle on
+      await stellarMap.enableInspectorMode(12345);
+      expect(stellarMap.inspectorMode).toBe(true);
+      
+      // Toggle off
+      stellarMap.toggleInspectorMode();
+      expect(stellarMap.inspectorMode).toBe(false);
+      
+      // Toggle back on (should re-enable with last seed)
+      stellarMap.toggleInspectorMode();
+      expect(stellarMap.inspectorMode).toBe(false); // Will be false since no last seed in this case
+    });
+
+    it('should throw error when enabling without service', async () => {
+      await expect(stellarMap.enableInspectorMode(12345)).rejects.toThrow('Inspector service not initialized');
+    });
+
+    it('should extend zoom range in inspector mode', () => {
+      stellarMap.inspectorZoomExtended = true;
+      
+      // Test extended zoom in
+      stellarMap.zoomLevel = 1.0;
+      stellarMap.zoomIn();
+      expect(stellarMap.zoomLevel).toBe(1.5);
+      
+      // Can zoom much further in inspector mode
+      for (let i = 0; i < 20; i++) {
+        stellarMap.zoomIn();
+      }
+      expect(stellarMap.zoomLevel).toBeLessThanOrEqual(50.0);
+      
+      // Test extended zoom out
+      stellarMap.zoomLevel = 0.1;
+      stellarMap.zoomOut();
+      expect(stellarMap.zoomLevel).toBeLessThan(0.1);
+      expect(stellarMap.zoomLevel).toBeGreaterThanOrEqual(0.001);
+    });
+
+    it('should render inspector objects with different visual styles', () => {
+      stellarMap.visible = true;
+      stellarMap.inspectorMode = true;
+      stellarMap.inspectorObjects = [
+        {
+          type: 'backgroundStar',
+          x: 1000,
+          y: 2000,
+          chunkX: 0,
+          chunkY: 1,
+          properties: { brightness: 0.5, size: 1, color: '#ffffff' }
+        },
+        {
+          type: 'celestialStar',
+          x: 1200,
+          y: 2200,
+          chunkX: 0,
+          chunkY: 1,
+          properties: { starType: 'G-type', radius: 50, color: '#ffff00' }
+        },
+        {
+          type: 'wormhole',
+          x: 1400,
+          y: 2400,
+          chunkX: 0,
+          chunkY: 1,
+          properties: { wormholeId: 'WH-001' }
+        },
+        {
+          type: 'nebula',
+          x: 1600,
+          y: 2600,
+          chunkX: 0,
+          chunkY: 1,
+          properties: { nebulaType: 'emission', colors: ['#ff0000'] }
+        }
+      ];
+      
+      stellarMap.render(mockRenderer, mockCamera, []);
+      
+      // Should render inspector objects
+      expect(mockRenderer.ctx.arc).toHaveBeenCalled(); // For circular objects
+      expect(mockRenderer.ctx.fill).toHaveBeenCalled();
+      expect(mockRenderer.ctx.stroke).toHaveBeenCalled(); // For wormhole diamonds and nebula borders
+    });
+
+    it('should use cached revealed chunks when view changes', async () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      stellarMap.inspectorMode = true;
+      stellarMap.inspectorSeed = 12345;
+      
+      // Add some revealed chunks to cache
+      stellarMap.revealedChunks.set('0,0', []);
+      stellarMap.revealedChunks.set('1,1', []);
+      
+      stellarMap.centerOnPosition(5000, 6000);
+      
+      // Should NOT call service - uses cached data instead
+      await new Promise(resolve => setTimeout(resolve, 0)); // Wait for async
+      expect(mockSeedInspectorService.getRegionObjects).not.toHaveBeenCalled();
+      expect(stellarMap.revealedChunks.size).toBe(2); // Cache should still exist
+    });
+
+    it('should use cached revealed chunks on zoom changes', async () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      stellarMap.inspectorMode = true;
+      stellarMap.inspectorSeed = 12345;
+      
+      // Add some revealed chunks to cache
+      stellarMap.revealedChunks.set('0,0', []);
+      stellarMap.revealedChunks.set('1,1', []);
+      
+      stellarMap.zoomIn();
+      
+      // Should NOT call service - uses cached data instead
+      await new Promise(resolve => setTimeout(resolve, 0)); // Wait for async
+      expect(mockSeedInspectorService.getRegionObjects).not.toHaveBeenCalled();
+      expect(stellarMap.revealedChunks.size).toBe(2); // Cache should still exist
+    });
+
+    it('should not render inspector objects when not in inspector mode', () => {
+      stellarMap.visible = true;
+      stellarMap.inspectorMode = false;
+      stellarMap.inspectorObjects = [];  // No inspector objects to render
+      
+      // Reset mock call counts for clean baseline
+      mockRenderer.ctx.fill.mockClear();
+      
+      stellarMap.render(mockRenderer, mockCamera, []);
+      
+      // Should not render any inspector objects (test that inspector objects aren't rendered)
+      const fillCallsAfterRender = mockRenderer.ctx.fill.mock.calls.length;
+      
+      // Now set inspector objects but keep inspector mode off
+      stellarMap.inspectorObjects = [
+        { type: 'star', x: 1000, y: 2000, chunkX: 0, chunkY: 1, properties: {} }
+      ];
+      
+      // Reset and render again - should have same number of fill calls
+      mockRenderer.ctx.fill.mockClear();
+      stellarMap.render(mockRenderer, mockCamera, []);
+      
+      expect(mockRenderer.ctx.fill.mock.calls.length).toBe(fillCallsAfterRender);
+    });
+
+    it('should handle inspector service errors gracefully', async () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      mockSeedInspectorService.getRegionObjects.mockRejectedValue(new Error('Service error'));
+      
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      const result = await stellarMap.revealChunks(12345, 0, 0, 2);
+      
+      expect(result.newChunks).toBe(0); // No chunks should be added on error
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to reveal chunks:', expect.any(Error));
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should reveal chunks with specified radius', async () => {
+      stellarMap.initInspectorMode(mockSeedInspectorService);
+      mockSeedInspectorService.getRegionObjects.mockResolvedValue([]);
+      
+      // Test revealing with custom radius - should generate individual chunks
+      const result = await stellarMap.revealChunks(12345, 0, 0, 2);
+      
+      // Should generate (2*2+1)^2 = 25 individual chunk calls
+      expect(mockSeedInspectorService.getRegionObjects).toHaveBeenCalledTimes(25);
+      
+      // Each call should be for an individual chunk (radius 0)
+      const lastCall = mockSeedInspectorService.getRegionObjects.mock.calls.slice(-1)[0];
+      const chunkRadius = lastCall[3]; // 4th parameter
+      expect(chunkRadius).toBe(0); // Individual chunks use radius 0
+      
+      // Should report correct number of new chunks
+      expect(result.newChunks).toBe(25);
+    });
+
+    describe('Inspector Object Visual Differentiation', () => {
+      beforeEach(() => {
+        stellarMap.visible = true;
+        stellarMap.inspectorMode = true;
+      });
+
+      it('should use different colors for different object types', () => {
+        // Background stars no longer supported in inspector mode (removed for performance)
+        expect(stellarMap.getInspectorObjectColor('celestialStar')).toBe('#ffdd88');
+        expect(stellarMap.getInspectorObjectColor('planet')).toBe('#88aa88');
+        expect(stellarMap.getInspectorObjectColor('wormhole')).toBe('#8844ff');
+        expect(stellarMap.getInspectorObjectColor('blackhole')).toBe('#ff0000');
+        expect(stellarMap.getInspectorObjectColor('comet')).toBe('#88ccff');
+        expect(stellarMap.getInspectorObjectColor('nebula')).toBe('#ff88cc');
+        expect(stellarMap.getInspectorObjectColor('asteroidGarden')).toBe('#cc8844');
+        expect(stellarMap.getInspectorObjectColor('moon')).toBe('#cccccc');
+      });
+
+      it('should render different shapes for different object types', () => {
+        stellarMap.inspectorObjects = [
+          { type: 'wormhole', x: 1000, y: 2000, chunkX: 0, chunkY: 1, properties: {} },
+          { type: 'nebula', x: 1200, y: 2200, chunkX: 0, chunkY: 1, properties: {} },
+          { type: 'planet', x: 1400, y: 2400, chunkX: 0, chunkY: 1, properties: {} }
+        ];
+        
+        stellarMap.render(mockRenderer, mockCamera, []);
+        
+        // Should use different rendering methods
+        expect(mockRenderer.ctx.moveTo).toHaveBeenCalled(); // For wormhole diamond
+        expect(mockRenderer.ctx.setLineDash).toHaveBeenCalled(); // For nebula dashed border  
+        expect(mockRenderer.ctx.fill).toHaveBeenCalled(); // For planet circle
       });
     });
   });
