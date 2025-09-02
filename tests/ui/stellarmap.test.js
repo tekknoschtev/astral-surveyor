@@ -64,7 +64,8 @@ describe('StellarMap System', () => {
       hasPinchZoomOut: vi.fn(() => false),
       wasJustPressed: vi.fn(() => false),
       isMousePressed: vi.fn(() => false),
-      isRightPressed: vi.fn(() => false)
+      isRightPressed: vi.fn(() => false),
+      consumeTouch: vi.fn()
     };
 
     // Mock navigator for touch detection
@@ -392,6 +393,23 @@ describe('StellarMap System', () => {
       expect(stellarMap.centerX).not.toBe(1000);
       expect(stellarMap.centerY).not.toBe(2000);
     });
+
+    it('should consume touch input when handling mouse movement to prevent ship movement', () => {
+      stellarMap.visible = true;
+      mockInput.isMousePressed.mockReturnValue(true);
+      
+      // First call to initialize tracking
+      const result1 = stellarMap.handleMouseMove(400, 300, mockCanvas, mockInput);
+      expect(result1).toBe(false); // No movement yet, just initialization
+      
+      // Second call with sufficient movement to trigger panning
+      const result2 = stellarMap.handleMouseMove(410, 310, mockCanvas, mockInput);
+      expect(result2).toBe(true); // Should return true when handling panning
+      expect(stellarMap.isPanning).toBe(true);
+      
+      // Should have called consumeTouch to prevent ship movement
+      expect(mockInput.consumeTouch).toHaveBeenCalled();
+    });
   });
 
   describe('Star and Planet Selection', () => {
@@ -495,6 +513,22 @@ describe('StellarMap System', () => {
       expect(result).toBe(true);
       expect(stellarMap.selectedStar).toBe(null);
       expect(stellarMap.selectedPlanet).toBe(null);
+    });
+
+    it('should consume touch input when handling star selection to prevent ship movement', () => {
+      stellarMap.visible = true;
+      stellarMap.centerX = 1000;
+      stellarMap.centerY = 2000;
+      stellarMap.zoomLevel = 2.0;
+      
+      // Test selecting a star should consume input
+      const result = stellarMap.handleStarSelection(400, 300, mockStars, mockCanvas, null, null, null, null, null, null, mockInput);
+      
+      expect(result).toBe(true);
+      expect(stellarMap.selectedStar).toBeTruthy();
+      
+      // Should have called consumeTouch to prevent ship movement
+      expect(mockInput.consumeTouch).toHaveBeenCalled();
     });
   });
 

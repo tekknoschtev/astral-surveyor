@@ -335,6 +335,9 @@ export class StellarMap {
         const deltaX = mouseX - this.lastMouseX;
         const deltaY = mouseY - this.lastMouseY;
         
+        // Always consume input when handling mouse movement over stellar map (like settings menu does)
+        input.consumeTouch();
+        
         // If there's any movement at all, apply it
         if (deltaX !== 0 || deltaY !== 0) {
             // Check if we should start panning (moved enough from start)
@@ -349,7 +352,6 @@ export class StellarMap {
             // Apply linear panning if active (scales properly with zoom)
             if (this.isPanning) {
                 const { mapWidth, mapHeight } = this.getMapBounds(canvas);
-                // Linear conversion: screen pixels to world units, scaled by zoom
                 const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
                 
                 // Simple 1:1 conversion with zoom scaling - no multiplication factor
@@ -360,9 +362,9 @@ export class StellarMap {
             // Always update last position
             this.lastMouseX = mouseX;
             this.lastMouseY = mouseY;
-            
-            return true; // Always consume when we have valid tracking and movement
         }
+        
+        return true; // Always consume input when handling stellar map mouse movement
         
         return false;
     }
@@ -377,7 +379,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, input?: Input): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -626,6 +628,10 @@ export class StellarMap {
             this.selectedComet = null;
         }
         
+        // Consume input to prevent ship movement when handling stellar map interactions
+        if (input) {
+            input.consumeTouch();
+        }
         return true; // Consumed the event
     }
     
