@@ -479,7 +479,7 @@ export class Input {
 
     // Get direction and intensity from mouse/touch position relative to screen center
     getMouseDirection(canvasWidth: number, canvasHeight: number): MouseDirection {
-        if (!this.mousePressed) {
+        if (!this.mousePressed || this.touchConsumed) {
             return { x: 0, y: 0, intensity: 0 };
         }
 
