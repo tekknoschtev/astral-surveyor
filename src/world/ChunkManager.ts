@@ -11,6 +11,8 @@ import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import { Comet, selectCometType } from '../celestial/comets.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { ErrorService } from '../services/ErrorService.js';
+import { RegionGenerator, type RegionInfo } from './RegionGenerator.js';
+import { applyRegionModifiers, type RegionSpawnModifiers } from './CosmicRegions.js';
 
 // Interface definitions
 interface ChunkCoords {
@@ -209,6 +211,7 @@ export class ChunkManager {
     discoveredObjects: Map<string, DiscoveryData>;
     debugObjects?: DebugObject[];
     private errorService: ErrorService;
+    private regionGenerator: RegionGenerator;
 
     constructor(errorService?: ErrorService) {
         this.chunkSize = GameConfig.world.chunkSize;
@@ -216,6 +219,7 @@ export class ChunkManager {
         this.activeChunks = new Map(); // Key: "x,y", Value: chunk data
         this.discoveredObjects = new Map(); // Key: "objId", Value: discovery state
         this.errorService = errorService || new ErrorService();
+        this.regionGenerator = new RegionGenerator();
     }
 
     getChunkCoords(worldX: number, worldY: number): ChunkCoords {
@@ -278,6 +282,9 @@ export class ChunkManager {
             return this.activeChunks.get(chunkKey)!;
         }
 
+        // Get region-modified spawn rates for this chunk
+        const regionSpawnRates = this.getRegionModifiedSpawnRates(chunkX, chunkY);
+
         const chunk: Chunk = {
             x: chunkX,
             y: chunkY,
@@ -317,11 +324,12 @@ export class ChunkManager {
         const starSystemRoll = starSystemRng.nextFloat(0, 1);
         let starSystemCount: number;
         
-        const spawnThreshold = 1 - GameConfig.world.starSystem.spawnChance;
+        // Use region-modified spawn rates instead of base configuration
+        const spawnThreshold = 1 - regionSpawnRates.starSystems;
         if (starSystemRoll < spawnThreshold) {
             starSystemCount = 0; // Most chunks will be empty space
         } else {
-            starSystemCount = 1; // Configured chance of having a star system
+            starSystemCount = 1; // Region-modified chance of having a star system
         }
 
         for (let i = 0; i < starSystemCount; i++) {
@@ -484,7 +492,7 @@ export class ChunkManager {
             }
             
             // Generate comets for this star system based on configuration
-            this.generateCometsForStarSystem(star, starSystemRng, chunk);
+            this.generateCometsForStarSystem(star, starSystemRng, chunk, regionSpawnRates.comets);
         }
 
         // Generate nebulae for this chunk (separate from star systems)
@@ -714,6 +722,11 @@ export class ChunkManager {
                 this.activeChunks.delete(chunkKey);
             }
         }
+        
+        // Cleanup distant region caches for performance
+        if (GameConfig.world.cosmicRegions?.enabled) {
+            this.regionGenerator.clearDistantCaches(playerX, playerY);
+        }
     }
 
     // Public method to access chunks for gravitational lensing preview
@@ -742,6 +755,77 @@ export class ChunkManager {
         }
 
         return objects;
+    }
+
+    // Cosmic Regions - Region boundary detection methods
+
+    /**
+     * Get the cosmic region at the specified world coordinates
+     */
+    getRegionAt(worldX: number, worldY: number): RegionInfo | null {
+        if (!GameConfig.world.cosmicRegions?.enabled) {
+            return null;
+        }
+        
+        return this.regionGenerator.getRegionAt(worldX, worldY);
+    }
+    
+    /**
+     * Get the cosmic region for a specific chunk
+     */
+    getChunkRegion(chunkX: number, chunkY: number): RegionInfo | null {
+        if (!GameConfig.world.cosmicRegions?.enabled) {
+            return null;
+        }
+        
+        // Use chunk center coordinates for region lookup
+        const worldX = chunkX * this.chunkSize + this.chunkSize * 0.5;
+        const worldY = chunkY * this.chunkSize + this.chunkSize * 0.5;
+        
+        return this.regionGenerator.getRegionAt(worldX, worldY);
+    }
+    
+    /**
+     * Apply region-specific spawn rate modifications to base probabilities
+     */
+    private getRegionModifiedSpawnRates(chunkX: number, chunkY: number): Record<string, number> {
+        // Get base spawn chances from configuration
+        const baseSpawnChances = {
+            starSystems: GameConfig.world.starSystem.spawnChance,
+            nebulae: GameConfig.world.specialObjects.nebulae.spawnChance,
+            asteroidGardens: GameConfig.world.specialObjects.asteroidGardens.spawnChance,
+            wormholes: GameConfig.world.specialObjects.wormholes.spawnChance,
+            blackHoles: GameConfig.world.specialObjects.blackHoles.spawnChance,
+            comets: GameConfig.world.specialObjects.comets.spawnChance,
+        };
+        
+        // If cosmic regions are disabled, use base rates
+        if (!GameConfig.world.cosmicRegions?.enabled) {
+            return baseSpawnChances;
+        }
+        
+        // Get region info for this chunk
+        const regionInfo = this.getChunkRegion(chunkX, chunkY);
+        
+        if (!regionInfo || regionInfo.influence <= 0) {
+            return baseSpawnChances;
+        }
+        
+        // Apply region modifiers with influence scaling
+        const influence = regionInfo.influence;
+        const modifiers = regionInfo.definition.spawnModifiers;
+        
+        // Interpolate between base rates and region-modified rates based on influence
+        const interpolatedModifiers: RegionSpawnModifiers = {
+            starSystems: 1 + (modifiers.starSystems - 1) * influence,
+            nebulae: 1 + (modifiers.nebulae - 1) * influence,
+            asteroidGardens: 1 + (modifiers.asteroidGardens - 1) * influence,
+            wormholes: 1 + (modifiers.wormholes - 1) * influence,
+            blackHoles: 1 + (modifiers.blackHoles - 1) * influence,
+            comets: 1 + (modifiers.comets - 1) * influence,
+        };
+        
+        return applyRegionModifiers(baseSpawnChances, interpolatedModifiers);
     }
 
     markObjectDiscovered(object: Star | Planet | Moon | Nebula | AsteroidGarden | Wormhole | BlackHole | any, objectName?: string): void {
@@ -1351,11 +1435,12 @@ export class ChunkManager {
     }
     
     // Generate comets for a star system based on configuration
-    generateCometsForStarSystem(star: Star, rng: SeededRandom, chunk: Chunk): void {
+    generateCometsForStarSystem(star: Star, rng: SeededRandom, chunk: Chunk, cometSpawnChance?: number): void {
         const config = GameConfig.world.specialObjects.comets;
+        const spawnChance = cometSpawnChance !== undefined ? cometSpawnChance : config.spawnChance;
         
-        // Check if this star system should have comets (20% chance)
-        if (rng.nextFloat(0, 1) >= config.spawnChance) {
+        // Check if this star system should have comets (region-modified chance)
+        if (rng.nextFloat(0, 1) >= spawnChance) {
             return; // No comets for this star system
         }
         
@@ -1550,7 +1635,10 @@ export class ChunkManager {
         const nebulaeRoll = nebulaeRng.nextFloat(0, 1);
         let nebulaeCount: number;
         
-        const spawnThreshold = GameConfig.world.specialObjects.nebulae.spawnChance;
+        // Get region-modified spawn rates for this chunk
+        const regionSpawnRates = this.getRegionModifiedSpawnRates(chunkX, chunkY);
+        
+        const spawnThreshold = regionSpawnRates.nebulae;
         const multipleThreshold = spawnThreshold + GameConfig.world.specialObjects.nebulae.multipleChance;
         
         if (nebulaeRoll < (1 - spawnThreshold)) {
@@ -1589,7 +1677,10 @@ export class ChunkManager {
         const asteroidRoll = asteroidRng.nextFloat(0, 1);
         let asteroidCount: number;
         
-        const asteroidSpawnThreshold = GameConfig.world.specialObjects.asteroidGardens.spawnChance;
+        // Get region-modified spawn rates for this chunk  
+        const regionSpawnRates = this.getRegionModifiedSpawnRates(chunkX, chunkY);
+        
+        const asteroidSpawnThreshold = regionSpawnRates.asteroidGardens;
         const asteroidMultipleThreshold = asteroidSpawnThreshold + GameConfig.world.specialObjects.asteroidGardens.multipleChance;
         
         if (asteroidRoll < (1 - asteroidSpawnThreshold)) {
@@ -1677,7 +1768,10 @@ export class ChunkManager {
         // 99.95% of chunks will have no wormholes (approximately 1 every 2000 chunks)
         const wormholeRoll = wormholeRng.nextFloat(0, 1);
         
-        if (wormholeRoll >= GameConfig.world.specialObjects.wormholes.spawnChance) {
+        // Get region-modified spawn rates for this chunk
+        const regionSpawnRates = this.getRegionModifiedSpawnRates(chunkX, chunkY);
+        
+        if (wormholeRoll >= regionSpawnRates.wormholes) {
             return; // No wormhole in this chunk (most of the time)
         }
         
@@ -1902,8 +1996,11 @@ export class ChunkManager {
         const blackHoleSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0xABCDEF01;
         const blackHoleRng = new SeededRandom(blackHoleSeed);
         
+        // Get region-modified spawn rates for this chunk
+        const regionSpawnRates = this.getRegionModifiedSpawnRates(chunkX, chunkY);
+        
         // Ultra-rare chance for black holes
-        const blackHoleChance = GameConfig.world.specialObjects.blackHoles.spawnChance;
+        const blackHoleChance = regionSpawnRates.blackHoles;
         
         if (blackHoleRng.next() > blackHoleChance) {
             return; // No black hole in this chunk
