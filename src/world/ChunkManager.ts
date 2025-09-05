@@ -204,11 +204,21 @@ interface DebugObject {
     y: number;
 }
 
+interface DiscoveredRegion {
+    regionType: string;
+    regionName: string;
+    discoveryX: number;  // Location where player first discovered this region
+    discoveryY: number;
+    influence: number;   // Influence at discovery location
+    timestamp: number;
+}
+
 export class ChunkManager {
     chunkSize: number;
     loadRadius: number;
     activeChunks: Map<string, Chunk>;
     discoveredObjects: Map<string, DiscoveryData>;
+    discoveredRegions: Map<string, DiscoveredRegion>;
     debugObjects?: DebugObject[];
     private errorService: ErrorService;
     private regionGenerator: RegionGenerator;
@@ -218,6 +228,7 @@ export class ChunkManager {
         this.loadRadius = 1; // Load chunks in 3x3 grid around player
         this.activeChunks = new Map(); // Key: "x,y", Value: chunk data
         this.discoveredObjects = new Map(); // Key: "objId", Value: discovery state
+        this.discoveredRegions = new Map(); // Key: "regionType", Value: discovery data
         this.errorService = errorService || new ErrorService();
         this.regionGenerator = new RegionGenerator();
     }
@@ -2171,6 +2182,30 @@ export class ChunkManager {
         return discoveredComets;
     }
 
+    markRegionDiscovered(regionType: string, regionName: string, discoveryX: number, discoveryY: number, influence: number): void {
+        // Only mark a region as discovered once (first discovery)
+        if (!this.discoveredRegions.has(regionType)) {
+            const regionData: DiscoveredRegion = {
+                regionType,
+                regionName,
+                discoveryX,
+                discoveryY,
+                influence,
+                timestamp: Date.now()
+            };
+            
+            this.discoveredRegions.set(regionType, regionData);
+        }
+    }
+
+    getDiscoveredRegions(): DiscoveredRegion[] {
+        return Array.from(this.discoveredRegions.values());
+    }
+
+    isRegionDiscovered(regionType: string): boolean {
+        return this.discoveredRegions.has(regionType);
+    }
+
     // Helper method to find a comet by identifier in active chunks
     private findCometByIdentifier(cometIndex: number, originalCometX: number, originalCometY: number): any | null {
         for (const chunk of this.activeChunks.values()) {
@@ -2254,4 +2289,4 @@ export class ChunkManager {
 }
 
 // Export interfaces for use by other modules
-export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet };
+export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet, DiscoveredRegion };

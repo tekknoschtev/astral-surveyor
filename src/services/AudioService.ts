@@ -36,7 +36,7 @@ interface ISoundManager {
     setAmbientMuted?(muted: boolean): void;
     isEffectsMuted?(): boolean;
     setEffectsMuted?(muted: boolean): void;
-    startSpaceDrone?(): void;
+    startSpaceDrone?(regionType?: string): void;
     stopSpaceDrone?(): void;
     isSpaceDronePlaying?(): boolean;
 }
@@ -75,7 +75,7 @@ export interface IAudioService {
     isAmbientPlaying(): boolean;
     
     // Atmospheric space drone
-    startSpaceDrone(): void;
+    startSpaceDrone(regionType?: string): void;
     stopSpaceDrone(): void;
     isSpaceDronePlaying(): boolean;
     
@@ -338,15 +338,16 @@ export class AudioService implements IAudioService {
     /**
      * Start atmospheric space drone
      * Creates a low, vacant droning sound with ebb and flow modulation inspired by SATRN
+     * @param regionType - Optional cosmic region type for unique soundscapes
      */
-    startSpaceDrone(): void {
+    startSpaceDrone(regionType?: string): void {
         this.ensureNotDisposed();
         
         if (!this.shouldPlaySound()) return;
 
         try {
             if (this.soundManager.startSpaceDrone) {
-                this.soundManager.startSpaceDrone();
+                this.soundManager.startSpaceDrone(regionType);
             }
         } catch (error) {
             console.warn('Failed to start space drone:', error);

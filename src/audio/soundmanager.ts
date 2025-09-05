@@ -525,6 +525,95 @@ export class SoundManager {
         return configs[name];
     }
 
+    /**
+     * Get regional audio parameters for cosmic region-specific soundscapes
+     */
+    private getRegionalAudioParameters(regionType?: string): {
+        volumeMultiplier: number;
+        bassLayers: number;
+        melodicLayers: number;
+        cycleLengthModifier: number;
+        frequencyShift: number;
+        harmonic: string;
+    } {
+        // Default parameters for unknown regions
+        const defaults = {
+            volumeMultiplier: 1.0,
+            bassLayers: 4,
+            melodicLayers: 4,
+            cycleLengthModifier: 1.0,
+            frequencyShift: 1.0,
+            harmonic: 'balanced'
+        };
+
+        if (!regionType) return defaults;
+
+        switch (regionType.toUpperCase()) {
+            case 'VOID':
+                return {
+                    volumeMultiplier: 0.7,      // Quieter, more sparse
+                    bassLayers: 2,              // Fewer layers for emptiness
+                    melodicLayers: 3,
+                    cycleLengthModifier: 1.5,   // Longer, slower cycles
+                    frequencyShift: 0.8,        // Lower frequencies
+                    harmonic: 'sparse'
+                };
+
+            case 'STAR_FORGE':
+                return {
+                    volumeMultiplier: 1.2,      // Brighter, more energetic
+                    bassLayers: 4,
+                    melodicLayers: 5,           // More layers for activity
+                    cycleLengthModifier: 0.7,   // Faster cycles
+                    frequencyShift: 1.3,        // Higher frequencies
+                    harmonic: 'bright'
+                };
+
+            case 'GALACTIC_CORE':
+                return {
+                    volumeMultiplier: 1.4,      // Dense, complex
+                    bassLayers: 5,              // Maximum density
+                    melodicLayers: 6,
+                    cycleLengthModifier: 0.8,   // Faster cycling
+                    frequencyShift: 1.1,        // Slightly higher
+                    harmonic: 'complex'
+                };
+
+            case 'ASTEROID_GRAVEYARD':
+                return {
+                    volumeMultiplier: 0.9,      // Crystalline, metallic
+                    bassLayers: 3,
+                    melodicLayers: 4,
+                    cycleLengthModifier: 1.2,   // Slower, more distinct
+                    frequencyShift: 1.2,        // Metallic frequencies
+                    harmonic: 'crystalline'
+                };
+
+            case 'ANCIENT_EXPANSE':
+                return {
+                    volumeMultiplier: 1.0,      // Mysterious, deep
+                    bassLayers: 4,
+                    melodicLayers: 3,           // Fewer melodic, more bass
+                    cycleLengthModifier: 1.3,   // Longer, mysterious cycles
+                    frequencyShift: 0.9,        // Deeper tones
+                    harmonic: 'mysterious'
+                };
+
+            case 'STELLAR_NURSERY':
+                return {
+                    volumeMultiplier: 1.1,      // Organic, evolving
+                    bassLayers: 4,
+                    melodicLayers: 5,
+                    cycleLengthModifier: 0.9,   // Dynamic cycling
+                    frequencyShift: 1.15,       // Bright, organic
+                    harmonic: 'organic'
+                };
+
+            default:
+                return defaults;
+        }
+    }
+
     private createReverbEffect(reverbTime: number, reverbDecay: number): AudioNode | null {
         if (!this.context) return null;
 
@@ -961,8 +1050,9 @@ export class SoundManager {
     /**
      * Start ethereal space ambient - inspired by SATRN's layered soundscape
      * Creates multiple evolving tonal layers that fade in and out over time
+     * @param regionType - Optional cosmic region type for unique soundscapes
      */
-    async startSpaceDrone(): Promise<void> {
+    async startSpaceDrone(regionType?: string): Promise<void> {
         
         if (!this.context || !this.ambientGain || this.muted) {
             return;
@@ -989,6 +1079,10 @@ export class SoundManager {
             this.ambientMasterGain.gain.setValueAtTime(0.6, now); // Overall ambient volume - moderate level
             this.ambientMasterGain.connect(this.ambientGain);
             
+            // === REGIONAL AUDIO VARIATIONS ===
+            // Apply cosmic region-specific audio characteristics
+            const regionParams = this.getRegionalAudioParameters(regionType);
+            
             // PHASE 4: Layered Harmonic Textures
             
             // === HARMONIC INTEGRATION WITH DISCOVERY SYSTEM ===
@@ -997,21 +1091,37 @@ export class SoundManager {
             
             // Layer 1: Bass Drone Layer (32-98Hz) - Fundamental cosmic foundation
             // Supports star discovery range (58-174 Hz) with deep harmonics
-            const bassDroneFreqs = [
+            // Apply regional frequency shifts and layer count modifications
+            const bassBases = [
                 { freq: 32.7, cycle: 75, phase: 0, volume: 0.25 },   // Ultra-deep C1 - supports black holes
                 { freq: 49.0, cycle: 68, phase: 25, volume: 0.3 },   // G1 - supports wormholes & deep stars
                 { freq: 65.4, cycle: 60, phase: 45, volume: 0.35 },  // C2 - fundamental root, supports rare discoveries
-                { freq: 87.0, cycle: 55, phase: 15, volume: 0.3 }    // G2 - supports star discoveries
+                { freq: 87.0, cycle: 55, phase: 15, volume: 0.3 },   // G2 - supports star discoveries
+                { freq: 98.0, cycle: 52, phase: 65, volume: 0.28 }   // Additional layer for dense regions
             ];
+            const bassDroneFreqs = bassBases.slice(0, regionParams.bassLayers).map(layer => ({
+                freq: layer.freq * regionParams.frequencyShift,
+                cycle: layer.cycle * regionParams.cycleLengthModifier,
+                phase: layer.phase,
+                volume: layer.volume * regionParams.volumeMultiplier
+            }));
             
             // Layer 2: Planetary Harmonic Layer (130-261Hz) - Mid-register planetary resonance  
             // Directly harmonizes with planet discovery range (146-392 Hz)
-            const melodicFreqs = [
+            const melodicBases = [
                 { freq: 130.8, cycle: 45, phase: 20, volume: 0.35 }, // C3 - star discovery harmony
                 { freq: 174.6, cycle: 42, phase: 35, volume: 0.4 },  // F3 - planet discovery fundamental
                 { freq: 196.0, cycle: 48, phase: 10, volume: 0.32 }, // G3 - planet discovery harmony 
-                { freq: 261.6, cycle: 40, phase: 50, volume: 0.3 }   // C4 - planet discovery harmony
+                { freq: 261.6, cycle: 40, phase: 50, volume: 0.3 },  // C4 - planet discovery harmony
+                { freq: 293.7, cycle: 38, phase: 75, volume: 0.28 }, // Additional melodic layers
+                { freq: 329.6, cycle: 43, phase: 15, volume: 0.26 }  // For active regions
             ];
+            const melodicFreqs = melodicBases.slice(0, regionParams.melodicLayers).map(layer => ({
+                freq: layer.freq * regionParams.frequencyShift,
+                cycle: layer.cycle * regionParams.cycleLengthModifier,
+                phase: layer.phase,
+                volume: layer.volume * regionParams.volumeMultiplier
+            }));
             
             // Layer 3: Ethereal Overtone Layer (329-659Hz) - High harmonic sparkle
             // Supports moon and nebula discovery range (329-987 Hz) 
@@ -1084,7 +1194,8 @@ export class SoundManager {
             // Start the evolution update loop (handles both ambient and melodic)
             this.startAmbientEvolution();
             
-            console.log('Space drone started - atmospheric background audio with melodic progressions');
+            const regionMsg = regionType ? ` (${regionParams.harmonic} soundscape for ${regionType})` : '';
+            console.log(`Space drone started - atmospheric background audio with melodic progressions${regionMsg}`);
             
         } catch (error) {
             console.warn('Failed to start space drone:', error);
