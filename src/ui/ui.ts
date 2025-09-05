@@ -4,6 +4,7 @@
 // Import dependencies
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
+import type { ChunkManager } from '../world/ChunkManager.js';
 
 // Interface definitions
 interface Discovery {
@@ -26,13 +27,44 @@ export class DiscoveryDisplay {
     maxDisplayed: number;
     displayDuration: number;
     notificationDuration: number;
+    private chunkManager: ChunkManager | null;
 
-    constructor() {
+    constructor(chunkManager?: ChunkManager) {
         this.discoveries = [];
         this.notifications = [];
         this.maxDisplayed = 5; // Show last 5 discoveries
         this.displayDuration = 15000; // 15 seconds per discovery
         this.notificationDuration = 3000; // 3 seconds for notifications
+        this.chunkManager = chunkManager || null;
+    }
+
+    private getRegionDescription(regionName: string, influence: number): string {
+        // Convert influence to descriptive text based on strength
+        let intensityDesc = '';
+        if (influence >= 0.9) {
+            intensityDesc = 'Deep in';
+        } else if (influence >= 0.7) {
+            intensityDesc = 'Within';
+        } else if (influence >= 0.5) {
+            intensityDesc = 'Entering';
+        } else if (influence >= 0.3) {
+            intensityDesc = 'Approaching';
+        } else {
+            intensityDesc = 'Near';
+        }
+
+        // Special handling for different region types to make them more atmospheric
+        const regionSpecialNames: Record<string, string> = {
+            'The Void': 'the Void',
+            'Star-Forge Cluster': 'the Star-Forge Cluster',
+            'Galactic Core': 'the Galactic Core',
+            'Asteroid Graveyard': 'the Asteroid Graveyard',
+            'Ancient Expanse': 'the Ancient Expanse',
+            'Stellar Nursery': 'the Stellar Nursery'
+        };
+
+        const displayName = regionSpecialNames[regionName] || regionName.toLowerCase();
+        return `${intensityDesc} ${displayName}`;
     }
 
     addDiscovery(objectName: string, objectType: string): void {
@@ -181,25 +213,48 @@ export class DiscoveryDisplay {
         const distanceText = `Distance: ${camera.getFormattedDistance()}`;
         const speedText = `Speed: ${camera.getFormattedSpeed()}`;
         
+        // Get region information if chunk manager is available
+        let regionText = '';
+        if (this.chunkManager) {
+            try {
+                const chunkX = Math.floor(x / this.chunkManager.chunkSize);
+                const chunkY = Math.floor(y / this.chunkManager.chunkSize);
+                const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+                
+                if (regionInfo && regionInfo.definition) {
+                    regionText = this.getRegionDescription(regionInfo.definition.name, regionInfo.influence);
+                }
+            } catch (error) {
+                // Silently handle any region lookup errors
+                regionText = '';
+            }
+        }
+        
         // Set up font to match game UI (Courier New, 12px)
         renderer.ctx.font = '12px "Courier New", monospace';
         renderer.ctx.textAlign = 'left';
         renderer.ctx.textBaseline = 'alphabetic';
         
-        // Calculate widths for right alignment
+        // Calculate widths for right alignment - include region text if available
         const coordWidth = renderer.ctx.measureText(coordText).width;
         const distanceWidth = renderer.ctx.measureText(distanceText).width;
         const speedWidth = renderer.ctx.measureText(speedText).width;
-        const maxWidth = Math.max(coordWidth, distanceWidth, speedWidth);
+        const regionWidth = regionText ? renderer.ctx.measureText(regionText).width : 0;
+        const maxWidth = Math.max(coordWidth, distanceWidth, speedWidth, regionWidth);
         
         // Position on the right side of screen
         const rightX = renderer.canvas.width - maxWidth - padding;
         
-        // Draw coordinates, distance, and speed (minimal, no background or instructions)
+        // Draw coordinates, distance, speed, and region (minimal, no background or instructions)
         renderer.ctx.fillStyle = '#b0c4d4'; // Soft blue-white to match new UI
         renderer.ctx.fillText(coordText, rightX, padding + 10);
         renderer.ctx.fillText(distanceText, rightX, padding + 25); // 15px below coordinates
         renderer.ctx.fillText(speedText, rightX, padding + 40); // 15px below distance
+        
+        // Draw region information if available
+        if (regionText) {
+            renderer.ctx.fillText(regionText, rightX, padding + 55); // 15px below speed
+        }
         
         // Restore context state
         renderer.ctx.restore();

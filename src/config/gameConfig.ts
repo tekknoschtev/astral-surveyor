@@ -89,6 +89,20 @@ export const WorldConfig = {
     // Binary star configuration
     binaryStars: {
         distanceRange: { min: 150, max: 300 },  // Distance between binary stars
+    },
+    
+    // Cosmic Regions Configuration  
+    cosmicRegions: {
+        enabled: true,                      // Enable/disable cosmic regions system
+        regionScale: 150000,               // Base size of regions in pixels (~75 chunks)
+        regionsPerMacroArea: 8,            // Number of region centers per macro area
+        macroAreaSize: 300000,             // Size of macro areas for region center generation
+        influenceFalloff: 0.3,             // How quickly region influence decreases with distance
+        minRegionDistance: 80000,          // Minimum distance between region centers
+        
+        // Performance optimization settings
+        cacheResolution: 10000,            // Resolution for region lookup caching (5 chunks)
+        maxCacheDistance: 900000,          // Maximum distance to keep cached region data
     }
 };
 

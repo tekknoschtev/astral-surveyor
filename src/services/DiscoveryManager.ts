@@ -13,7 +13,7 @@ export interface DiscoveryEntry {
     id: string;
     name: string;
     type: string;
-    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region';
     coordinates: {
         x: number;
         y: number;
@@ -28,6 +28,8 @@ export interface DiscoveryEntry {
         nebulaType?: string;
         gardenType?: string;
         blackHoleTypeName?: string;
+        regionType?: string;
+        regionInfluence?: number;
         isNotable: boolean;
         discoveryRadius?: number;
     };
@@ -145,6 +147,86 @@ export class DiscoveryManager {
             const logPrefix = isNotable ? '🌟 RARE DISCOVERY!' : '⭐ Discovery!';
             console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
         }
+    }
+
+    /**
+     * Process a newly discovered region
+     */
+    processRegionDiscovery(regionType: string, regionName: string, camera: Camera, influence: number, chunkManager?: any): void {
+        // Check if this region has already been discovered
+        const regionId = `region_${regionType}`;
+        if (this.discoveries.has(regionId)) {
+            return; // Already discovered
+        }
+
+        const shareableURL = generateShareableURL(camera.x, camera.y);
+        const discoveryEntry = this.createRegionDiscoveryEntry(
+            regionType,
+            regionName,
+            camera,
+            influence,
+            shareableURL
+        );
+
+        // Store in persistent discovery list
+        this.discoveries.set(discoveryEntry.id, discoveryEntry);
+
+        // Mark region as discovered in chunk manager
+        if (chunkManager && chunkManager.markRegionDiscovered) {
+            chunkManager.markRegionDiscovered(regionType, regionName, camera.x, camera.y, influence);
+        }
+
+        // Add to UI displays
+        this.discoveryDisplay.addDiscovery(regionName, 'Cosmic Region');
+        this.discoveryLogbook.addDiscovery(regionName, 'Cosmic Region');
+
+        // Play discovery sound (soft discovery sound for regions)
+        this.playRegionDiscoverySound();
+
+        // Log region discovery
+        console.log(`🌌 REGION DISCOVERY! You have entered ${regionName}. Share: ${shareableURL}`);
+    }
+
+    /**
+     * Create a detailed discovery entry for a region
+     */
+    private createRegionDiscoveryEntry(
+        regionType: string,
+        regionName: string,
+        camera: Camera,
+        influence: number,
+        shareableURL: string
+    ): DiscoveryEntry {
+        const timestamp = Date.now();
+
+        return {
+            id: `region_${regionType}`,
+            name: regionName,
+            type: 'Cosmic Region',
+            objectType: 'region',
+            coordinates: {
+                x: camera.x,
+                y: camera.y
+            },
+            timestamp,
+            rarity: 'uncommon', // Regions are uncommon discoveries
+            shareableURL,
+            metadata: {
+                regionType: regionType,
+                regionInfluence: influence,
+                isNotable: influence > 0.8, // High influence regions are notable
+                discoveryRadius: 0 // Regions don't have discovery radius
+            }
+        };
+    }
+
+    /**
+     * Play a soft discovery sound for regions
+     */
+    private playRegionDiscoverySound(): void {
+        // Use the rare discovery sound for regions as they are special discoveries
+        // The rare discovery sound is harmonically rich and appropriate for cosmic regions
+        this.soundManager.playRareDiscovery();
     }
 
     /**

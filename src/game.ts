@@ -115,6 +115,9 @@ export class Game {
     private cachedActiveObjects?: ActiveObjects;
     settingsMenu: SettingsMenu;
     
+    // Region discovery tracking
+    private currentRegionType: string | null = null;
+    
     // Expose properties for backward compatibility with tests
     get lastBlackHoleWarnings() {
         return this.discoveryManager['lastBlackHoleWarnings'];
@@ -159,11 +162,12 @@ export class Game {
         this.ship = new Ship();
         this.thrusterParticles = new ThrusterParticles();
         this.starParticles = new StarParticles();
-        this.discoveryDisplay = new DiscoveryDisplay();
+        this.discoveryDisplay = new DiscoveryDisplay(this.chunkManager);
         this.discoveryLogbook = new DiscoveryLogbook();
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
         this.stellarMap.setNamingService(this.namingService);
+        this.stellarMap.setChunkManager(this.chunkManager);
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
         
@@ -559,6 +563,9 @@ export class Game {
         
         this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
         
+        // Check for region discovery
+        this.checkRegionDiscovery();
+        
         // Check for wormhole traversal
         this.checkWormholeTraversal(activeObjects.wormholes);
         
@@ -687,7 +694,8 @@ export class Game {
             wormholes: this.chunkManager.getDiscoveredWormholes(),
             asteroidGardens: this.chunkManager.getDiscoveredAsteroidGardens(),
             blackHoles: this.chunkManager.getDiscoveredBlackHoles(),
-            comets: this.chunkManager.getDiscoveredComets()
+            comets: this.chunkManager.getDiscoveredComets(),
+            regions: this.chunkManager.getDiscoveredRegions()
         };
     }
 
@@ -803,6 +811,71 @@ export class Game {
         }
     }
 
+    checkRegionDiscovery(): void {
+        try {
+            // Get current position
+            const chunkX = Math.floor(this.camera.x / this.chunkManager.chunkSize);
+            const chunkY = Math.floor(this.camera.y / this.chunkManager.chunkSize);
+            
+            // Get region information at current position
+            const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+            
+            if (regionInfo && regionInfo.definition && regionInfo.influence > 0.5) {
+                // Only trigger discovery if influence is significant (> 50%)
+                
+                if (this.currentRegionType !== regionInfo.regionType) {
+                    // Player has entered a new region
+                    this.currentRegionType = regionInfo.regionType;
+                    
+                    // Process the region discovery
+                    this.discoveryManager.processRegionDiscovery(
+                        regionInfo.regionType,
+                        regionInfo.definition.name,
+                        this.camera,
+                        regionInfo.influence,
+                        this.chunkManager
+                    );
+                    
+                    // Update ambient music for the new region
+                    if (this.soundManager.isSpaceDronePlaying()) {
+                        this.soundManager.stopSpaceDrone();
+                        // Brief delay for smooth transition
+                        setTimeout(() => {
+                            this.soundManager.startSpaceDrone(regionInfo.regionType);
+                        }, 500);
+                    }
+                }
+            } else {
+                // Player is in a transition area or no strong regional influence
+                // Only clear current region if we're really in a low influence area
+                if (regionInfo && regionInfo.influence < 0.1) {
+                    this.currentRegionType = null;
+                }
+            }
+        } catch (error) {
+            // Silently handle region lookup errors
+            console.warn('Region discovery check failed:', error);
+        }
+    }
+
+    getCurrentRegionType(): string | undefined {
+        try {
+            // Get current position
+            const chunkX = Math.floor(this.camera.x / this.chunkManager.chunkSize);
+            const chunkY = Math.floor(this.camera.y / this.chunkManager.chunkSize);
+            
+            // Get region information at current position
+            const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+            
+            if (regionInfo && regionInfo.definition && regionInfo.influence > 0.3) {
+                return regionInfo.regionType;
+            }
+        } catch (error) {
+            // Silently handle region lookup errors
+        }
+        return undefined;
+    }
+
     checkWormholeTraversal(wormholes: CelestialObject[]): void {
         // Skip if already traversing
         if (this.isTraversing) {
@@ -848,7 +921,9 @@ export class Game {
             const resumed = await this.soundManager.resumeAudioContext();
             if (resumed && !this.soundManager.isSpaceDronePlaying()) {
                 // Start space drone after successful audio context resume
-                this.soundManager.startSpaceDrone();
+                // Get current region for regional soundscape
+                const currentRegion = this.getCurrentRegionType();
+                this.soundManager.startSpaceDrone(currentRegion);
                 this.discoveryDisplay.addNotification('🌌 Atmospheric audio enabled');
             }
         }

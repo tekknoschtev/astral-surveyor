@@ -7,6 +7,7 @@ import type { Camera } from '../camera/camera.js';
 import type { Input } from '../input/input.js';
 import { NamingService } from '../naming/naming.js';
 import type { SeedInspectorService, CelestialObjectData } from '../debug/SeedInspectorService.js';
+import type { ChunkManager } from '../world/ChunkManager.js';
 
 // Interface definitions
 interface StarLike {
@@ -173,6 +174,9 @@ export class StellarMap {
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
     revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
+    
+    // Chunk Manager for region information
+    chunkManager: ChunkManager | null;
 
     constructor() {
         this.visible = false;
@@ -246,6 +250,9 @@ export class StellarMap {
         // Initialize persistent revealed areas system
         this.revealedChunks = new Map();
         this.revealedChunksMetadata = new Map();
+        
+        // Initialize chunk manager
+        this.chunkManager = null;
     }
 
     private getLabelFont(): string {
@@ -940,6 +947,10 @@ export class StellarMap {
         this.namingService = namingService;
     }
     
+    setChunkManager(chunkManager: ChunkManager): void {
+        this.chunkManager = chunkManager;
+    }
+    
     // Enable following player position
     enableFollowPlayer(camera: Camera): void {
         this.followPlayer = true;
@@ -1012,6 +1023,8 @@ export class StellarMap {
         
         // Draw coordinate grid
         this.renderGrid(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale);
+        
+        // Cosmic regions display disabled
         
         // Draw discovered objects (conditionally in inspector mode)
         if (!this.inspectorMode || this.showDiscoveredObjects) {
@@ -1125,6 +1138,429 @@ export class StellarMap {
                 ctx.stroke();
             }
         }
+    }
+
+    renderCosmicRegions(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number): void {
+        // Completely disable all region display for now
+        return;
+    }
+
+    private drawCleanRegionLabels(
+        ctx: CanvasRenderingContext2D,
+        regionCenters: Map<string, {x: number, y: number, name: string, count: number}>,
+        mapX: number,
+        mapY: number,
+        mapWidth: number,
+        mapHeight: number,
+        scale: number
+    ): void {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '14px "Courier New", monospace';
+        
+        const minDistance = 80; // Minimum distance between labels in screen pixels
+        const drawnPositions: Array<{x: number, y: number}> = [];
+        
+        for (const [regionType, center] of regionCenters) {
+            if (center.count < 2) continue; // Only show for regions with multiple sample points
+            
+            // Convert to screen coordinates
+            const screenX = mapX + mapWidth/2 + (center.x - this.centerX) * scale;
+            const screenY = mapY + mapHeight/2 + (center.y - this.centerY) * scale;
+            
+            // Check if this label would be too close to existing ones
+            let tooClose = false;
+            for (const pos of drawnPositions) {
+                const distance = Math.sqrt((screenX - pos.x) ** 2 + (screenY - pos.y) ** 2);
+                if (distance < minDistance) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            
+            if (!tooClose && screenX >= mapX && screenX <= mapX + mapWidth && 
+                screenY >= mapY && screenY <= mapY + mapHeight) {
+                
+                // Draw subtle background
+                const textWidth = ctx.measureText(center.name).width;
+                ctx.fillStyle = '#000000aa';
+                ctx.fillRect(screenX - textWidth/2 - 8, screenY - 10, textWidth + 16, 20);
+                
+                // Draw region name
+                ctx.fillStyle = '#b0c4d4';
+                ctx.fillText(center.name, screenX, screenY);
+                
+                drawnPositions.push({x: screenX, y: screenY});
+            }
+        }
+        
+        ctx.restore();
+    }
+
+    private sampleRegionBoundaries(
+        mapX: number,
+        mapY: number,
+        mapWidth: number,
+        mapHeight: number,
+        scale: number,
+        sampleSpacing: number,
+        regionColors: Record<string, string>
+    ): Map<string, Array<{x: number, y: number}>> {
+        const boundaryPoints = new Map<string, Array<{x: number, y: number}>>();
+        
+        // Sample in screen-space grid, not world chunks
+        for (let screenX = mapX; screenX < mapX + mapWidth; screenX += sampleSpacing) {
+            for (let screenY = mapY; screenY < mapY + mapHeight; screenY += sampleSpacing) {
+                
+                // Convert screen coordinates to world coordinates
+                const worldX = this.centerX + (screenX - mapX - mapWidth/2) / scale;
+                const worldY = this.centerY + (screenY - mapY - mapHeight/2) / scale;
+                
+                try {
+                    // Sample region at this world point
+                    const chunkX = Math.floor(worldX / this.chunkManager!.chunkSize);
+                    const chunkY = Math.floor(worldY / this.chunkManager!.chunkSize);
+                    const currentRegion = this.chunkManager!.getChunkRegion(chunkX, chunkY);
+                    
+                    if (!currentRegion || !currentRegion.definition) continue;
+                    
+                    // Only process discovered regions in normal view
+                    const isDiscovered = this.chunkManager!.isRegionDiscovered(currentRegion.regionType);
+                    if (!isDiscovered && !this.inspectorMode) continue;
+                    
+                    // Check neighboring samples for boundary detection
+                    const neighbors = [
+                        {dx: sampleSpacing, dy: 0},
+                        {dx: 0, dy: sampleSpacing}
+                    ];
+                    
+                    for (const {dx, dy} of neighbors) {
+                        const neighScreenX = screenX + dx;
+                        const neighScreenY = screenY + dy;
+                        
+                        // Skip if neighbor is outside screen bounds
+                        if (neighScreenX >= mapX + mapWidth || neighScreenY >= mapY + mapHeight) continue;
+                        
+                        // Convert neighbor screen coordinates to world coordinates
+                        const neighWorldX = this.centerX + (neighScreenX - mapX - mapWidth/2) / scale;
+                        const neighWorldY = this.centerY + (neighScreenY - mapY - mapHeight/2) / scale;
+                        
+                        const neighChunkX = Math.floor(neighWorldX / this.chunkManager!.chunkSize);
+                        const neighChunkY = Math.floor(neighWorldY / this.chunkManager!.chunkSize);
+                        const neighborRegion = this.chunkManager!.getChunkRegion(neighChunkX, neighChunkY);
+                        
+                        if (!neighborRegion || !neighborRegion.definition) continue;
+                        
+                        // If neighbor region is different, this is a boundary point
+                        if (neighborRegion.regionType !== currentRegion.regionType) {
+                            const neighIsDiscovered = this.chunkManager!.isRegionDiscovered(neighborRegion.regionType);
+                            if (!neighIsDiscovered && !this.inspectorMode) continue;
+                            
+                            // Use color from region with higher influence
+                            const useCurrentColor = currentRegion.influence >= neighborRegion.influence;
+                            const color = useCurrentColor ? 
+                                regionColors[currentRegion.regionType] : 
+                                regionColors[neighborRegion.regionType];
+                            const colorKey = color || '#666666';
+                            
+                            if (!boundaryPoints.has(colorKey)) {
+                                boundaryPoints.set(colorKey, []);
+                            }
+                            
+                            // Record boundary point in world coordinates (for smooth curves)
+                            boundaryPoints.get(colorKey)!.push({x: worldX, y: worldY});
+                        }
+                    }
+                } catch (error) {
+                    continue;
+                }
+            }
+        }
+        
+        return boundaryPoints;
+    }
+
+    private renderContourBoundaries(
+        ctx: CanvasRenderingContext2D,
+        boundaryPoints: Map<string, Array<{x: number, y: number}>>,
+        regionColors: Record<string, string>
+    ): void {
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        for (const [color, points] of boundaryPoints) {
+            if (points.length < 1) continue; // Draw even single points for debugging
+            
+            ctx.strokeStyle = color + 'CC'; // Much more opaque for visibility
+            console.log(`Rendering ${points.length} boundary points with color ${color}`);
+            
+            // Simple approach: draw small circles at each boundary point for debugging
+            for (const point of points) {
+                const screenPoint = this.worldToScreenCoords(point);
+                ctx.beginPath();
+                ctx.arc(screenPoint.x, screenPoint.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Try multiple grouping tolerances and draw simple lines between nearby points
+            if (points.length >= 2) {
+                // Sort points for better connection
+                const sortedPoints = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+                
+                ctx.beginPath();
+                let startPoint = this.worldToScreenCoords(sortedPoints[0]);
+                ctx.moveTo(startPoint.x, startPoint.y);
+                
+                // Connect to nearby points within reasonable distance
+                for (let i = 1; i < sortedPoints.length; i++) {
+                    const currentScreen = this.worldToScreenCoords(sortedPoints[i]);
+                    const prevScreen = this.worldToScreenCoords(sortedPoints[i-1]);
+                    
+                    // If points are reasonably close, connect them
+                    const distance = Math.sqrt(
+                        (currentScreen.x - prevScreen.x) ** 2 + 
+                        (currentScreen.y - prevScreen.y) ** 2
+                    );
+                    
+                    if (distance < 100) { // Screen pixels
+                        ctx.lineTo(currentScreen.x, currentScreen.y);
+                    } else {
+                        // Start a new path segment
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(currentScreen.x, currentScreen.y);
+                    }
+                }
+                
+                ctx.stroke();
+            }
+        }
+    }
+
+    private groupNearbyPoints(points: Array<{x: number, y: number}>, tolerance: number): Array<Array<{x: number, y: number}>> {
+        if (points.length === 0) return [];
+        
+        const paths: Array<Array<{x: number, y: number}>> = [];
+        const used = new Set<number>();
+        
+        for (let i = 0; i < points.length; i++) {
+            if (used.has(i)) continue;
+            
+            const currentPath = [points[i]];
+            used.add(i);
+            
+            // Find nearby points to connect
+            let found = true;
+            while (found) {
+                found = false;
+                const lastPoint = currentPath[currentPath.length - 1];
+                
+                for (let j = 0; j < points.length; j++) {
+                    if (used.has(j)) continue;
+                    
+                    const dx = points[j].x - lastPoint.x;
+                    const dy = points[j].y - lastPoint.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance <= tolerance) {
+                        currentPath.push(points[j]);
+                        used.add(j);
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (currentPath.length > 1) {
+                paths.push(currentPath);
+            }
+        }
+        
+        return paths;
+    }
+
+    private worldToScreenCoords(worldPoint: {x: number, y: number}): {x: number, y: number} {
+        // This method needs access to current rendering context - we'll need to pass it in
+        // For now, using a simplified approach
+        const mapBounds = this.getMapBounds(document.querySelector('canvas') as HTMLCanvasElement);
+        const worldToMapScale = Math.min(mapBounds.mapWidth, mapBounds.mapHeight) / (this.gridSize * 4 / this.zoomLevel);
+        
+        return {
+            x: mapBounds.mapX + mapBounds.mapWidth/2 + (worldPoint.x - this.centerX) * worldToMapScale,
+            y: mapBounds.mapY + mapBounds.mapHeight/2 + (worldPoint.y - this.centerY) * worldToMapScale
+        };
+    }
+
+    private drawRegionLabelsFromSamples(
+        ctx: CanvasRenderingContext2D,
+        mapX: number,
+        mapY: number,
+        mapWidth: number,
+        mapHeight: number,
+        scale: number,
+        sampleSpacing: number
+    ): void {
+        // Only show labels at appropriate zoom levels
+        if (this.zoomLevel < 0.1 || this.zoomLevel > 1.5) return;
+        
+        const regionCenters = new Map<string, {x: number, y: number, name: string, count: number}>();
+        const minDistance = sampleSpacing * 3; // Minimum distance between labels
+        
+        // Sample region centers from sparse grid
+        const labelSampleSpacing = sampleSpacing * 2;
+        for (let screenX = mapX; screenX < mapX + mapWidth; screenX += labelSampleSpacing) {
+            for (let screenY = mapY; screenY < mapY + mapHeight; screenY += labelSampleSpacing) {
+                const worldX = this.centerX + (screenX - mapX - mapWidth/2) / scale;
+                const worldY = this.centerY + (screenY - mapY - mapHeight/2) / scale;
+                
+                try {
+                    const chunkX = Math.floor(worldX / this.chunkManager!.chunkSize);
+                    const chunkY = Math.floor(worldY / this.chunkManager!.chunkSize);
+                    const region = this.chunkManager!.getChunkRegion(chunkX, chunkY);
+                    
+                    if (!region || !region.definition) continue;
+                    
+                    const isDiscovered = this.chunkManager!.isRegionDiscovered(region.regionType);
+                    if (!isDiscovered && !this.inspectorMode) continue;
+                    
+                    const regionKey = region.regionType;
+                    if (!regionCenters.has(regionKey)) {
+                        regionCenters.set(regionKey, {
+                            x: screenX,
+                            y: screenY,
+                            name: region.definition.name,
+                            count: 1
+                        });
+                    } else {
+                        const center = regionCenters.get(regionKey)!;
+                        center.x = (center.x * center.count + screenX) / (center.count + 1);
+                        center.y = (center.y * center.count + screenY) / (center.count + 1);
+                        center.count++;
+                    }
+                } catch (error) {
+                    continue;
+                }
+            }
+        }
+        
+        // Draw labels with spacing control
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '12px "Courier New", monospace';
+        
+        const drawnPositions: Array<{x: number, y: number}> = [];
+        
+        for (const [regionType, center] of regionCenters) {
+            if (center.count < 3) continue; // Only show for significant regions
+            
+            // Check minimum distance from other labels
+            let tooClose = false;
+            for (const pos of drawnPositions) {
+                const distance = Math.sqrt((center.x - pos.x) ** 2 + (center.y - pos.y) ** 2);
+                if (distance < minDistance) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            
+            if (!tooClose) {
+                // Draw text background
+                const textWidth = ctx.measureText(center.name).width;
+                ctx.fillStyle = '#000000c0';
+                ctx.fillRect(center.x - textWidth/2 - 4, center.y - 8, textWidth + 8, 16);
+                
+                // Draw label
+                ctx.fillStyle = '#b0c4d4cc';
+                ctx.fillText(center.name, center.x, center.y);
+                
+                drawnPositions.push({x: center.x, y: center.y});
+            }
+        }
+        
+        ctx.restore();
+    }
+
+    private isLineVisible(x1: number, y1: number, x2: number, y2: number, mapX: number, mapY: number, mapWidth: number, mapHeight: number): boolean {
+        // Simple bounds check - if any part of the line is within screen bounds
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        
+        return !(maxX < mapX || minX > mapX + mapWidth || maxY < mapY || minY > mapY + mapHeight);
+    }
+
+    private drawRegionLabels(
+        ctx: CanvasRenderingContext2D,
+        regionCenters: Map<string, {x: number, y: number, name: string, color: string, count: number}>,
+        mapX: number,
+        mapY: number,
+        mapWidth: number,
+        mapHeight: number,
+        scale: number
+    ): void {
+        // Only show labels at appropriate zoom levels to avoid clutter
+        if (this.zoomLevel < 0.1 || this.zoomLevel > 1.5) return;
+        
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Calculate font size based on zoom level
+        const fontSize = Math.max(10, Math.min(16, this.zoomLevel * 20));
+        ctx.font = `${fontSize}px "Courier New", monospace`;
+        
+        // Minimum distance between labels to prevent overlap
+        const minDistance = Math.max(50, 100 / this.zoomLevel);
+        const drawnPositions: Array<{x: number, y: number}> = [];
+        
+        for (const [regionType, center] of regionCenters) {
+            // Convert world coordinates to map coordinates
+            const labelMapX = mapX + mapWidth/2 + (center.x - this.centerX) * scale;
+            const labelMapY = mapY + mapHeight/2 + (center.y - this.centerY) * scale;
+            
+            // Only draw if label is within visible area
+            if (labelMapX < mapX || labelMapX > mapX + mapWidth || 
+                labelMapY < mapY || labelMapY > mapY + mapHeight) {
+                continue;
+            }
+            
+            // Check minimum distance from other labels
+            let tooClose = false;
+            for (const pos of drawnPositions) {
+                const distance = Math.sqrt((labelMapX - pos.x) ** 2 + (labelMapY - pos.y) ** 2);
+                if (distance < minDistance) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            
+            if (!tooClose && center.count >= 3) { // Only show labels for regions with enough chunks
+                // Draw text background for readability
+                const textWidth = ctx.measureText(center.name).width;
+                const textHeight = fontSize;
+                const padding = 4;
+                
+                ctx.fillStyle = '#000000c0'; // Semi-transparent background
+                ctx.fillRect(
+                    labelMapX - textWidth/2 - padding,
+                    labelMapY - textHeight/2 - padding,
+                    textWidth + padding * 2,
+                    textHeight + padding * 2
+                );
+                
+                // Draw region label
+                ctx.fillStyle = center.color + 'cc'; // Semi-transparent color
+                ctx.fillText(center.name, labelMapX, labelMapY);
+                
+                drawnPositions.push({x: labelMapX, y: labelMapY});
+            }
+        }
+        
+        ctx.restore();
     }
 
     renderDiscoveredStars(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredStars: StarLike[]): void {
@@ -3628,7 +4064,7 @@ export class StellarMap {
         // Calculate overlay dimensions
         const stats = this.currentViewStatistics;
         const objectTypes = Object.keys(stats.objectCounts);
-        const contentLines = 3 + objectTypes.length; // seed + total + density + object counts
+        const contentLines = 3 + 1 + objectTypes.length; // seed + total + density + discovered toggle + object counts
         const overlayHeight = headerHeight + (contentLines * lineHeight) + padding * 2 + 25; // +25 for instruction text
         const overlayWidth = 280;
 
