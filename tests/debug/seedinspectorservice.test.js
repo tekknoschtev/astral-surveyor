@@ -15,7 +15,8 @@ describe('SeedInspectorService', () => {
 
         // Create mock ChunkManager
         mockChunkManager = {
-            generateChunk: vi.fn()
+            generateChunk: vi.fn(),
+            _generateChunk: vi.fn()
         };
 
         // Create service instance
@@ -30,7 +31,7 @@ describe('SeedInspectorService', () => {
     describe('Region Analysis', () => {
         it('should analyze a 3x3 region correctly', async () => {
             // Mock chunk generation to return predictable data
-            mockChunkManager.generateChunk.mockImplementation((chunkX, chunkY) => ({
+            const mockChunkData = (chunkX, chunkY) => ({
                 x: chunkX,
                 y: chunkY,
                 stars: Array(50).fill(null).map((_, i) => ({ // 50 background stars per chunk
@@ -60,8 +61,12 @@ describe('SeedInspectorService', () => {
                 asteroidGardens: [],
                 wormholes: [],
                 blackholes: [],
-                comets: []
-            }));
+                comets: [],
+                roguePlanets: []
+            });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 1);
 
@@ -88,8 +93,8 @@ describe('SeedInspectorService', () => {
         });
 
         it('should handle different region sizes', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [],
                 celestialStars: [],
                 planets: [],
@@ -98,8 +103,12 @@ describe('SeedInspectorService', () => {
                 asteroidGardens: [],
                 wormholes: [],
                 blackholes: [],
-                comets: []
+                comets: [],
+                roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             // Test 1x1 region (single chunk)
             const smallAnalysis = await seedInspector.analyzeRegion(12345, 0, 0, 0);
@@ -113,7 +122,7 @@ describe('SeedInspectorService', () => {
         });
 
         it('should handle non-zero center coordinates', async () => {
-            mockChunkManager.generateChunk.mockImplementation((chunkX, chunkY) => ({
+            const mockChunkData = (chunkX, chunkY) => ({
                 x: chunkX,
                 y: chunkY,
                 stars: [],
@@ -124,8 +133,12 @@ describe('SeedInspectorService', () => {
                 asteroidGardens: [],
                 wormholes: [],
                 blackholes: [],
-                comets: []
-            }));
+                comets: [],
+                roguePlanets: []
+            });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             // Analyze region centered at (4000, 6000) which should be chunks (2, 3)
             const analysis = await seedInspector.analyzeRegion(12345, 4000, 6000, 1);
@@ -140,9 +153,9 @@ describe('SeedInspectorService', () => {
                 [1, 4], [2, 4], [3, 4]
             ];
             
-            expect(mockChunkManager.generateChunk).toHaveBeenCalledTimes(9);
+            expect(mockChunkManager._generateChunk).toHaveBeenCalledTimes(9);
             for (const [x, y] of expectedChunks) {
-                expect(mockChunkManager.generateChunk).toHaveBeenCalledWith(x, y);
+                expect(mockChunkManager._generateChunk).toHaveBeenCalledWith(x, y);
             }
         });
 
@@ -150,11 +163,15 @@ describe('SeedInspectorService', () => {
             const testSeed = 99999;
             setUniverseSeed(testSeed);
             
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [], celestialStars: [], planets: [], moons: [],
-                nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: []
+                nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], 
+                comets: [], roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             await seedInspector.analyzeRegion(12345, 0, 0, 0);
 
@@ -165,9 +182,9 @@ describe('SeedInspectorService', () => {
 
     describe('Object Data Collection', () => {
         it('should collect detailed object data for visualization', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0,
-                y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX,
+                y: chunkY,
                 stars: [{
                     x: 100,
                     y: 200,
@@ -195,8 +212,12 @@ describe('SeedInspectorService', () => {
                 asteroidGardens: [],
                 wormholes: [],
                 blackholes: [],
-                comets: []
+                comets: [],
+                roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const objects = await seedInspector.getRegionObjects(12345, 0, 0, 0);
 
@@ -217,8 +238,8 @@ describe('SeedInspectorService', () => {
         });
 
         it('should handle chunks with rare objects', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [],
                 celestialStars: [],
                 planets: [],
@@ -246,8 +267,12 @@ describe('SeedInspectorService', () => {
                     eventHorizonRadius: 10,
                     gravitationalInfluence: 30
                 }],
-                comets: []
+                comets: [],
+                roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const objects = await seedInspector.getRegionObjects(12345, 0, 0, 0);
 
@@ -266,11 +291,15 @@ describe('SeedInspectorService', () => {
 
     describe('Data Export', () => {
         it('should export analysis as JSON', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [], celestialStars: [], planets: [], moons: [],
-                nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: []
+                nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], 
+                comets: [], roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 0);
             const jsonExport = seedInspector.exportAnalysis(analysis);
@@ -284,13 +313,17 @@ describe('SeedInspectorService', () => {
         });
 
         it('should export analysis as CSV', async () => {
-            mockChunkManager.generateChunk.mockImplementation((chunkX, chunkY) => ({
+            const mockChunkData = (chunkX, chunkY) => ({
                 x: chunkX, y: chunkY,
                 stars: Array(10).fill(null), // 10 background stars
                 celestialStars: [{}], // 1 celestial star
                 planets: [{}], // 1 planet
-                moons: [], nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: []
-            }));
+                moons: [], nebulae: [], asteroidGardens: [], wormholes: [], 
+                blackholes: [], comets: [], roguePlanets: []
+            });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 0);
             const csvExport = seedInspector.exportAnalysisCSV(analysis);
@@ -303,8 +336,8 @@ describe('SeedInspectorService', () => {
 
     describe('Edge Cases and Error Handling', () => {
         it('should handle empty chunks', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [],
                 celestialStars: [],
                 planets: [],
@@ -313,8 +346,12 @@ describe('SeedInspectorService', () => {
                 asteroidGardens: [],
                 wormholes: [],
                 blackholes: [],
-                comets: []
+                comets: [],
+                roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 0);
             
@@ -325,7 +362,7 @@ describe('SeedInspectorService', () => {
         });
 
         it('should handle ChunkManager errors gracefully', async () => {
-            mockChunkManager.generateChunk.mockImplementation(() => {
+            mockChunkManager._generateChunk.mockImplementation(() => {
                 throw new Error('Chunk generation failed');
             });
 
@@ -334,12 +371,15 @@ describe('SeedInspectorService', () => {
         });
 
         it('should calculate density correctly with zero chunks', async () => {
-            // This shouldn't happen in normal usage, but test defensive programming
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [], celestialStars: [], planets: [], moons: [],
-                nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: []
+                nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], 
+                comets: [], roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             // Use radius 0 for single chunk to avoid division issues
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 0);
@@ -351,8 +391,8 @@ describe('SeedInspectorService', () => {
 
     describe('Binary System Detection', () => {
         it('should detect binary star systems correctly', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: [],
                 celestialStars: [
                     { // Primary star
@@ -360,7 +400,7 @@ describe('SeedInspectorService', () => {
                         y: 1000,
                         starTypeName: 'G-type Main Sequence'
                     },
-                    { // Companion star very close (within 100-unit grid)
+                    { // Companion star very close (within 300-unit distance for binary detection)
                         x: 1050,
                         y: 1020,
                         starTypeName: 'M-type Red Dwarf'
@@ -371,8 +411,12 @@ describe('SeedInspectorService', () => {
                         starTypeName: 'F-type Main Sequence'
                     }
                 ],
-                planets: [], moons: [], nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: []
+                planets: [], moons: [], nebulae: [], asteroidGardens: [], wormholes: [], 
+                blackholes: [], comets: [], roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 0);
             
@@ -385,15 +429,19 @@ describe('SeedInspectorService', () => {
     describe('Seed Consistency', () => {
         it('should produce identical results for the same seed', async () => {
             let callCount = 0;
-            mockChunkManager.generateChunk.mockImplementation((chunkX, chunkY) => {
+            const mockChunkData = (chunkX, chunkY) => {
                 callCount++;
                 return {
                     x: chunkX, y: chunkY,
                     stars: Array(callCount).fill(null), // Different count based on call order
                     celestialStars: [], planets: [], moons: [], nebulae: [], 
-                    asteroidGardens: [], wormholes: [], blackholes: [], comets: []
+                    asteroidGardens: [], wormholes: [], blackholes: [], comets: [], 
+                    roguePlanets: []
                 };
-            });
+            };
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis1 = await seedInspector.analyzeRegion(12345, 0, 0, 0);
             
@@ -407,12 +455,16 @@ describe('SeedInspectorService', () => {
         });
 
         it('should produce different results for different seeds', async () => {
-            mockChunkManager.generateChunk.mockImplementation((chunkX, chunkY) => ({
+            const mockChunkData = (chunkX, chunkY) => ({
                 x: chunkX, y: chunkY,
                 stars: Array(Math.floor(Math.random() * 50)).fill(null), // Random count
                 celestialStars: [], planets: [], moons: [], nebulae: [],
-                asteroidGardens: [], wormholes: [], blackholes: [], comets: []
-            }));
+                asteroidGardens: [], wormholes: [], blackholes: [], comets: [], 
+                roguePlanets: []
+            });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const analysis1 = await seedInspector.analyzeRegion(12345, 0, 0, 0);
             const analysis2 = await seedInspector.analyzeRegion(67890, 0, 0, 0);
@@ -425,13 +477,17 @@ describe('SeedInspectorService', () => {
 
     describe('Performance', () => {
         it('should complete analysis within reasonable time', async () => {
-            mockChunkManager.generateChunk.mockReturnValue({
-                x: 0, y: 0,
+            const mockChunkData = (chunkX, chunkY) => ({
+                x: chunkX, y: chunkY,
                 stars: Array(100).fill(null).map(() => ({ x: 0, y: 0 })), // Large number of objects
                 celestialStars: Array(10).fill(null).map(() => ({ x: 0, y: 0 })),
                 planets: Array(20).fill(null).map(() => ({ x: 0, y: 0 })),
-                moons: [], nebulae: [], asteroidGardens: [], wormholes: [], blackholes: [], comets: []
+                moons: [], nebulae: [], asteroidGardens: [], wormholes: [], 
+                blackholes: [], comets: [], roguePlanets: []
             });
+            
+            mockChunkManager.generateChunk.mockImplementation(mockChunkData);
+            mockChunkManager._generateChunk.mockImplementation(mockChunkData);
 
             const startTime = performance.now();
             const analysis = await seedInspector.analyzeRegion(12345, 0, 0, 2); // 5x5 = 25 chunks

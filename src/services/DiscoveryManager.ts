@@ -13,7 +13,7 @@ export interface DiscoveryEntry {
     id: string;
     name: string;
     type: string;
-    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region';
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet';
     coordinates: {
         x: number;
         y: number;
@@ -54,7 +54,7 @@ export interface DiscoveryStatistics {
 export interface DiscoveryFilter {
     category?: DiscoveryCategory;
     rarity?: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
-    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     hasNotes?: boolean;
     dateRange?: {
         start: number;
@@ -64,7 +64,7 @@ export interface DiscoveryFilter {
 
 // Interface for celestial objects in discovery context
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     id?: string;
@@ -82,6 +82,7 @@ interface CelestialObject {
     nebulaType?: string;
     gardenType?: string;
     gardenTypeData?: { name: string };
+    variant?: 'ice' | 'rock' | 'volcanic'; // For rogue planets
     updatePosition?(deltaTime: number): void;
     update?(deltaTime: number): void;
     checkDiscovery?(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
@@ -304,6 +305,14 @@ export class DiscoveryManager {
             }
             return 'uncommon';
         }
+        if (obj.type === 'rogue-planet') {
+            // Rogue planets are rare discoveries since they're uncommon (8% spawn rate) and drift in deep space
+            const variant = obj.variant || 'rock';
+            if (variant === 'volcanic') {
+                return 'ultra-rare'; // Volcanic rogue planets with internal heat are extremely rare
+            }
+            return 'rare'; // Ice and rock variants are rare but not ultra-rare
+        }
         return 'common';
     }
 
@@ -333,6 +342,18 @@ export class DiscoveryManager {
             return obj.blackHoleTypeName || 'Black Hole';
         } else if (obj.type === 'star') {
             return obj.starTypeName || 'Star';
+        } else if (obj.type === 'rogue-planet') {
+            // Convert variant to display name using same logic as naming service
+            const variant = obj.variant || 'rock';
+            switch (variant) {
+                case 'ice':
+                    return 'Frozen Rogue Planet';
+                case 'volcanic':
+                    return 'Volcanic Rogue Planet';
+                case 'rock':
+                default:
+                    return 'Rocky Rogue Planet';
+            }
         }
         return 'Unknown';
     }
@@ -368,6 +389,9 @@ export class DiscoveryManager {
         } else if (obj.type === 'blackhole') {
             // All black holes are ultra-rare, cosmic discoveries of ultimate significance
             return true;
+        } else if (obj.type === 'rogue-planet') {
+            // All rogue planets are rare discoveries - lonely worlds drifting in deep space
+            return true;
         }
         return false;
     }
@@ -398,6 +422,12 @@ export class DiscoveryManager {
         } else if (obj.type === 'comet') {
             // Play comet discovery sound - bright, swift, crystalline
             this.soundManager.playCometDiscovery();
+        } else if (obj.type === 'rogue-planet') {
+            // Play rogue planet discovery sound - use planet discovery with variant-specific tone
+            const variant = obj.variant || 'rock';
+            const displayType = variant === 'ice' ? 'Frozen World' : 
+                               variant === 'volcanic' ? 'Volcanic World' : 'Rocky World';
+            this.soundManager.playPlanetDiscovery(displayType);
         }
         
         // Play additional rare discovery sound for special objects

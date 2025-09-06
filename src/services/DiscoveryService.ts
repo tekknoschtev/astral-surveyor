@@ -12,7 +12,7 @@ interface CameraInterface {
 interface DiscoverableObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     discoveryDistance?: number;
     radius?: number;
     discovered: boolean;
