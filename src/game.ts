@@ -43,7 +43,7 @@ interface GameStartingPosition {
 
 // Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     id?: string;
@@ -81,6 +81,8 @@ interface ActiveObjects {
     blackholes: CelestialObject[];
     asteroidGardens: CelestialObject[];
     comets: CelestialObject[];
+    // Region-specific objects (Phase 0: rogue-planet only)
+    roguePlanets: CelestialObject[];
 }
 
 
@@ -114,6 +116,9 @@ export class Game {
     // Performance optimization: Cache active objects between update and render phases
     private cachedActiveObjects?: ActiveObjects;
     settingsMenu: SettingsMenu;
+    
+    // Region discovery tracking
+    private currentRegionType: string | null = null;
     
     // Expose properties for backward compatibility with tests
     get lastBlackHoleWarnings() {
@@ -159,11 +164,12 @@ export class Game {
         this.ship = new Ship();
         this.thrusterParticles = new ThrusterParticles();
         this.starParticles = new StarParticles();
-        this.discoveryDisplay = new DiscoveryDisplay();
+        this.discoveryDisplay = new DiscoveryDisplay(this.chunkManager);
         this.discoveryLogbook = new DiscoveryLogbook();
         this.stellarMap = new StellarMap();
         this.namingService = new NamingService();
         this.stellarMap.setNamingService(this.namingService);
+        this.stellarMap.setChunkManager(this.chunkManager);
         this.touchUI = new TouchUI();
         this.soundManager = new SoundManager();
         
@@ -501,7 +507,7 @@ export class Game {
                     if (!overlayClicked) {
                         // Handle stellar map interactions (simplified) - only if not panning
                         const discovered = this.getDiscoveredObjects();
-                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, this.input);
+                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, this.input);
                     }
                 }
             }
@@ -519,7 +525,7 @@ export class Game {
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets);
             
             // Also update statistics overlay hover state
             this.stellarMap.updateStatisticsOverlayHover(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas);
@@ -546,7 +552,7 @@ export class Game {
         // Get active celestial objects for physics and discovery (cache for render phase)
         this.cachedActiveObjects = this.chunkManager.getAllActiveObjects();
         const activeObjects = this.cachedActiveObjects;
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets, ...activeObjects.roguePlanets];
         
         // Update orbital positions and animations for all celestial objects
         this.updateCelestialObjects(activeObjects, deltaTime);
@@ -558,6 +564,9 @@ export class Game {
         this.chunkManager.restoreDiscoveryState(celestialObjects as any);
         
         this.camera.update(this.input, deltaTime, this.renderer.canvas.width, this.renderer.canvas.height, celestialObjects, this.stellarMap);
+        
+        // Check for region discovery
+        this.checkRegionDiscovery();
         
         // Check for wormhole traversal
         this.checkWormholeTraversal(activeObjects.wormholes);
@@ -687,7 +696,9 @@ export class Game {
             wormholes: this.chunkManager.getDiscoveredWormholes(),
             asteroidGardens: this.chunkManager.getDiscoveredAsteroidGardens(),
             blackHoles: this.chunkManager.getDiscoveredBlackHoles(),
-            comets: this.chunkManager.getDiscoveredComets()
+            comets: this.chunkManager.getDiscoveredComets(),
+            roguePlanets: this.chunkManager.getDiscoveredRoguePlanets(),
+            regions: this.chunkManager.getDiscoveredRegions()
         };
     }
 
@@ -803,6 +814,71 @@ export class Game {
         }
     }
 
+    checkRegionDiscovery(): void {
+        try {
+            // Get current position
+            const chunkX = Math.floor(this.camera.x / this.chunkManager.chunkSize);
+            const chunkY = Math.floor(this.camera.y / this.chunkManager.chunkSize);
+            
+            // Get region information at current position
+            const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+            
+            if (regionInfo && regionInfo.definition && regionInfo.influence > 0.5) {
+                // Only trigger discovery if influence is significant (> 50%)
+                
+                if (this.currentRegionType !== regionInfo.regionType) {
+                    // Player has entered a new region
+                    this.currentRegionType = regionInfo.regionType;
+                    
+                    // Process the region discovery
+                    this.discoveryManager.processRegionDiscovery(
+                        regionInfo.regionType,
+                        regionInfo.definition.name,
+                        this.camera,
+                        regionInfo.influence,
+                        this.chunkManager
+                    );
+                    
+                    // Update ambient music for the new region
+                    if (this.soundManager.isSpaceDronePlaying()) {
+                        this.soundManager.stopSpaceDrone();
+                        // Brief delay for smooth transition
+                        setTimeout(() => {
+                            this.soundManager.startSpaceDrone(regionInfo.regionType);
+                        }, 500);
+                    }
+                }
+            } else {
+                // Player is in a transition area or no strong regional influence
+                // Only clear current region if we're really in a low influence area
+                if (regionInfo && regionInfo.influence < 0.1) {
+                    this.currentRegionType = null;
+                }
+            }
+        } catch (error) {
+            // Silently handle region lookup errors
+            console.warn('Region discovery check failed:', error);
+        }
+    }
+
+    getCurrentRegionType(): string | undefined {
+        try {
+            // Get current position
+            const chunkX = Math.floor(this.camera.x / this.chunkManager.chunkSize);
+            const chunkY = Math.floor(this.camera.y / this.chunkManager.chunkSize);
+            
+            // Get region information at current position
+            const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+            
+            if (regionInfo && regionInfo.definition && regionInfo.influence > 0.3) {
+                return regionInfo.regionType;
+            }
+        } catch (error) {
+            // Silently handle region lookup errors
+        }
+        return undefined;
+    }
+
     checkWormholeTraversal(wormholes: CelestialObject[]): void {
         // Skip if already traversing
         if (this.isTraversing) {
@@ -848,7 +924,9 @@ export class Game {
             const resumed = await this.soundManager.resumeAudioContext();
             if (resumed && !this.soundManager.isSpaceDronePlaying()) {
                 // Start space drone after successful audio context resume
-                this.soundManager.startSpaceDrone();
+                // Get current region for regional soundscape
+                const currentRegion = this.getCurrentRegionType();
+                this.soundManager.startSpaceDrone(currentRegion);
                 this.discoveryDisplay.addNotification('🌌 Atmospheric audio enabled');
             }
         }
@@ -896,6 +974,14 @@ export class Game {
                 obj.render(this.renderer, this.camera);
             // }
         }
+        
+        // Render rogue planets (wandering worlds - same layer as planets) - culling disabled
+        for (const obj of activeObjects.roguePlanets) {
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
+        }
+        
         for (const obj of activeObjects.moons) {
             // if (this.isObjectInScreen(obj, screenBounds)) {
                 obj.render(this.renderer, this.camera);
@@ -947,7 +1033,7 @@ export class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discovered = this.getDiscoveredObjects();
-        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);

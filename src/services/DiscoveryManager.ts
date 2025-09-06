@@ -13,7 +13,7 @@ export interface DiscoveryEntry {
     id: string;
     name: string;
     type: string;
-    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet';
     coordinates: {
         x: number;
         y: number;
@@ -28,6 +28,8 @@ export interface DiscoveryEntry {
         nebulaType?: string;
         gardenType?: string;
         blackHoleTypeName?: string;
+        regionType?: string;
+        regionInfluence?: number;
         isNotable: boolean;
         discoveryRadius?: number;
     };
@@ -52,7 +54,7 @@ export interface DiscoveryStatistics {
 export interface DiscoveryFilter {
     category?: DiscoveryCategory;
     rarity?: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
-    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     hasNotes?: boolean;
     dateRange?: {
         start: number;
@@ -62,7 +64,7 @@ export interface DiscoveryFilter {
 
 // Interface for celestial objects in discovery context
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     id?: string;
@@ -80,6 +82,7 @@ interface CelestialObject {
     nebulaType?: string;
     gardenType?: string;
     gardenTypeData?: { name: string };
+    variant?: 'ice' | 'rock' | 'volcanic'; // For rogue planets
     updatePosition?(deltaTime: number): void;
     update?(deltaTime: number): void;
     checkDiscovery?(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
@@ -145,6 +148,86 @@ export class DiscoveryManager {
             const logPrefix = isNotable ? '🌟 RARE DISCOVERY!' : '⭐ Discovery!';
             console.log(`${logPrefix} Share ${objectName} (${objectType}): ${shareableURL}`);
         }
+    }
+
+    /**
+     * Process a newly discovered region
+     */
+    processRegionDiscovery(regionType: string, regionName: string, camera: Camera, influence: number, chunkManager?: any): void {
+        // Check if this region has already been discovered
+        const regionId = `region_${regionType}`;
+        if (this.discoveries.has(regionId)) {
+            return; // Already discovered
+        }
+
+        const shareableURL = generateShareableURL(camera.x, camera.y);
+        const discoveryEntry = this.createRegionDiscoveryEntry(
+            regionType,
+            regionName,
+            camera,
+            influence,
+            shareableURL
+        );
+
+        // Store in persistent discovery list
+        this.discoveries.set(discoveryEntry.id, discoveryEntry);
+
+        // Mark region as discovered in chunk manager
+        if (chunkManager && chunkManager.markRegionDiscovered) {
+            chunkManager.markRegionDiscovered(regionType, regionName, camera.x, camera.y, influence);
+        }
+
+        // Add to UI displays
+        this.discoveryDisplay.addDiscovery(regionName, 'Cosmic Region');
+        this.discoveryLogbook.addDiscovery(regionName, 'Cosmic Region');
+
+        // Play discovery sound (soft discovery sound for regions)
+        this.playRegionDiscoverySound();
+
+        // Log region discovery
+        console.log(`🌌 REGION DISCOVERY! You have entered ${regionName}. Share: ${shareableURL}`);
+    }
+
+    /**
+     * Create a detailed discovery entry for a region
+     */
+    private createRegionDiscoveryEntry(
+        regionType: string,
+        regionName: string,
+        camera: Camera,
+        influence: number,
+        shareableURL: string
+    ): DiscoveryEntry {
+        const timestamp = Date.now();
+
+        return {
+            id: `region_${regionType}`,
+            name: regionName,
+            type: 'Cosmic Region',
+            objectType: 'region',
+            coordinates: {
+                x: camera.x,
+                y: camera.y
+            },
+            timestamp,
+            rarity: 'uncommon', // Regions are uncommon discoveries
+            shareableURL,
+            metadata: {
+                regionType: regionType,
+                regionInfluence: influence,
+                isNotable: influence > 0.8, // High influence regions are notable
+                discoveryRadius: 0 // Regions don't have discovery radius
+            }
+        };
+    }
+
+    /**
+     * Play a soft discovery sound for regions
+     */
+    private playRegionDiscoverySound(): void {
+        // Use the rare discovery sound for regions as they are special discoveries
+        // The rare discovery sound is harmonically rich and appropriate for cosmic regions
+        this.soundManager.playRareDiscovery();
     }
 
     /**
@@ -222,6 +305,14 @@ export class DiscoveryManager {
             }
             return 'uncommon';
         }
+        if (obj.type === 'rogue-planet') {
+            // Rogue planets are rare discoveries since they're uncommon (8% spawn rate) and drift in deep space
+            const variant = obj.variant || 'rock';
+            if (variant === 'volcanic') {
+                return 'ultra-rare'; // Volcanic rogue planets with internal heat are extremely rare
+            }
+            return 'rare'; // Ice and rock variants are rare but not ultra-rare
+        }
         return 'common';
     }
 
@@ -251,6 +342,18 @@ export class DiscoveryManager {
             return obj.blackHoleTypeName || 'Black Hole';
         } else if (obj.type === 'star') {
             return obj.starTypeName || 'Star';
+        } else if (obj.type === 'rogue-planet') {
+            // Convert variant to display name using same logic as naming service
+            const variant = obj.variant || 'rock';
+            switch (variant) {
+                case 'ice':
+                    return 'Frozen Rogue Planet';
+                case 'volcanic':
+                    return 'Volcanic Rogue Planet';
+                case 'rock':
+                default:
+                    return 'Rocky Rogue Planet';
+            }
         }
         return 'Unknown';
     }
@@ -286,6 +389,9 @@ export class DiscoveryManager {
         } else if (obj.type === 'blackhole') {
             // All black holes are ultra-rare, cosmic discoveries of ultimate significance
             return true;
+        } else if (obj.type === 'rogue-planet') {
+            // All rogue planets are rare discoveries - lonely worlds drifting in deep space
+            return true;
         }
         return false;
     }
@@ -316,6 +422,12 @@ export class DiscoveryManager {
         } else if (obj.type === 'comet') {
             // Play comet discovery sound - bright, swift, crystalline
             this.soundManager.playCometDiscovery();
+        } else if (obj.type === 'rogue-planet') {
+            // Play rogue planet discovery sound - use planet discovery with variant-specific tone
+            const variant = obj.variant || 'rock';
+            const displayType = variant === 'ice' ? 'Frozen World' : 
+                               variant === 'volcanic' ? 'Volcanic World' : 'Rocky World';
+            this.soundManager.playPlanetDiscovery(displayType);
         }
         
         // Play additional rare discovery sound for special objects

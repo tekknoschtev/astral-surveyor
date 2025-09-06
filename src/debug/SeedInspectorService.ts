@@ -24,6 +24,7 @@ export interface ChunkAnalysis {
     wormholes: number;
     blackholes: number;
     comets: number;
+    roguePlanets: number;
     starSystems: number;
     binarySystems: number;
 }
@@ -49,6 +50,7 @@ export interface RegionAnalysis {
         wormholes: number;
         blackholes: number;
         comets: number;
+        roguePlanets: number;
         starSystems: number;
         binarySystems: number;
     };
@@ -64,6 +66,7 @@ export interface RegionAnalysis {
         wormholes: number;
         blackholes: number;
         comets: number;
+        roguePlanets: number;
         starSystems: number;
         binarySystems: number;
     };
@@ -80,12 +83,17 @@ export interface RegionAnalysis {
  * Individual celestial object data for detailed inspection
  */
 export interface CelestialObjectData {
-    type: 'backgroundStar' | 'celestialStar' | 'planet' | 'moon' | 'nebula' | 'asteroidGarden' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'backgroundStar' | 'celestialStar' | 'planet' | 'moon' | 'nebula' | 'asteroidGarden' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     chunkX: number;
     chunkY: number;
     properties: Record<string, any>; // Type-specific properties
+    cosmicRegion?: {
+        regionType: string;
+        regionName: string;
+        influence: number;
+    };
 }
 
 /**
@@ -132,6 +140,7 @@ export class SeedInspectorService {
                 wormholes: 0,
                 blackholes: 0,
                 comets: 0,
+                roguePlanets: 0,
                 starSystems: 0,
                 binarySystems: 0
             };
@@ -155,6 +164,7 @@ export class SeedInspectorService {
                     totals.wormholes += analysis.wormholes;
                     totals.blackholes += analysis.blackholes;
                     totals.comets += analysis.comets;
+                    totals.roguePlanets += analysis.roguePlanets;
                     totals.starSystems += analysis.starSystems;
                     totals.binarySystems += analysis.binarySystems;
                 }
@@ -180,6 +190,7 @@ export class SeedInspectorService {
                     wormholes: totals.wormholes / totalChunks,
                     blackholes: totals.blackholes / totalChunks,
                     comets: totals.comets / totalChunks,
+                    roguePlanets: totals.roguePlanets / totalChunks,
                     starSystems: totals.starSystems / totalChunks,
                     binarySystems: totals.binarySystems / totalChunks
                 },
@@ -202,7 +213,8 @@ export class SeedInspectorService {
      */
     private async analyzeChunk(chunkX: number, chunkY: number): Promise<ChunkAnalysis> {
         // Generate the chunk using existing ChunkManager logic
-        const chunk = this.chunkManager.generateChunk(chunkX, chunkY);
+        // Use the private _generateChunk method to bypass cache for fresh analysis
+        const chunk = (this.chunkManager as any)._generateChunk(chunkX, chunkY);
         
         // Count binary systems (approximate - count pairs of nearby stars)
         let binarySystems = 0;
@@ -238,9 +250,30 @@ export class SeedInspectorService {
             wormholes: chunk.wormholes.length,
             blackholes: chunk.blackholes.length,
             comets: chunk.comets.length,
+            roguePlanets: chunk.roguePlanets ? chunk.roguePlanets.length : 0,
             starSystems: Math.max(1, Math.ceil(chunk.celestialStars.length / 2)), // Estimate systems from stars
             binarySystems
         };
+    }
+
+    /**
+     * Get cosmic region information for a specific chunk
+     */
+    private getCosmicRegionInfo(chunkX: number, chunkY: number): { regionType: string; regionName: string; influence: number } | null {
+        try {
+            const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+            if (regionInfo && regionInfo.definition) {
+                return {
+                    regionType: regionInfo.regionType,
+                    regionName: regionInfo.definition.name,
+                    influence: regionInfo.influence
+                };
+            }
+        } catch (error) {
+            // Silently handle region lookup errors
+            console.warn('Failed to get cosmic region info:', error);
+        }
+        return null;
     }
 
     /**
@@ -265,7 +298,10 @@ export class SeedInspectorService {
                 for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
                     const chunkX = centerChunkX + dx;
                     const chunkY = centerChunkY + dy;
-                    const chunk = this.chunkManager.generateChunk(chunkX, chunkY);
+                    const chunk = (this.chunkManager as any)._generateChunk(chunkX, chunkY);
+                    
+                    // Get cosmic region information for this chunk
+                    const cosmicRegion = this.getCosmicRegionInfo(chunkX, chunkY);
 
                     // Skip background stars entirely in inspector mode - they're just visual noise for analysis
 
@@ -281,7 +317,8 @@ export class SeedInspectorService {
                                 starType: star.starTypeName,
                                 radius: star.radius,
                                 color: star.color
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -298,7 +335,8 @@ export class SeedInspectorService {
                                 radius: planet.radius,
                                 color: planet.color,
                                 orbitalDistance: planet.orbitalDistance
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -313,7 +351,8 @@ export class SeedInspectorService {
                             properties: {
                                 radius: moon.radius,
                                 orbitalDistance: moon.orbitalDistance
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -328,7 +367,8 @@ export class SeedInspectorService {
                                 nebulaType: nebula.nebulaType,
                                 radius: nebula.radius,
                                 colors: nebula.colors
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -343,7 +383,8 @@ export class SeedInspectorService {
                                 gardenType: garden.gardenType,
                                 fieldRadius: garden.fieldRadius,
                                 rockCount: garden.rockCount
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -359,7 +400,8 @@ export class SeedInspectorService {
                                 designation: wormhole.designation,
                                 twinX: wormhole.twinX,
                                 twinY: wormhole.twinY
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -374,7 +416,8 @@ export class SeedInspectorService {
                                 blackHoleType: blackhole.blackHoleTypeName,
                                 eventHorizonRadius: blackhole.eventHorizonRadius,
                                 gravitationalInfluence: blackhole.gravitationalInfluence
-                            }
+                            },
+                            cosmicRegion
                         });
                     }
 
@@ -389,7 +432,24 @@ export class SeedInspectorService {
                                 cometType: comet.cometType,
                                 currentDistance: comet.currentDistance,
                                 isVisible: comet.isVisible
-                            }
+                            },
+                            cosmicRegion
+                        });
+                    }
+
+                    // Add rogue planets
+                    for (const roguePlanet of chunk.roguePlanets) {
+                        objects.push({
+                            type: 'rogue-planet',
+                            x: roguePlanet.x,
+                            y: roguePlanet.y,
+                            chunkX,
+                            chunkY,
+                            properties: {
+                                variant: roguePlanet.variant,
+                                radius: roguePlanet.radius
+                            },
+                            cosmicRegion
                         });
                     }
                 }

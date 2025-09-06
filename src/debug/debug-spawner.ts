@@ -8,6 +8,7 @@ import { Star, Planet, StarTypes, PlanetTypes } from '../celestial/celestial.js'
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import { Comet, selectCometType, CometTypes } from '../celestial/comets.js';
+import { RoguePlanet } from '../celestial/RegionSpecificObjects.js';
 import { NamingService } from '../naming/naming.js';
 import type { Camera } from '../camera/camera.js';
 import type { ChunkManager } from '../world/world.js';
@@ -602,6 +603,33 @@ export class DebugSpawner {
         }
     }
 
+    // ===== REGION-SPECIFIC OBJECT SPAWN METHODS (Phase 0 Placeholders) =====
+
+    /**
+     * Spawn a rogue planet near the player for testing (Phase 1)
+     */
+    static spawnRoguePlanet(camera: Camera, chunkManager: ChunkManager, variant?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        const distance = 150 + Math.random() * 100;
+        const angle = Math.random() * Math.PI * 2;
+        const x = camera.x + Math.cos(angle) * distance;
+        const y = camera.y + Math.sin(angle) * distance;
+
+        const validVariants: ('ice' | 'rock' | 'volcanic')[] = ['ice', 'rock', 'volcanic'];
+        const selectedVariant = (variant && validVariants.includes(variant as any)) ? variant as 'ice' | 'rock' | 'volcanic' : validVariants[Math.floor(Math.random() * validVariants.length)];
+        
+        const roguePlanet = new RoguePlanet(x, y, selectedVariant);
+        roguePlanet.discovered = true;
+
+        this.addObjectToChunk(chunkManager, 'rogue-planet', roguePlanet, x, y);
+        console.log(`🪐 DEBUG: Spawned ${selectedVariant} rogue planet at (${Math.round(x)}, ${Math.round(y)})`);
+    }
+
+
     /**
      * Helper method to add objects to the appropriate chunk
      */
@@ -654,6 +682,10 @@ export class DebugSpawner {
                     break;
                 case 'wormhole':
                     chunk.wormholes.push(object);
+                    break;
+                // Region-specific objects (Phase 0: rogue-planet only)
+                case 'rogue-planet':
+                    chunk.roguePlanets.push(object);
                     break;
             }
         }
