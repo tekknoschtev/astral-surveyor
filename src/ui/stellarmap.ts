@@ -4272,7 +4272,8 @@ export class StellarMap {
                 'wormhole': 0,
                 'blackhole': 0,
                 'comet': 0,
-                'rogue-planet': 0
+                'rogue-planet': 0,
+                'dark-nebula': 0
             };
 
             // Count objects from revealed chunks
@@ -4288,7 +4289,8 @@ export class StellarMap {
             const totalObjects = objectCounts.celestialStar + objectCounts.planet + 
                                objectCounts.moon + objectCounts.nebula + 
                                objectCounts.asteroidGarden + objectCounts.wormhole + 
-                               objectCounts.blackhole + objectCounts.comet;
+                               objectCounts.blackhole + objectCounts.comet + 
+                               objectCounts['rogue-planet'] + objectCounts['dark-nebula'];
 
             // Calculate area from revealed chunks count
             const revealedChunkCount = this.getRevealedChunkCount(this.inspectorSeed);
@@ -4335,7 +4337,7 @@ export class StellarMap {
             blackhole: '#ff0000',           // Red for black holes
             comet: '#88ccff',               // Light blue for comets
             'rogue-planet': '#cc88aa',      // Muted purple for rogue planets
-            'dark-nebula': '#2a1a0a'        // Very dark brown for dark nebulae
+            'dark-nebula': '#6a4a3a'        // Medium brown for dark nebulae (visible against black space)
         };
         return colors[objectType] || '#ffffff';
     }
