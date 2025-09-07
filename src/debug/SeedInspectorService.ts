@@ -24,6 +24,7 @@ export interface ChunkAnalysis {
     wormholes: number;
     blackholes: number;
     comets: number;
+    roguePlanets: number;
     starSystems: number;
     binarySystems: number;
 }
@@ -49,6 +50,7 @@ export interface RegionAnalysis {
         wormholes: number;
         blackholes: number;
         comets: number;
+        roguePlanets: number;
         starSystems: number;
         binarySystems: number;
     };
@@ -64,6 +66,7 @@ export interface RegionAnalysis {
         wormholes: number;
         blackholes: number;
         comets: number;
+        roguePlanets: number;
         starSystems: number;
         binarySystems: number;
     };
@@ -80,7 +83,7 @@ export interface RegionAnalysis {
  * Individual celestial object data for detailed inspection
  */
 export interface CelestialObjectData {
-    type: 'backgroundStar' | 'celestialStar' | 'planet' | 'moon' | 'nebula' | 'asteroidGarden' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'backgroundStar' | 'celestialStar' | 'planet' | 'moon' | 'nebula' | 'asteroidGarden' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     chunkX: number;
@@ -137,6 +140,7 @@ export class SeedInspectorService {
                 wormholes: 0,
                 blackholes: 0,
                 comets: 0,
+                roguePlanets: 0,
                 starSystems: 0,
                 binarySystems: 0
             };
@@ -160,6 +164,7 @@ export class SeedInspectorService {
                     totals.wormholes += analysis.wormholes;
                     totals.blackholes += analysis.blackholes;
                     totals.comets += analysis.comets;
+                    totals.roguePlanets += analysis.roguePlanets;
                     totals.starSystems += analysis.starSystems;
                     totals.binarySystems += analysis.binarySystems;
                 }
@@ -185,6 +190,7 @@ export class SeedInspectorService {
                     wormholes: totals.wormholes / totalChunks,
                     blackholes: totals.blackholes / totalChunks,
                     comets: totals.comets / totalChunks,
+                    roguePlanets: totals.roguePlanets / totalChunks,
                     starSystems: totals.starSystems / totalChunks,
                     binarySystems: totals.binarySystems / totalChunks
                 },
@@ -207,7 +213,8 @@ export class SeedInspectorService {
      */
     private async analyzeChunk(chunkX: number, chunkY: number): Promise<ChunkAnalysis> {
         // Generate the chunk using existing ChunkManager logic
-        const chunk = this.chunkManager.generateChunk(chunkX, chunkY);
+        // Use the private _generateChunk method to bypass cache for fresh analysis
+        const chunk = (this.chunkManager as any)._generateChunk(chunkX, chunkY);
         
         // Count binary systems (approximate - count pairs of nearby stars)
         let binarySystems = 0;
@@ -243,6 +250,7 @@ export class SeedInspectorService {
             wormholes: chunk.wormholes.length,
             blackholes: chunk.blackholes.length,
             comets: chunk.comets.length,
+            roguePlanets: chunk.roguePlanets ? chunk.roguePlanets.length : 0,
             starSystems: Math.max(1, Math.ceil(chunk.celestialStars.length / 2)), // Estimate systems from stars
             binarySystems
         };
@@ -290,7 +298,7 @@ export class SeedInspectorService {
                 for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
                     const chunkX = centerChunkX + dx;
                     const chunkY = centerChunkY + dy;
-                    const chunk = this.chunkManager.generateChunk(chunkX, chunkY);
+                    const chunk = (this.chunkManager as any)._generateChunk(chunkX, chunkY);
                     
                     // Get cosmic region information for this chunk
                     const cosmicRegion = this.getCosmicRegionInfo(chunkX, chunkY);
@@ -424,6 +432,22 @@ export class SeedInspectorService {
                                 cometType: comet.cometType,
                                 currentDistance: comet.currentDistance,
                                 isVisible: comet.isVisible
+                            },
+                            cosmicRegion
+                        });
+                    }
+
+                    // Add rogue planets
+                    for (const roguePlanet of chunk.roguePlanets) {
+                        objects.push({
+                            type: 'rogue-planet',
+                            x: roguePlanet.x,
+                            y: roguePlanet.y,
+                            chunkX,
+                            chunkY,
+                            properties: {
+                                variant: roguePlanet.variant,
+                                radius: roguePlanet.radius
                             },
                             cosmicRegion
                         });

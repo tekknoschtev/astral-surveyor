@@ -43,7 +43,7 @@ interface GameStartingPosition {
 
 // Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     id?: string;
@@ -81,6 +81,8 @@ interface ActiveObjects {
     blackholes: CelestialObject[];
     asteroidGardens: CelestialObject[];
     comets: CelestialObject[];
+    // Region-specific objects (Phase 0: rogue-planet only)
+    roguePlanets: CelestialObject[];
 }
 
 
@@ -505,7 +507,7 @@ export class Game {
                     if (!overlayClicked) {
                         // Handle stellar map interactions (simplified) - only if not panning
                         const discovered = this.getDiscoveredObjects();
-                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, this.input);
+                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, this.input);
                     }
                 }
             }
@@ -523,7 +525,7 @@ export class Game {
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets);
             
             // Also update statistics overlay hover state
             this.stellarMap.updateStatisticsOverlayHover(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas);
@@ -550,7 +552,7 @@ export class Game {
         // Get active celestial objects for physics and discovery (cache for render phase)
         this.cachedActiveObjects = this.chunkManager.getAllActiveObjects();
         const activeObjects = this.cachedActiveObjects;
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets, ...activeObjects.roguePlanets];
         
         // Update orbital positions and animations for all celestial objects
         this.updateCelestialObjects(activeObjects, deltaTime);
@@ -695,6 +697,7 @@ export class Game {
             asteroidGardens: this.chunkManager.getDiscoveredAsteroidGardens(),
             blackHoles: this.chunkManager.getDiscoveredBlackHoles(),
             comets: this.chunkManager.getDiscoveredComets(),
+            roguePlanets: this.chunkManager.getDiscoveredRoguePlanets(),
             regions: this.chunkManager.getDiscoveredRegions()
         };
     }
@@ -971,6 +974,14 @@ export class Game {
                 obj.render(this.renderer, this.camera);
             // }
         }
+        
+        // Render rogue planets (wandering worlds - same layer as planets) - culling disabled
+        for (const obj of activeObjects.roguePlanets) {
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
+        }
+        
         for (const obj of activeObjects.moons) {
             // if (this.isObjectInScreen(obj, screenBounds)) {
                 obj.render(this.renderer, this.camera);
@@ -1022,7 +1033,7 @@ export class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discovered = this.getDiscoveredObjects();
-        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets);
+        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);

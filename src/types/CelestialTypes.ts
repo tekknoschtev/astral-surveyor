@@ -3,7 +3,7 @@
 
 // Base celestial object interface
 export interface CelestialObjectData {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
     x: number;
     y: number;
     id?: string;
@@ -82,8 +82,18 @@ export interface BlackHoleData extends CelestialObjectData {
     eventHorizonRadius?: number;
 }
 
+// Region-specific object types (Phase 0: rogue-planet only)
+
+export interface RoguePlanetData extends CelestialObjectData {
+    type: 'rogue-planet';
+    variant: 'ice' | 'rock' | 'volcanic';
+    size: number;
+    hasMoons?: boolean;
+    surfaceTemperature?: number;
+}
+
 // Union type for all celestial objects
-export type AnyCelestialData = StarData | PlanetData | MoonData | NebulaData | AsteroidData | WormholeData | BlackHoleData;
+export type AnyCelestialData = StarData | PlanetData | MoonData | NebulaData | AsteroidData | WormholeData | BlackHoleData | RoguePlanetData;
 
 // Discovery-related types
 export interface DiscoveryEvent {
@@ -154,4 +164,6 @@ export interface ActiveObjects {
     wormholes: WormholeData[];
     blackholes: BlackHoleData[];
     asteroidGardens: AsteroidData[];
+    // Region-specific objects (Phase 0: rogue-planet only)
+    roguePlanets: RoguePlanetData[];
 }

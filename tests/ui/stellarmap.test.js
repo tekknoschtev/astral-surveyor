@@ -522,7 +522,7 @@ describe('StellarMap System', () => {
       stellarMap.zoomLevel = 2.0;
       
       // Test selecting a star should consume input
-      const result = stellarMap.handleStarSelection(400, 300, mockStars, mockCanvas, null, null, null, null, null, null, mockInput);
+      const result = stellarMap.handleStarSelection(400, 300, mockStars, mockCanvas, null, null, null, null, null, null, [], mockInput);
       
       expect(result).toBe(true);
       expect(stellarMap.selectedStar).toBeTruthy();

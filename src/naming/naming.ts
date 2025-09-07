@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet';
 }
 
 interface Star extends CelestialObject {
@@ -66,6 +66,11 @@ interface Comet extends CelestialObject {
         discoveryValue: number;
         description: string;
     };
+}
+
+interface RoguePlanet extends CelestialObject {
+    type: 'rogue-planet';
+    variant?: 'ice' | 'rock' | 'volcanic';
 }
 
 // Full designation result for detailed information
@@ -455,6 +460,8 @@ export class NamingService {
             return this.generateAsteroidGardenName(object);
         } else if (object.type === 'comet') {
             return this.generateCometName(object);
+        } else if (object.type === 'rogue-planet') {
+            return this.generateRoguePlanetName(object as RoguePlanet);
         }
         
         return 'Unknown Object';
@@ -539,6 +546,17 @@ export class NamingService {
                 classification: this.getCometClassification(comet.cometType?.name),
                 parentStar: parentStarName
             };
+        } else if (object.type === 'rogue-planet') {
+            const roguePlanet = object as RoguePlanet;
+            const roguePlanetName = this.generateRoguePlanetName(roguePlanet);
+            const coordName = this.generateCoordinateDesignation(roguePlanet.x, roguePlanet.y);
+            const variantType = this.getRoguePlanetVariantName(roguePlanet.variant);
+            return {
+                catalog: roguePlanetName,
+                coordinate: coordName,
+                type: 'Rogue Planet',
+                classification: `Free-floating ${variantType} planet`
+            };
         }
         
         return null;
@@ -570,6 +588,9 @@ export class NamingService {
         } else if (object.type === 'comet') {
             // Organic comets are rare and notable, others are uncommon but significant
             return object.cometType?.name === 'Organic Comet';
+        } else if (object.type === 'rogue-planet') {
+            // Volcanic rogue planets are notable due to their rare internal heat source
+            return object.variant === 'volcanic';
         }
         
         return false;
@@ -636,5 +657,52 @@ export class NamingService {
         const sequenceNumber = (cometIndex + 1).toString().padStart(2, '0');
         
         return `C/${year}-S${sequenceNumber}`;
+    }
+
+    /**
+     * Generate rogue planet designation following planetary nomenclature convention
+     * Examples: "RP-1234", "RP-5678-ICE", "RP-9876-VOL"
+     */
+    generateRoguePlanetName(roguePlanet: RoguePlanet): string {
+        // Generate catalog number based on position
+        const catalogNumber = this.generateRoguePlanetCatalogNumber(roguePlanet.x, roguePlanet.y);
+        const baseName = `RP-${catalogNumber}`;
+        
+        // Add variant suffix for volcanic variants (most notable)
+        if (roguePlanet.variant === 'volcanic') {
+            return `${baseName}-VOL`;
+        } else if (roguePlanet.variant === 'ice') {
+            return `${baseName}-ICE`;
+        }
+        
+        // Rock variants use base name only
+        return baseName;
+    }
+
+    /**
+     * Generate rogue planet catalog number (RP range: 1000-9999)
+     */
+    private generateRoguePlanetCatalogNumber(x: number, y: number): number {
+        const hash1 = this.hashCoordinate(x * 1.7); // Different multiplier from other objects
+        const hash2 = this.hashCoordinate(y * 2.1);
+        const combined = (hash1 ^ hash2) >>> 0;
+        
+        // Rogue Planet range: 1000-9999 to distinguish from regular planets
+        return 1000 + (combined % 9000);
+    }
+
+    /**
+     * Get readable variant name for rogue planet classification
+     */
+    private getRoguePlanetVariantName(variant?: 'ice' | 'rock' | 'volcanic'): string {
+        switch (variant) {
+            case 'ice':
+                return 'frozen';
+            case 'volcanic':
+                return 'volcanic';
+            case 'rock':
+            default:
+                return 'rocky';
+        }
     }
 }
