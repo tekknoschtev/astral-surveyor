@@ -104,6 +104,112 @@ interface CometLike {
 // Union type for all discoverable objects
 type DiscoverableObject = StarLike | PlanetLike | NebulaLike | WormholeLike | AsteroidGardenLike | BlackHoleLike | CometLike;
 
+// Centralized Hover System Interfaces
+interface HoverableObject {
+    type: string;
+    x: number;
+    y: number;
+    // Optional properties that may exist on different object types
+    radius?: number;
+    [key: string]: any; // Allow other properties
+}
+
+interface HoverConfig {
+    threshold: number;
+    renderSize: number;
+    priority: number; // Lower number = higher priority
+}
+
+class StellarMapHoverSystem {
+    private hoveredObject: HoverableObject | null = null;
+    private hoveredObjectType: string | null = null;
+
+    private readonly hoverConfigs: Record<string, HoverConfig> = {
+        'planet': { threshold: 15, renderSize: 3, priority: 1 },
+        'rogue-planet': { threshold: 15, renderSize: 3, priority: 2 },
+        'dark-nebula': { threshold: 18, renderSize: 4, priority: 3 },
+        'nebula': { threshold: 20, renderSize: 5, priority: 4 },
+        'wormhole': { threshold: 12, renderSize: 3, priority: 5 },
+        'comet': { threshold: 12, renderSize: 2, priority: 6 },
+        'blackhole': { threshold: 15, renderSize: 4, priority: 7 },
+        'asteroidGarden': { threshold: 18, renderSize: 4, priority: 8 },
+        'celestialStar': { threshold: 10, renderSize: 2, priority: 9 }
+    };
+
+    detectHover(mouseX: number, mouseY: number, mapX: number, mapY: number, mapWidth: number, mapHeight: number, 
+                worldToMapScale: number, centerX: number, centerY: number, objectCollections: Record<string, HoverableObject[]>): void {
+        
+        let closestObject: HoverableObject | null = null;
+        let closestDistance = Infinity;
+        let closestType: string | null = null;
+
+        // Check all object collections in priority order
+        const sortedTypes = Object.keys(this.hoverConfigs).sort((a, b) => 
+            this.hoverConfigs[a].priority - this.hoverConfigs[b].priority
+        );
+
+        for (const objectType of sortedTypes) {
+            const objects = objectCollections[objectType];
+            if (!objects || objects.length === 0) continue;
+
+            const config = this.hoverConfigs[objectType];
+
+            for (const obj of objects) {
+                const objMapX = mapX + mapWidth/2 + (obj.x - centerX) * worldToMapScale;
+                const objMapY = mapY + mapHeight/2 + (obj.y - centerY) * worldToMapScale;
+
+                // Check if object is within map bounds
+                if (objMapX >= mapX && objMapX <= mapX + mapWidth && 
+                    objMapY >= mapY && objMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - objMapX)**2 + (mouseY - objMapY)**2);
+                    if (distance <= config.threshold && distance < closestDistance) {
+                        closestObject = obj;
+                        closestDistance = distance;
+                        closestType = objectType;
+                    }
+                }
+            }
+
+            // If we found something at this priority level, stop searching lower priorities
+            if (closestObject) break;
+        }
+
+        this.hoveredObject = closestObject;
+        this.hoveredObjectType = closestType;
+    }
+
+    getHoveredObject(): { object: HoverableObject | null, type: string | null } {
+        return { object: this.hoveredObject, type: this.hoveredObjectType };
+    }
+
+    clearHover(): void {
+        this.hoveredObject = null;
+        this.hoveredObjectType = null;
+    }
+
+    renderHoverEffect(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, 
+                     worldToMapScale: number, centerX: number, centerY: number): void {
+        if (!this.hoveredObject || !this.hoveredObjectType) return;
+
+        const config = this.hoverConfigs[this.hoveredObjectType];
+        if (!config) return;
+
+        const objMapX = mapX + mapWidth/2 + (this.hoveredObject.x - centerX) * worldToMapScale;
+        const objMapY = mapY + mapHeight/2 + (this.hoveredObject.y - centerY) * worldToMapScale;
+
+        // Render hover effect
+        ctx.save();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(objMapX, objMapY, config.renderSize * 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+}
 
 interface GameStartingPosition {
     x: number;
@@ -136,6 +242,8 @@ export class StellarMap {
     hoveredComet: CometLike | null;
     selectedRoguePlanet: any | null;
     hoveredRoguePlanet: any | null;
+    selectedDarkNebula: any | null;
+    hoveredDarkNebula: any | null;
     namingService: NamingService | null;
     
     // Interactive panning state
@@ -173,6 +281,9 @@ export class StellarMap {
     hoveredObjectTypeIndex: number;
     showDiscoveredObjects: boolean;
     
+    // Centralized hover system
+    private hoverSystem: StellarMapHoverSystem;
+    
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
     revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
@@ -202,7 +313,12 @@ export class StellarMap {
         this.hoveredComet = null;
         this.selectedRoguePlanet = null;
         this.hoveredRoguePlanet = null;
+        this.selectedDarkNebula = null;
+        this.hoveredDarkNebula = null;
         this.namingService = null; // Will be injected
+        
+        // Initialize centralized hover system
+        this.hoverSystem = new StellarMapHoverSystem();
         
         // Interactive panning state
         this.followPlayer = true; // Whether map should follow player position
@@ -247,7 +363,8 @@ export class StellarMap {
             'wormhole': true,
             'blackhole': true,
             'comet': true,
-            'rogue-planet': true
+            'rogue-planet': true,
+            'dark-nebula': true
         };
         this.hoveredObjectTypeIndex = -1;
         this.showDiscoveredObjects = true;
@@ -391,7 +508,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, input?: Input): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, input?: Input): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -596,9 +713,32 @@ export class StellarMap {
                 }
             }
         }
+
+        // Check for dark nebula clicks (void region objects visible at all zoom levels)
+        let closestDarkNebula: any | null = null;
+        let closestDarkNebulaDistance = Infinity;
+
+        if (discoveredDarkNebulae) {
+            for (const darkNebula of discoveredDarkNebulae) {
+                const darkNebulaMapX = mapX + mapWidth/2 + (darkNebula.x - this.centerX) * worldToMapScale;
+                const darkNebulaMapY = mapY + mapHeight/2 + (darkNebula.y - this.centerY) * worldToMapScale;
+                
+                // Dark nebulae are larger objects, so use a bigger click threshold
+                const darkNebulaClickThreshold = Math.max(15, clickThreshold * 1.2);
+                if (darkNebulaMapX >= mapX && darkNebulaMapX <= mapX + mapWidth && 
+                    darkNebulaMapY >= mapY && darkNebulaMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - darkNebulaMapX)**2 + (mouseY - darkNebulaMapY)**2);
+                    if (distance <= darkNebulaClickThreshold && distance < closestDarkNebulaDistance) {
+                        closestDarkNebula = darkNebula;
+                        closestDarkNebulaDistance = distance;
+                    }
+                }
+            }
+        }
         
-        // Select the closest object (prioritize order: planets > rogue planets > wormholes > nebulae > comets > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestRoguePlanetDistance)) {
+        // Select the closest object (prioritize order: planets > rogue planets > dark nebulae > wormholes > nebulae > comets > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestRoguePlanetDistance, closestDarkNebulaDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
             this.selectedNebula = null;
@@ -607,7 +747,8 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
-        } else if (closestRoguePlanet && closestRoguePlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
+            this.selectedDarkNebula = null;
+        } else if (closestRoguePlanet && closestRoguePlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestDarkNebulaDistance)) {
             this.selectedRoguePlanet = closestRoguePlanet;
             this.selectedStar = null;
             this.selectedPlanet = null;
@@ -616,6 +757,17 @@ export class StellarMap {
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
+            this.selectedDarkNebula = null;
+        } else if (closestDarkNebula && closestDarkNebulaDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
+            this.selectedDarkNebula = closestDarkNebula;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
+            this.selectedNebula = null;
+            this.selectedWormhole = null;
+            this.selectedBlackHole = null;
+            this.selectedAsteroidGarden = null;
+            this.selectedComet = null;
+            this.selectedRoguePlanet = null;
         } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedWormhole = closestWormhole;
             this.selectedStar = null;
@@ -625,6 +777,7 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
         } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedNebula = closestNebula;
             this.selectedStar = null;
@@ -634,6 +787,7 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
         } else if (closestComet && closestCometDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.selectedComet = closestComet;
             this.selectedStar = null;
@@ -643,6 +797,7 @@ export class StellarMap {
             this.selectedBlackHole = null;
             this.selectedAsteroidGarden = null;
             this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
         } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
             this.selectedBlackHole = closestBlackHole;
             this.selectedStar = null;
@@ -652,6 +807,7 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.selectedAsteroidGarden = closestAsteroidGarden;
             this.selectedStar = null;
@@ -661,6 +817,7 @@ export class StellarMap {
             this.selectedBlackHole = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
             this.selectedPlanet = null;
@@ -670,6 +827,7 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
         } else {
             this.selectedStar = null;
             this.selectedPlanet = null;
@@ -705,7 +863,7 @@ export class StellarMap {
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -714,292 +872,155 @@ export class StellarMap {
         
         // Check if mouse is within map bounds
         if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredBlackHole = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
+            this.hoverSystem.clearHover();
+            this.clearAllOldHoverStates();
             this.updateCursor(canvas);
             return;
         }
+
+        // Simple centralized approach: prepare data and let hover system handle it
+        const objectCollections: Record<string, HoverableObject[]> = {
+            'celestialStar': (discoveredStars || []).map(obj => ({...obj, type: 'celestialStar'})),
+            'planet': this.zoomLevel > 3.0 ? (discoveredPlanets || []).map(obj => ({...obj, type: 'planet'})) : [],
+            'nebula': (discoveredNebulae || []).map(obj => ({...obj, type: 'nebula'})),
+            'wormhole': (discoveredWormholes || []).map(obj => ({...obj, type: 'wormhole'})),
+            'asteroidGarden': (discoveredAsteroidGardens || []).map(obj => ({...obj, type: 'asteroidGarden'})),
+            'blackhole': (discoveredBlackHoles || []).map(obj => ({...obj, type: 'blackhole'})),
+            'comet': (discoveredComets || []).map(obj => ({...obj, type: 'comet'})),
+            'rogue-planet': (discoveredRoguePlanets || []).map(obj => ({...obj, type: 'rogue-planet'})),
+            'dark-nebula': (discoveredDarkNebulae || []).map(obj => ({...obj, type: 'dark-nebula'}))
+        };
+
+        // Use centralized hover detection
+        this.hoverSystem.detectHover(
+            mouseX, mouseY, mapX, mapY, mapWidth, mapHeight,
+            worldToMapScale, this.centerX, this.centerY, objectCollections
+        );
+
+        // Sync back to old properties for compatibility
+        this.syncOldHoverStates();
+        this.updateCursor(canvas);
+    }
+
+    // NEW: Centralized hover detection using the new hover system
+    private detectHoverTargetNew(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null): void {
+        if (!this.visible) return;
         
-        // Find closest celestial object to mouse position (prioritize planets if in detail view)
-        let closestStar: StarLike | null = null;
-        let closestPlanet: PlanetLike | null = null;
-        let closestNebula: NebulaLike | null = null;
-        let closestWormhole: WormholeLike | null = null;
-        let closestAsteroidGarden: AsteroidGardenLike | null = null;
-        let closestBlackHole: BlackHoleLike | null = null;
-        let closestStarDistance = Infinity;
-        let closestPlanetDistance = Infinity;
-        let closestNebulaDistance = Infinity;
-        let closestWormholeDistance = Infinity;
-        let closestAsteroidGardenDistance = Infinity;
-        let closestBlackHoleDistance = Infinity;
-        const hoverThreshold = 15; // Slightly larger than click threshold for better UX
+        // Calculate map bounds and scaling
+        const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
+        const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
         
-        // Check for planet hover first (in detail view)
-        if (this.zoomLevel > 3.0 && discoveredPlanets) {
-            for (const planet of discoveredPlanets) {
-                // Skip planets without position data
-                if (planet.x === null || planet.y === null) continue;
-                
-                const planetMapX = mapX + mapWidth/2 + (planet.x - this.centerX) * worldToMapScale;
-                const planetMapY = mapY + mapHeight/2 + (planet.y - this.centerY) * worldToMapScale;
-                
-                // Check if planet is within map bounds and hover threshold
-                if (planetMapX >= mapX && planetMapX <= mapX + mapWidth && 
-                    planetMapY >= mapY && planetMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - planetMapX)**2 + (mouseY - planetMapY)**2);
-                    if (distance <= hoverThreshold && distance < closestPlanetDistance) {
-                        closestPlanet = planet;
-                        closestPlanetDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for star hover
-        for (const star of discoveredStars) {
-            const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * worldToMapScale;
-            const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * worldToMapScale;
-            
-            // Check if star is within map bounds and hover threshold
-            if (starMapX >= mapX && starMapX <= mapX + mapWidth && 
-                starMapY >= mapY && starMapY <= mapY + mapHeight) {
-                
-                const distance = Math.sqrt((mouseX - starMapX)**2 + (mouseY - starMapY)**2);
-                if (distance <= hoverThreshold && distance < closestStarDistance) {
-                    closestStar = star;
-                    closestStarDistance = distance;
-                }
-            }
-        }
-        
-        // Check for nebula hover (visible at all zoom levels)
-        if (discoveredNebulae) {
-            for (const nebula of discoveredNebulae) {
-                // Skip nebulae without position data
-                if (nebula.x === null || nebula.y === null) continue;
-                
-                const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * worldToMapScale;
-                const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * worldToMapScale;
-                
-                // Check if nebula is within map bounds and hover threshold
-                // Use larger threshold for nebulae since they're rendered as larger clouds
-                const nebulaHoverThreshold = Math.max(20, hoverThreshold);
-                if (nebulaMapX >= mapX && nebulaMapX <= mapX + mapWidth && 
-                    nebulaMapY >= mapY && nebulaMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - nebulaMapX)**2 + (mouseY - nebulaMapY)**2);
-                    if (distance <= nebulaHoverThreshold && distance < closestNebulaDistance) {
-                        closestNebula = nebula;
-                        closestNebulaDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for wormhole hover (visible at all zoom levels)
-        if (discoveredWormholes) {
-            for (const wormhole of discoveredWormholes) {
-                const wormholeMapX = mapX + mapWidth/2 + (wormhole.x - this.centerX) * worldToMapScale;
-                const wormholeMapY = mapY + mapHeight/2 + (wormhole.y - this.centerY) * worldToMapScale;
-                
-                // Use larger hover threshold for wormholes due to their vortex effect
-                const wormholeHoverThreshold = Math.max(25, hoverThreshold);
-                if (wormholeMapX >= mapX && wormholeMapX <= mapX + mapWidth && 
-                    wormholeMapY >= mapY && wormholeMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - wormholeMapX)**2 + (mouseY - wormholeMapY)**2);
-                    if (distance <= wormholeHoverThreshold && distance < closestWormholeDistance) {
-                        closestWormhole = wormhole;
-                        closestWormholeDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for asteroid garden hover
-        if (discoveredAsteroidGardens) {
-            for (const asteroidGarden of discoveredAsteroidGardens) {
-                const gardenMapX = mapX + mapWidth/2 + (asteroidGarden.x - this.centerX) * worldToMapScale;
-                const gardenMapY = mapY + mapHeight/2 + (asteroidGarden.y - this.centerY) * worldToMapScale;
-                
-                // Use larger hover threshold for asteroid gardens since they're spread out
-                const gardenHoverThreshold = Math.max(25, hoverThreshold);
-                if (gardenMapX >= mapX && gardenMapX <= mapX + mapWidth && 
-                    gardenMapY >= mapY && gardenMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - gardenMapX)**2 + (mouseY - gardenMapY)**2);
-                    if (distance <= gardenHoverThreshold && distance < closestAsteroidGardenDistance) {
-                        closestAsteroidGarden = asteroidGarden;
-                        closestAsteroidGardenDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for black hole hover
-        if (discoveredBlackHoles) {
-            for (const blackHole of discoveredBlackHoles) {
-                const blackHoleMapX = mapX + mapWidth/2 + (blackHole.x - this.centerX) * worldToMapScale;
-                const blackHoleMapY = mapY + mapHeight/2 + (blackHole.y - this.centerY) * worldToMapScale;
-                
-                // Use larger hover threshold for black holes due to their accretion disc
-                const blackHoleHoverThreshold = Math.max(30, hoverThreshold);
-                if (blackHoleMapX >= mapX && blackHoleMapX <= mapX + mapWidth && 
-                    blackHoleMapY >= mapY && blackHoleMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - blackHoleMapX)**2 + (mouseY - blackHoleMapY)**2);
-                    if (distance <= blackHoleHoverThreshold && distance < closestBlackHoleDistance) {
-                        closestBlackHole = blackHole;
-                        closestBlackHoleDistance = distance;
-                    }
-                }
-            }
+        // Check if mouse is within map bounds
+        if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
+            this.hoverSystem.clearHover();
+            this.clearAllOldHoverStates();
+            this.updateCursor(canvas);
+            return;
         }
 
-        // Check for comet hover
-        let closestComet: CometLike | null = null;
-        let closestCometDistance = Infinity;
+        // Prepare object collections for the new hover system
+        const objectCollections: Record<string, HoverableObject[]> = {
+            'celestialStar': (discoveredStars || []).map(obj => ({...obj, type: 'celestialStar'})),
+            'planet': this.zoomLevel > 3.0 ? (discoveredPlanets || []).map(obj => ({...obj, type: 'planet'})) : [],
+            'nebula': (discoveredNebulae || []).map(obj => ({...obj, type: 'nebula'})),
+            'wormhole': (discoveredWormholes || []).map(obj => ({...obj, type: 'wormhole'})),
+            'asteroidGarden': (discoveredAsteroidGardens || []).map(obj => ({...obj, type: 'asteroidGarden'})),
+            'blackhole': (discoveredBlackHoles || []).map(obj => ({...obj, type: 'blackhole'})),
+            'comet': (discoveredComets || []).map(obj => ({...obj, type: 'comet'})),
+            'rogue-planet': (discoveredRoguePlanets || []).map(obj => ({...obj, type: 'rogue-planet'})),
+            'dark-nebula': (discoveredDarkNebulae || []).map(obj => ({...obj, type: 'dark-nebula'}))
+        };
 
-        if (discoveredComets) {
-            for (const comet of discoveredComets) {
-                const cometMapX = mapX + mapWidth/2 + (comet.x - this.centerX) * worldToMapScale;
-                const cometMapY = mapY + mapHeight/2 + (comet.y - this.centerY) * worldToMapScale;
+        // Use the new centralized hover system
+        this.updateHoverStatesUsingCentralizedSystem(
+            mouseX, mouseY, canvas, mapX, mapY, mapWidth, mapHeight, worldToMapScale, objectCollections
+        );
+    }
 
-                // Use slightly larger hover threshold for comets due to their tail
-                const cometHoverThreshold = Math.max(18, hoverThreshold);
-                if (cometMapX >= mapX && cometMapX <= mapX + mapWidth && 
-                    cometMapY >= mapY && cometMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - cometMapX)**2 + (mouseY - cometMapY)**2);
-                    if (distance <= cometHoverThreshold && distance < closestCometDistance) {
-                        closestComet = comet;
-                        closestCometDistance = distance;
-                    }
-                }
+    private clearAllOldHoverStates(): void {
+        this.hoveredStar = null;
+        this.hoveredPlanet = null;
+        this.hoveredNebula = null;
+        this.hoveredWormhole = null;
+        this.hoveredAsteroidGarden = null;
+        this.hoveredBlackHole = null;
+        this.hoveredComet = null;
+        this.hoveredRoguePlanet = null;
+        this.hoveredDarkNebula = null;
+    }
+
+    private syncOldHoverStates(): void {
+        const { object: hoveredObject, type: hoveredType } = this.hoverSystem.getHoveredObject();
+        
+        // Clear all old hover states first
+        this.clearAllOldHoverStates();
+
+        // Set the appropriate old property based on what was hovered
+        if (hoveredObject && hoveredType) {
+            switch (hoveredType) {
+                case 'celestialStar':
+                    this.hoveredStar = hoveredObject as unknown as StarLike;
+                    break;
+                case 'planet':
+                    this.hoveredPlanet = hoveredObject as unknown as PlanetLike;
+                    break;
+                case 'nebula':
+                    this.hoveredNebula = hoveredObject as unknown as NebulaLike;
+                    break;
+                case 'wormhole':
+                    this.hoveredWormhole = hoveredObject as unknown as WormholeLike;
+                    break;
+                case 'asteroidGarden':
+                    this.hoveredAsteroidGarden = hoveredObject as unknown as AsteroidGardenLike;
+                    break;
+                case 'blackhole':
+                    this.hoveredBlackHole = hoveredObject as unknown as BlackHoleLike;
+                    break;
+                case 'comet':
+                    this.hoveredComet = hoveredObject as unknown as CometLike;
+                    break;
+                case 'rogue-planet':
+                    this.hoveredRoguePlanet = hoveredObject as unknown;
+                    break;
+                case 'dark-nebula':
+                    this.hoveredDarkNebula = hoveredObject as unknown;
+                    break;
             }
         }
+    }
 
-        // Check for rogue planet hover (wandering worlds visible at all zoom levels)
-        let closestRoguePlanet: any | null = null;
-        let closestRoguePlanetDistance = Infinity;
+    private updateHoverStatesUsingCentralizedSystem(
+        mouseX: number, 
+        mouseY: number, 
+        canvas: HTMLCanvasElement,
+        mapX: number,
+        mapY: number,
+        mapWidth: number,
+        mapHeight: number,
+        worldToMapScale: number,
+        objectCollections: Record<string, HoverableObject[]>
+    ): void {
+        // Use the centralized hover system to detect what object is being hovered
+        this.hoverSystem.detectHover(
+            mouseX, 
+            mouseY, 
+            mapX, 
+            mapY, 
+            mapWidth, 
+            mapHeight, 
+            worldToMapScale,
+            this.centerX, 
+            this.centerY, 
+            objectCollections
+        );
 
-        if (discoveredRoguePlanets) {
-            for (const roguePlanet of discoveredRoguePlanets) {
-                const roguePlanetMapX = mapX + mapWidth/2 + (roguePlanet.x - this.centerX) * worldToMapScale;
-                const roguePlanetMapY = mapY + mapHeight/2 + (roguePlanet.y - this.centerY) * worldToMapScale;
-
-                // Use similar hover threshold to regular planets
-                const roguePlanetHoverThreshold = Math.max(15, hoverThreshold);
-                if (roguePlanetMapX >= mapX && roguePlanetMapX <= mapX + mapWidth && 
-                    roguePlanetMapY >= mapY && roguePlanetMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - roguePlanetMapX)**2 + (mouseY - roguePlanetMapY)**2);
-                    if (distance <= roguePlanetHoverThreshold && distance < closestRoguePlanetDistance) {
-                        closestRoguePlanet = roguePlanet;
-                        closestRoguePlanetDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Set hover state (prioritize order: planets > rogue planets > nebulae > wormholes > comets > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestRoguePlanetDistance)) {
-            this.hoveredPlanet = closestPlanet;
-            this.hoveredStar = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        } else if (closestRoguePlanet && closestRoguePlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
-            this.hoveredRoguePlanet = closestRoguePlanet;
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
-            this.hoveredNebula = closestNebula;
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
-            this.hoveredWormhole = closestWormhole;
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        } else if (closestComet && closestCometDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
-            this.hoveredComet = closestComet;
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredRoguePlanet = null;
-        } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
-            this.hoveredBlackHole = closestBlackHole;
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
-            this.hoveredAsteroidGarden = closestAsteroidGarden;
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        } else if (closestStar) {
-            this.hoveredStar = closestStar;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        } else {
-            this.hoveredStar = null;
-            this.hoveredPlanet = null;
-            this.hoveredNebula = null;
-            this.hoveredWormhole = null;
-            this.hoveredBlackHole = null;
-            this.hoveredAsteroidGarden = null;
-            this.hoveredComet = null;
-            this.hoveredRoguePlanet = null;
-        }
-        
-        // Update cursor based on hover state
+        // Update old system properties for backward compatibility
+        this.syncOldHoverStates();
         this.updateCursor(canvas);
     }
     
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet || this.hoveredRoguePlanet) {
+        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet || this.hoveredRoguePlanet || this.hoveredDarkNebula) {
             canvas.style.cursor = 'pointer';
         } else if (this.visible) {
             // Use crosshair for map navigation when visible
@@ -1071,7 +1092,7 @@ export class StellarMap {
         // No need to refresh data on zoom changes
     }
 
-    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null): void {
+    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -1152,6 +1173,11 @@ export class StellarMap {
             // Draw discovered rogue planets (wandering worlds between stars)
             if (discoveredRoguePlanets && discoveredRoguePlanets.length > 0) {
                 this.renderDiscoveredRoguePlanets(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredRoguePlanets);
+            }
+
+            // Draw discovered dark nebulae (void region objects that occlude stars)
+            if (discoveredDarkNebulae && discoveredDarkNebulae.length > 0) {
+                this.renderDiscoveredDarkNebulae(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredDarkNebulae);
             }
         }
 
@@ -2420,6 +2446,141 @@ export class StellarMap {
         }
     }
 
+    renderDiscoveredDarkNebulae(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredDarkNebulae: any[]): void {
+        if (!discoveredDarkNebulae) return;
+
+        for (const darkNebula of discoveredDarkNebulae) {
+            // Convert world coordinates to map coordinates
+            const nebulaMapX = mapX + mapWidth/2 + (darkNebula.x - this.centerX) * scale;
+            const nebulaMapY = mapY + mapHeight/2 + (darkNebula.y - this.centerY) * scale;
+            
+            // Calculate dark nebula size based on radius and zoom level
+            const baseSize = Math.max(8, darkNebula.radius * scale * 0.3); // Larger than planets
+            const nebulaSize = Math.max(4, baseSize * Math.min(1.2, this.zoomLevel * 0.8));
+            
+            // Check if dark nebula is within map bounds (with margin for size)
+            const margin = nebulaSize + 5;
+            if (nebulaMapX >= mapX - margin && nebulaMapX <= mapX + mapWidth + margin && 
+                nebulaMapY >= mapY - margin && nebulaMapY <= mapY + mapHeight + margin) {
+                
+                ctx.save();
+                
+                // Get dark nebula color and opacity based on variant
+                const nebulaColor = this.getDarkNebulaColor(darkNebula.variant);
+                const occlusionStrength = darkNebula.occlusionStrength || 0.8;
+                
+                // Create gradient for dark nebula representation
+                const gradient = ctx.createRadialGradient(
+                    nebulaMapX, nebulaMapY, 0,
+                    nebulaMapX, nebulaMapY, nebulaSize
+                );
+                
+                // Dark core fading to transparent edges
+                gradient.addColorStop(0, nebulaColor + Math.floor(occlusionStrength * 255).toString(16).padStart(2, '0'));
+                gradient.addColorStop(0.7, nebulaColor + Math.floor(occlusionStrength * 128).toString(16).padStart(2, '0'));
+                gradient.addColorStop(1, nebulaColor + '00'); // Fully transparent
+                
+                // Draw dark nebula with irregular shape approximation
+                ctx.fillStyle = gradient;
+                if (darkNebula.shape === 'irregular') {
+                    // Draw irregular shape with multiple overlapping circles
+                    for (let i = 0; i < 3; i++) {
+                        const offsetX = (Math.random() - 0.5) * nebulaSize * 0.4;
+                        const offsetY = (Math.random() - 0.5) * nebulaSize * 0.4;
+                        const circleSize = nebulaSize * (0.6 + Math.random() * 0.4);
+                        
+                        ctx.beginPath();
+                        ctx.arc(nebulaMapX + offsetX, nebulaMapY + offsetY, circleSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    // Draw circular shape
+                    ctx.beginPath();
+                    ctx.arc(nebulaMapX, nebulaMapY, nebulaSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Add subtle border to make it visible against dark backgrounds
+                ctx.strokeStyle = nebulaColor + '80'; // 50% opacity border
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        }
+    }
+
+    private getDarkNebulaColor(variant: 'dense-core' | 'wispy' | 'globular'): string {
+        switch (variant) {
+            case 'dense-core':
+                return '#2C1810'; // Very dark brown
+            case 'wispy':
+                return '#1A1A2E'; // Dark purple-blue
+            case 'globular':
+            default:
+                return '#0F0F23'; // Very dark blue
+        }
+    }
+
+    renderDarkNebulaInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        if (!this.selectedDarkNebula || !this.namingService) return;
+        
+        // Panel dimensions and position (same as other panels)
+        const panelWidth = 300;
+        const panelHeight = 120;
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background (same style as other panels)
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel content (same style as other panels)
+        ctx.fillStyle = '#b0c4d4';
+        ctx.font = '12px "Courier New", monospace';
+        
+        let lineY = panelY + 20;
+        const lineHeight = 14;
+        
+        // Dark nebula designation
+        const darkNebulaName = this.generateDarkNebulaDisplayName(this.selectedDarkNebula);
+        ctx.fillText(`Designation: ${darkNebulaName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Dark nebula variant/type
+        const variantName = this.selectedDarkNebula.variant ? 
+            this.selectedDarkNebula.variant.charAt(0).toUpperCase() + this.selectedDarkNebula.variant.slice(1).replace('-', ' ') + ' Dark Nebula' :
+            'Dark Nebula';
+        ctx.fillText(`Type: ${variantName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Special property: Star occlusion
+        const occlusionPercent = Math.round((this.selectedDarkNebula.occlusionStrength || 0.8) * 100);
+        ctx.fillText(`Star Occlusion: ${occlusionPercent}%`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Position
+        ctx.fillText(`Position: (${Math.round(this.selectedDarkNebula.x)}, ${Math.round(this.selectedDarkNebula.y)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Discovery timestamp if available
+        if (this.selectedDarkNebula.timestamp) {
+            const date = new Date(this.selectedDarkNebula.timestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
+    }
+
+    generateDarkNebulaDisplayName(darkNebula: any): string {
+        if (!this.namingService) return 'Unknown Dark Nebula';
+        
+        // Use the naming service to generate a consistent name
+        return this.namingService.generateDisplayName(darkNebula);
+    }
+
     renderAsteroidField(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {rocks: string[], accents: string[]}, worldX: number, worldY: number): void {
         // Draw several small rocks scattered around the center point
         const rockCount = Math.max(4, Math.floor(size * 0.8)); // More rocks, better distribution
@@ -2809,6 +2970,8 @@ export class StellarMap {
             this.renderAsteroidGardenInfoPanel(ctx, canvas);
         } else if (this.selectedRoguePlanet && this.namingService) {
             this.renderRoguePlanetInfoPanel(ctx, canvas);
+        } else if (this.selectedDarkNebula && this.namingService) {
+            this.renderDarkNebulaInfoPanel(ctx, canvas);
         }
     }
 
@@ -4171,7 +4334,8 @@ export class StellarMap {
             wormhole: '#8844ff',            // Purple for wormholes
             blackhole: '#ff0000',           // Red for black holes
             comet: '#88ccff',               // Light blue for comets
-            'rogue-planet': '#cc88aa'       // Muted purple for rogue planets
+            'rogue-planet': '#cc88aa',      // Muted purple for rogue planets
+            'dark-nebula': '#2a1a0a'        // Very dark brown for dark nebulae
         };
         return colors[objectType] || '#ffffff';
     }
@@ -4243,6 +4407,17 @@ export class StellarMap {
                     ctx.arc(objMapX, objMapY, size * 2, 0, Math.PI * 2);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                } else if (obj.type === 'dark-nebula') {
+                    // Dark filled circle with thick border for dark nebulae
+                    ctx.fillStyle = color + 'CC'; // Darker fill
+                    ctx.beginPath();
+                    ctx.arc(objMapX, objMapY, size * 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Thick border to make them visible
+                    ctx.strokeStyle = color + 'FF';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
                 } else {
                     // Filled circles for other objects
                     ctx.fillStyle = color + '90'; // Semi-transparent

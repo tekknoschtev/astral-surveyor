@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
 }
 
 interface Star extends CelestialObject {
@@ -71,6 +71,11 @@ interface Comet extends CelestialObject {
 interface RoguePlanet extends CelestialObject {
     type: 'rogue-planet';
     variant?: 'ice' | 'rock' | 'volcanic';
+}
+
+interface DarkNebula extends CelestialObject {
+    type: 'dark-nebula';
+    variant?: 'dense-core' | 'wispy' | 'globular';
 }
 
 // Full designation result for detailed information
@@ -462,6 +467,8 @@ export class NamingService {
             return this.generateCometName(object);
         } else if (object.type === 'rogue-planet') {
             return this.generateRoguePlanetName(object as RoguePlanet);
+        } else if (object.type === 'dark-nebula') {
+            return this.generateDarkNebulaName(object as DarkNebula);
         }
         
         return 'Unknown Object';
@@ -557,6 +564,17 @@ export class NamingService {
                 type: 'Rogue Planet',
                 classification: `Free-floating ${variantType} planet`
             };
+        } else if (object.type === 'dark-nebula') {
+            const darkNebula = object as DarkNebula;
+            const darkNebulaName = this.generateDarkNebulaName(darkNebula);
+            const coordName = this.generateCoordinateDesignation(darkNebula.x, darkNebula.y);
+            const variantType = this.getDarkNebulaVariantName(darkNebula.variant);
+            return {
+                catalog: darkNebulaName,
+                coordinate: coordName,
+                type: 'Dark Nebula',
+                classification: `${variantType} dust cloud with stellar occlusion`
+            };
         }
         
         return null;
@@ -591,6 +609,9 @@ export class NamingService {
         } else if (object.type === 'rogue-planet') {
             // Volcanic rogue planets are notable due to their rare internal heat source
             return object.variant === 'volcanic';
+        } else if (object.type === 'dark-nebula') {
+            // Dense-core dark nebulae are notable due to complete stellar occlusion
+            return object.variant === 'dense-core';
         }
         
         return false;
@@ -692,6 +713,39 @@ export class NamingService {
     }
 
     /**
+     * Generate dark nebula name following the format "[Descriptor] Dark Cloud"
+     * Examples: "Serpent Dark Cloud", "Hooded Dark Cloud", "Veil Dark Cloud"
+     */
+    generateDarkNebulaName(darkNebula: DarkNebula): string {
+        // Use predefined descriptors that evoke mystery and darkness
+        const descriptors = [
+            'Serpent', 'Hooded', 'Veil', 'Shadow', 'Phantom', 'Wraith', 'Ghost', 'Shroud',
+            'Cloak', 'Mask', 'Midnight', 'Raven', 'Obsidian', 'Void', 'Eclipse', 'Shade',
+            'Specter', 'Umbra', 'Dusk', 'Gloom', 'Mist', 'Fog', 'Haze', 'Soot', 'Ash',
+            'Coal', 'Jet', 'Onyx', 'Ebony', 'Pitch', 'Ink', 'Carbon', 'Charcoal'
+        ];
+        
+        // Generate deterministic descriptor based on position
+        const catalogNumber = this.generateDarkNebulaCatalogNumber(darkNebula.x, darkNebula.y);
+        const descriptorIndex = catalogNumber % descriptors.length;
+        const descriptor = descriptors[descriptorIndex];
+        
+        return `${descriptor} Dark Cloud`;
+    }
+
+    /**
+     * Generate dark nebula catalog number for deterministic naming
+     */
+    private generateDarkNebulaCatalogNumber(x: number, y: number): number {
+        const hash1 = this.hashCoordinate(x * 2.3); // Different multiplier for dark nebulae  
+        const hash2 = this.hashCoordinate(y * 1.9);
+        const combined = (hash1 ^ hash2) >>> 0;
+        
+        // Use full range for descriptor selection
+        return combined % 1000000;
+    }
+
+    /**
      * Get readable variant name for rogue planet classification
      */
     private getRoguePlanetVariantName(variant?: 'ice' | 'rock' | 'volcanic'): string {
@@ -703,6 +757,21 @@ export class NamingService {
             case 'rock':
             default:
                 return 'rocky';
+        }
+    }
+
+    /**
+     * Get readable variant name for dark nebula classification
+     */
+    private getDarkNebulaVariantName(variant?: 'dense-core' | 'wispy' | 'globular'): string {
+        switch (variant) {
+            case 'dense-core':
+                return 'dense-core';
+            case 'globular':
+                return 'globular';
+            case 'wispy':
+            default:
+                return 'wispy';
         }
     }
 }

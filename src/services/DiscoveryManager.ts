@@ -13,7 +13,7 @@ export interface DiscoveryEntry {
     id: string;
     name: string;
     type: string;
-    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet';
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet' | 'dark-nebula';
     coordinates: {
         x: number;
         y: number;
@@ -54,7 +54,7 @@ export interface DiscoveryStatistics {
 export interface DiscoveryFilter {
     category?: DiscoveryCategory;
     rarity?: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
-    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
+    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
     hasNotes?: boolean;
     dateRange?: {
         start: number;
@@ -64,7 +64,7 @@ export interface DiscoveryFilter {
 
 // Interface for celestial objects in discovery context
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
     x: number;
     y: number;
     id?: string;

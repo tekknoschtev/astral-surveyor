@@ -408,3 +408,305 @@ export class RoguePlanet extends CelestialObject {
     }
 }
 
+// Phase 2: DarkNebula class with star occlusion rendering system
+// Supports three variants: dense-core, wispy, and globular with unique visual effects
+
+interface DarkNebulaVisualEffects {
+    occludesStars?: boolean;
+    hasWispyEdges?: boolean;
+    hasStaticEffect?: boolean;
+    hasIrregularShape?: boolean;
+    hasBrownTones?: boolean;
+}
+
+export class DarkNebula extends CelestialObject {
+    variant: 'dense-core' | 'wispy' | 'globular';
+    radius: number;
+    color: string;
+    occlusionStrength: number; // 0.0 to 1.0, affects star dimming
+    shape: 'circular' | 'irregular';
+    visualEffects: DarkNebulaVisualEffects;
+    discoveryTimestamp?: number;
+    
+    // Pre-calculated irregular shape vertices (deterministic based on position)
+    shapeVertices: Array<{angle: number, radius: number}> = [];
+
+    constructor(x: number, y: number, variant: 'dense-core' | 'wispy' | 'globular' = 'wispy') {
+        super(x, y, 'dark-nebula');
+        this.variant = variant;
+        this.initializeProperties();
+        this.initializeVisualFeatures();
+    }
+
+    private initializeProperties(): void {
+        // Set properties based on variant
+        switch (this.variant) {
+            case 'dense-core':
+                this.radius = 180; // Large, irregular areas
+                this.color = '#2F1B14'; // Dark brown
+                this.occlusionStrength = 1.0; // Complete star occlusion
+                this.shape = 'irregular';
+                this.visualEffects = {
+                    occludesStars: true,
+                    hasIrregularShape: true,
+                    hasBrownTones: true
+                };
+                this.discoveryDistance = 80;
+                break;
+            case 'wispy':
+                this.radius = 220; // Larger but more diffuse
+                this.color = '#3D2B1F'; // Lighter brown
+                this.occlusionStrength = 0.6; // Partial star dimming
+                this.shape = 'irregular';
+                this.visualEffects = {
+                    occludesStars: true,
+                    hasWispyEdges: true,
+                    hasIrregularShape: true,
+                    hasBrownTones: true
+                };
+                this.discoveryDistance = 80;
+                break;
+            case 'globular':
+                this.radius = 160; // Medium, nearly perfect circle
+                this.color = '#4A3420'; // Medium brown
+                this.occlusionStrength = 0.8; // Strong star dimming
+                this.shape = 'circular';
+                this.visualEffects = {
+                    occludesStars: true,
+                    hasBrownTones: true
+                };
+                this.discoveryDistance = 80;
+                break;
+        }
+    }
+
+    private initializeVisualFeatures(): void {
+        // Generate deterministic irregular shape vertices if needed
+        if (this.shape === 'irregular') {
+            const positionSeed = hashPosition(this.x, this.y);
+            const rng = new SeededRandom(positionSeed + 4000);
+            
+            const vertexCount = 16 + Math.floor(rng.next() * 8); // 16-24 vertices
+            for (let i = 0; i < vertexCount; i++) {
+                const angle = (i / vertexCount) * Math.PI * 2;
+                const radiusVariation = 0.6 + rng.next() * 0.8; // 60%-140% of base radius
+                this.shapeVertices.push({
+                    angle: angle,
+                    radius: this.radius * radiusVariation
+                });
+            }
+        }
+    }
+
+    render(renderer: Renderer, camera: Camera): void {
+        const ctx = renderer.ctx;
+        const [screenX, screenY] = camera.worldToScreen(this.x, this.y, ctx.canvas.width, ctx.canvas.height);
+        
+        // Check if dark nebula is visible on screen (with larger margins due to size)
+        const margin = this.radius + 100;
+        if (screenX < -margin || screenX > ctx.canvas.width + margin || 
+            screenY < -margin || screenY > ctx.canvas.height + margin) {
+            return;
+        }
+
+        // First pass: Apply star occlusion effect
+        this.renderStarOcclusion(ctx, camera, screenX, screenY);
+        
+        // Second pass: Render nebula dust texture
+        this.renderNebulaVisual(ctx, screenX, screenY);
+        
+        // Third pass: Apply discovery indicator if applicable
+        this.renderDiscoveryIndicator(renderer, screenX, screenY);
+    }
+
+    private renderStarOcclusion(ctx: CanvasRenderingContext2D, camera: Camera, centerX: number, centerY: number): void {
+        if (!this.visualEffects.occludesStars) return;
+        
+        ctx.save();
+        
+        // Create occlusion mask based on shape
+        ctx.globalCompositeOperation = 'destination-out';
+        
+        if (this.shape === 'circular') {
+            // Simple circular occlusion
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
+            gradient.addColorStop(0, `rgba(0,0,0,${this.occlusionStrength})`);
+            gradient.addColorStop(0.7, `rgba(0,0,0,${this.occlusionStrength * 0.8})`);
+            gradient.addColorStop(1, `rgba(0,0,0,0)`);
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Irregular shape occlusion
+            ctx.beginPath();
+            for (let i = 0; i < this.shapeVertices.length; i++) {
+                const vertex = this.shapeVertices[i];
+                const x = centerX + Math.cos(vertex.angle) * vertex.radius;
+                const y = centerY + Math.sin(vertex.angle) * vertex.radius;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.closePath();
+            
+            // Create irregular gradient for more realistic occlusion
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
+            gradient.addColorStop(0, `rgba(0,0,0,${this.occlusionStrength})`);
+            gradient.addColorStop(0.8, `rgba(0,0,0,${this.occlusionStrength * 0.6})`);
+            gradient.addColorStop(1, `rgba(0,0,0,0)`);
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+
+    private renderNebulaVisual(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+        ctx.save();
+        
+        // Set blend mode for realistic dust appearance
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.4;
+        
+        if (this.shape === 'circular') {
+            // Render circular nebula
+            this.drawCircularNebula(ctx, centerX, centerY);
+        } else {
+            // Render irregular nebula
+            this.drawIrregularNebula(ctx, centerX, centerY);
+        }
+        
+        // Add variant-specific effects
+        if (this.visualEffects.hasWispyEdges && this.variant === 'wispy') {
+            this.drawWispyEdges(ctx, centerX, centerY);
+        }
+        
+        ctx.restore();
+    }
+
+    private drawCircularNebula(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
+        gradient.addColorStop(0, this.color);
+        gradient.addColorStop(0.5, this.lightenColor(this.color, 0.2));
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    private drawIrregularNebula(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+        ctx.beginPath();
+        for (let i = 0; i < this.shapeVertices.length; i++) {
+            const vertex = this.shapeVertices[i];
+            const x = centerX + Math.cos(vertex.angle) * vertex.radius;
+            const y = centerY + Math.sin(vertex.angle) * vertex.radius;
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.closePath();
+        
+        // Create gradient that follows the irregular shape
+        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
+        gradient.addColorStop(0, this.color);
+        gradient.addColorStop(0.6, this.lightenColor(this.color, 0.15));
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    }
+
+    private drawWispyEdges(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 5000);
+        
+        // Draw wispy tendrils extending from the main nebula
+        for (let i = 0; i < 8; i++) {
+            const angle = rng.next() * Math.PI * 2;
+            const length = this.radius * (0.3 + rng.next() * 0.4);
+            const startX = centerX + Math.cos(angle) * this.radius * 0.8;
+            const startY = centerY + Math.sin(angle) * this.radius * 0.8;
+            const endX = startX + Math.cos(angle) * length;
+            const endY = startY + Math.sin(angle) * length;
+            
+            const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+            gradient.addColorStop(0, this.lightenColor(this.color, 0.1));
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 8 + rng.next() * 4;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `dark-nebula-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 8,
+            rarity: visualizationService.getObjectRarity('dark-nebula'),
+            objectType: 'dark-nebula',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 8,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+    }
+
+    // Utility method to lighten a color for gradients
+    private lightenColor(color: string, factor: number): string {
+        // Simple color lightening - converts hex to rgb and increases brightness
+        const hex = color.replace('#', '');
+        const r = Math.min(255, Math.floor(parseInt(hex.substr(0, 2), 16) * (1 + factor)));
+        const g = Math.min(255, Math.floor(parseInt(hex.substr(2, 2), 16) * (1 + factor)));
+        const b = Math.min(255, Math.floor(parseInt(hex.substr(4, 2), 16) * (1 + factor)));
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+}
+

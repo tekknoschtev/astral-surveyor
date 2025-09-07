@@ -457,7 +457,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       
@@ -517,7 +518,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -575,7 +577,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -608,7 +611,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -638,7 +642,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -672,7 +677,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -704,7 +710,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -739,7 +746,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [mockWormhole],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -773,7 +781,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [mockBlackHole],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -887,7 +896,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
     });
@@ -934,7 +944,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [{ render: vi.fn() }],
         blackholes: [{ render: vi.fn() }],
         comets: [{ render: vi.fn() }],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -993,7 +1004,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       game.discoveryLogbook.isMouseOver = vi.fn().mockReturnValue(false);
@@ -1052,7 +1064,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       game.stellarMap.isVisible = vi.fn().mockReturnValue(false);
@@ -1081,7 +1094,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [mockWormhole],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       game.camera.velocityX = 100;
@@ -1122,7 +1136,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [mockWormhole],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -1244,7 +1259,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [mockBlackHole],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       const initialVelocityX = game.camera.velocityX;
@@ -1282,7 +1298,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [mockBlackHole],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -1321,7 +1338,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [mockBlackHole],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -1349,7 +1367,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [mockBlackHole],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       await game.update(0.016);
@@ -1511,7 +1530,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -1585,7 +1605,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [mockWormhole],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       
       const destinationPreviewSpy = vi.spyOn(game, 'getDestinationPreviewObjects').mockReturnValue([]);
@@ -1634,7 +1655,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
 
       expect(() => game.update(0.016)).not.toThrow();
@@ -1651,7 +1673,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -1682,7 +1705,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       
@@ -1790,7 +1814,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         wormholes: [],
         blackholes: [],
         comets: [],
-        roguePlanets: []
+        roguePlanets: [],
+        darkNebulae: []
       });
       
       await game.checkForExistingSave();
