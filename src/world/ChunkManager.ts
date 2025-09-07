@@ -2336,7 +2336,6 @@ export class ChunkManager {
         }
         return null;
     }
-
     markRegionDiscovered(regionType: string, regionName: string, discoveryX: number, discoveryY: number, influence: number): void {
         // Only mark a region as discovered once (first discovery)
         if (!this.discoveredRegions.has(regionType)) {
