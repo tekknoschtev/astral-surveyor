@@ -121,6 +121,10 @@ export class Game {
     // Region discovery tracking
     private currentRegionType: string | null = null;
     
+    // Dark nebula ambient audio tracking
+    private baseAmbientVolume: number = 0.8; // Store the original ambient volume
+    private currentAmbientReduction: number = 0; // Current reduction amount (0 = no reduction)
+    
     // Expose properties for backward compatibility with tests
     get lastBlackHoleWarnings() {
         return this.discoveryManager['lastBlackHoleWarnings'];
@@ -636,6 +640,67 @@ export class Game {
                 wormhole.update(deltaTime);
             }
         }
+        
+        // Update Dark Nebula ambient sound reduction based on proximity
+        this.updateDarkNebulaAmbientEffects(activeObjects.darkNebulae);
+    }
+
+    /**
+     * Update Dark Nebula ambient sound effects based on ship proximity
+     * Creates "dead zone" audio effect by reducing ambient volume near Dark Nebulae
+     */
+    private updateDarkNebulaAmbientEffects(darkNebulae: any[]): void {
+        if (!darkNebulae || darkNebulae.length === 0) {
+            // No dark nebulae nearby, restore full ambient volume if it was reduced
+            if (this.currentAmbientReduction > 0) {
+                this.currentAmbientReduction = Math.max(0, this.currentAmbientReduction - 0.02); // Gradual restoration
+                const newVolume = this.baseAmbientVolume * (1 - this.currentAmbientReduction);
+                this.soundManager.setAmbientVolume(newVolume);
+            }
+            return;
+        }
+
+        // Find the closest Dark Nebula and calculate sound reduction
+        let closestDistance = Infinity;
+        let maxReduction = 0;
+
+        for (const darkNebula of darkNebulae) {
+            const distance = Math.sqrt(
+                Math.pow(this.camera.x - darkNebula.x, 2) + 
+                Math.pow(this.camera.y - darkNebula.y, 2)
+            );
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                
+                // Calculate reduction based on proximity and nebula properties
+                const effectRadius = darkNebula.radius * 1.5; // Effective audio range is larger than visual
+                const occlusionStrength = darkNebula.occlusionStrength || 0.6; // Default if not set
+                
+                if (distance <= effectRadius) {
+                    // Calculate reduction: stronger at center, fading to edges
+                    const proximityFactor = 1 - (distance / effectRadius);
+                    maxReduction = Math.max(maxReduction, proximityFactor * occlusionStrength * 0.8); // Max 80% reduction
+                }
+            }
+        }
+
+        // Smoothly transition ambient volume based on the strongest effect
+        const targetReduction = maxReduction;
+        const transitionSpeed = 0.02; // Gradual transition for smooth audio
+
+        if (targetReduction > this.currentAmbientReduction) {
+            // Entering nebula - gradual sound reduction
+            this.currentAmbientReduction = Math.min(targetReduction, this.currentAmbientReduction + transitionSpeed);
+        } else if (targetReduction < this.currentAmbientReduction) {
+            // Leaving nebula - gradual sound restoration
+            this.currentAmbientReduction = Math.max(targetReduction, this.currentAmbientReduction - transitionSpeed);
+        }
+
+        // Apply the ambient volume reduction
+        const newVolume = this.baseAmbientVolume * (1 - this.currentAmbientReduction);
+        this.soundManager.setAmbientVolume(newVolume);
+        
     }
 
     /**

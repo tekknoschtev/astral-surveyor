@@ -452,6 +452,7 @@ export class DarkNebula extends CelestialObject {
                     hasBrownTones: true
                 };
                 this.discoveryDistance = 80;
+                this.discoveryValue = 35; // As per Phase 2 design document
                 break;
             case 'wispy':
                 this.radius = 220; // Larger but more diffuse
@@ -465,6 +466,7 @@ export class DarkNebula extends CelestialObject {
                     hasBrownTones: true
                 };
                 this.discoveryDistance = 80;
+                this.discoveryValue = 35; // As per Phase 2 design document
                 break;
             case 'globular':
                 this.radius = 160; // Medium, nearly perfect circle
@@ -476,6 +478,7 @@ export class DarkNebula extends CelestialObject {
                     hasBrownTones: true
                 };
                 this.discoveryDistance = 80;
+                this.discoveryValue = 35; // As per Phase 2 design document
                 break;
         }
     }
@@ -509,37 +512,44 @@ export class DarkNebula extends CelestialObject {
             return;
         }
 
-        // First pass: Apply star occlusion effect
-        this.renderStarOcclusion(ctx, camera, screenX, screenY);
+        // Render star occlusion effect (dark void appearance)
+        this.renderStarOcclusion(ctx, screenX, screenY);
         
-        // Second pass: Render nebula dust texture
-        this.renderNebulaVisual(ctx, screenX, screenY);
+        // Render subtle dust effects for wispy variants (much more subtle than before)
+        if (this.variant === 'wispy') {
+            this.renderSubtleDustEffects(ctx, screenX, screenY);
+        }
         
-        // Third pass: Apply discovery indicator if applicable
-        this.renderDiscoveryIndicator(renderer, screenX, screenY);
+        // Apply discovery indicator if applicable
+        if (this.discovered) {
+            this.renderDiscoveryIndicator(renderer, screenX, screenY);
+        }
     }
 
-    private renderStarOcclusion(ctx: CanvasRenderingContext2D, camera: Camera, centerX: number, centerY: number): void {
+    private renderStarOcclusion(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
         if (!this.visualEffects.occludesStars) return;
         
         ctx.save();
         
-        // Create occlusion mask based on shape
-        ctx.globalCompositeOperation = 'destination-out';
+        // Use multiply blend mode to darken the background stars, creating the effect of dust blocking light
+        ctx.globalCompositeOperation = 'multiply';
         
         if (this.shape === 'circular') {
-            // Simple circular occlusion
+            // Create circular darkness gradient
             const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
-            gradient.addColorStop(0, `rgba(0,0,0,${this.occlusionStrength})`);
-            gradient.addColorStop(0.7, `rgba(0,0,0,${this.occlusionStrength * 0.8})`);
-            gradient.addColorStop(1, `rgba(0,0,0,0)`);
+            
+            // Dense core - very dark center fading to transparent edges
+            const coreDarkness = 1.0 - this.occlusionStrength; // 0.0 = black, 1.0 = no effect
+            gradient.addColorStop(0, `rgb(${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)})`);
+            gradient.addColorStop(0.6, `rgb(${Math.floor((coreDarkness + 0.3) * 255)}, ${Math.floor((coreDarkness + 0.3) * 255)}, ${Math.floor((coreDarkness + 0.3) * 255)})`);
+            gradient.addColorStop(1, 'rgb(255, 255, 255)'); // No darkening at edges
             
             ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
             ctx.fill();
         } else {
-            // Irregular shape occlusion
+            // Create irregular darkness shape
             ctx.beginPath();
             for (let i = 0; i < this.shapeVertices.length; i++) {
                 const vertex = this.shapeVertices[i];
@@ -554,11 +564,13 @@ export class DarkNebula extends CelestialObject {
             }
             ctx.closePath();
             
-            // Create irregular gradient for more realistic occlusion
+            // Create gradient that follows the irregular shape
             const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
-            gradient.addColorStop(0, `rgba(0,0,0,${this.occlusionStrength})`);
-            gradient.addColorStop(0.8, `rgba(0,0,0,${this.occlusionStrength * 0.6})`);
-            gradient.addColorStop(1, `rgba(0,0,0,0)`);
+            
+            const coreDarkness = 1.0 - this.occlusionStrength;
+            gradient.addColorStop(0, `rgb(${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)})`);
+            gradient.addColorStop(0.7, `rgb(${Math.floor((coreDarkness + 0.2) * 255)}, ${Math.floor((coreDarkness + 0.2) * 255)}, ${Math.floor((coreDarkness + 0.2) * 255)})`);
+            gradient.addColorStop(1, 'rgb(255, 255, 255)');
             
             ctx.fillStyle = gradient;
             ctx.fill();
@@ -567,88 +579,31 @@ export class DarkNebula extends CelestialObject {
         ctx.restore();
     }
 
-    private renderNebulaVisual(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+    private renderSubtleDustEffects(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
         ctx.save();
         
-        // Set blend mode for realistic dust appearance
+        // Very subtle dust wisps only for the wispy variant
         ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = 0.4;
+        ctx.globalAlpha = 0.12; // Much more subtle than the original 0.4
         
-        if (this.shape === 'circular') {
-            // Render circular nebula
-            this.drawCircularNebula(ctx, centerX, centerY);
-        } else {
-            // Render irregular nebula
-            this.drawIrregularNebula(ctx, centerX, centerY);
-        }
-        
-        // Add variant-specific effects
-        if (this.visualEffects.hasWispyEdges && this.variant === 'wispy') {
-            this.drawWispyEdges(ctx, centerX, centerY);
-        }
-        
-        ctx.restore();
-    }
-
-    private drawCircularNebula(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
-        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
-        gradient.addColorStop(0, this.color);
-        gradient.addColorStop(0.5, this.lightenColor(this.color, 0.2));
-        gradient.addColorStop(1, 'rgba(0,0,0,0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    private drawIrregularNebula(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
-        ctx.beginPath();
-        for (let i = 0; i < this.shapeVertices.length; i++) {
-            const vertex = this.shapeVertices[i];
-            const x = centerX + Math.cos(vertex.angle) * vertex.radius;
-            const y = centerY + Math.sin(vertex.angle) * vertex.radius;
-            
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-        ctx.closePath();
-        
-        // Create gradient that follows the irregular shape
-        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
-        gradient.addColorStop(0, this.color);
-        gradient.addColorStop(0.6, this.lightenColor(this.color, 0.15));
-        gradient.addColorStop(1, 'rgba(0,0,0,0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.fill();
-    }
-
-    private drawWispyEdges(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
-        ctx.save();
-        ctx.globalAlpha = 0.3;
-        
+        // Draw very faint wispy tendrils extending from the dark core
         const positionSeed = hashPosition(this.x, this.y);
         const rng = new SeededRandom(positionSeed + 5000);
         
-        // Draw wispy tendrils extending from the main nebula
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 6; i++) {
             const angle = rng.next() * Math.PI * 2;
-            const length = this.radius * (0.3 + rng.next() * 0.4);
-            const startX = centerX + Math.cos(angle) * this.radius * 0.8;
-            const startY = centerY + Math.sin(angle) * this.radius * 0.8;
+            const length = this.radius * (0.2 + rng.next() * 0.3);
+            const startX = centerX + Math.cos(angle) * this.radius * 0.7;
+            const startY = centerY + Math.sin(angle) * this.radius * 0.7;
             const endX = startX + Math.cos(angle) * length;
             const endY = startY + Math.sin(angle) * length;
             
             const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
-            gradient.addColorStop(0, this.lightenColor(this.color, 0.1));
+            gradient.addColorStop(0, '#4A3420'); // Very muted brown
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
             
             ctx.strokeStyle = gradient;
-            ctx.lineWidth = 8 + rng.next() * 4;
+            ctx.lineWidth = 3 + rng.next() * 2;
             ctx.lineCap = 'round';
             
             ctx.beginPath();
@@ -659,6 +614,7 @@ export class DarkNebula extends CelestialObject {
         
         ctx.restore();
     }
+
 
     private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
         // Use unified discovery visualization system

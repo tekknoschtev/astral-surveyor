@@ -2149,7 +2149,13 @@ export class ChunkManager {
                 if (debugObj.type === 'rogue-planet' && debugObj.object instanceof RoguePlanet) {
                     const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
                     if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
-                        chunk.roguePlanets.push(debugObj.object);
+                        // Check if this debug object is already in the chunk to avoid duplicates
+                        const alreadyExists = chunk.roguePlanets.some(existingPlanet => 
+                            existingPlanet.x === debugObj.object.x && existingPlanet.y === debugObj.object.y
+                        );
+                        if (!alreadyExists) {
+                            chunk.roguePlanets.push(debugObj.object);
+                        }
                         // Continue to check for natural rogue planets too
                     }
                 }

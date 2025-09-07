@@ -8,6 +8,7 @@ import type { Input } from '../input/input.js';
 import { NamingService } from '../naming/naming.js';
 import type { SeedInspectorService, CelestialObjectData } from '../debug/SeedInspectorService.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
+import { GameConstants } from '../config/GameConstants.js';
 
 // Interface definitions
 interface StarLike {
@@ -4082,7 +4083,7 @@ export class StellarMap {
         }
 
         // Convert world coordinates to chunk coordinates
-        const chunkSize = 1000; // Each chunk is 1000x1000 world units
+        const chunkSize = GameConstants.DEFAULT_CHUNK_SIZE;
         const centerChunkX = Math.floor(centerWorldX / chunkSize);
         const centerChunkY = Math.floor(centerWorldY / chunkSize);
 
@@ -4256,6 +4257,7 @@ export class StellarMap {
         try {
             // Get all revealed objects for current seed
             const revealedObjects = this.getRevealedObjects(this.inspectorSeed);
+            console.log(`🎯 DEBUG: updateViewStatistics - Found ${revealedObjects.length} revealed objects total`);
             
             if (revealedObjects.length === 0) {
                 this.currentViewStatistics = null;
@@ -4277,13 +4279,20 @@ export class StellarMap {
             };
 
             // Count objects from revealed chunks
+            const debugObjectCounts: Record<string, number> = {};
             for (const obj of revealedObjects) {
+                // Track for debugging
+                debugObjectCounts[obj.type] = (debugObjectCounts[obj.type] || 0) + 1;
+                
                 if (objectCounts.hasOwnProperty(obj.type)) {
                     objectCounts[obj.type]++;
                 } else {
                     objectCounts[obj.type] = 1;
                 }
             }
+            
+            console.log(`📊 DEBUG: Raw object counts from revealed chunks:`, debugObjectCounts);
+            console.log(`📊 DEBUG: Final object counts:`, objectCounts);
 
             // Calculate total meaningful objects (exclude background stars for density)
             const totalObjects = objectCounts.celestialStar + objectCounts.planet + 

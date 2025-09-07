@@ -115,6 +115,7 @@ export abstract class CelestialObject {
     type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
     discovered: boolean = false;
     discoveryDistance: number = 50;
+    discoveryValue: number = 10; // Default discovery value
 
     constructor(x: number, y: number, type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula') {
         this.x = x;

@@ -149,6 +149,7 @@ export class SeedInspectorService {
                 binarySystems: 0
             };
 
+
             // Analyze each chunk in the region
             for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
                 for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
@@ -174,6 +175,7 @@ export class SeedInspectorService {
                     totals.binarySystems += analysis.binarySystems;
                 }
             }
+
 
             const totalChunks = chunks.length;
             const analysisTime = performance.now() - startTime;
@@ -218,6 +220,7 @@ export class SeedInspectorService {
      * @param chunkY - Chunk Y coordinate
      */
     private async analyzeChunk(chunkX: number, chunkY: number): Promise<ChunkAnalysis> {
+        
         // Generate the chunk using existing ChunkManager logic
         // Use the private _generateChunk method to bypass cache for fresh analysis
         const chunk = (this.chunkManager as any)._generateChunk(chunkX, chunkY);
@@ -300,11 +303,22 @@ export class SeedInspectorService {
             const centerChunkX = Math.floor(centerX / chunkSize);
             const centerChunkY = Math.floor(centerY / chunkSize);
 
+            // Track processed chunks to prevent duplicates
+            const processedChunks = new Set<string>();
+
             // Collect objects from each chunk
             for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
                 for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
                     const chunkX = centerChunkX + dx;
                     const chunkY = centerChunkY + dy;
+                    const chunkKey = `${chunkX},${chunkY}`;
+                    
+                    // Skip if this chunk was already processed
+                    if (processedChunks.has(chunkKey)) {
+                        continue;
+                    }
+                    processedChunks.add(chunkKey);
+                    
                     const chunk = (this.chunkManager as any)._generateChunk(chunkX, chunkY);
                     
                     // Get cosmic region information for this chunk
