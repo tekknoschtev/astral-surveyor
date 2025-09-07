@@ -43,7 +43,7 @@ interface GameStartingPosition {
 
 // Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
     x: number;
     y: number;
     id?: string;
@@ -83,6 +83,7 @@ interface ActiveObjects {
     comets: CelestialObject[];
     // Region-specific objects (Phase 0: rogue-planet only)
     roguePlanets: CelestialObject[];
+    darkNebulae: CelestialObject[];
 }
 
 
@@ -119,6 +120,10 @@ export class Game {
     
     // Region discovery tracking
     private currentRegionType: string | null = null;
+    
+    // Dark nebula ambient audio tracking
+    private baseAmbientVolume: number = 0.8; // Store the original ambient volume
+    private currentAmbientReduction: number = 0; // Current reduction amount (0 = no reduction)
     
     // Expose properties for backward compatibility with tests
     get lastBlackHoleWarnings() {
@@ -318,7 +323,9 @@ export class Game {
                         ...activeObjects.asteroidGardens,
                         ...activeObjects.wormholes,
                         ...activeObjects.blackholes,
-                        ...activeObjects.comets
+                        ...activeObjects.comets,
+                        ...activeObjects.roguePlanets,
+                        ...activeObjects.darkNebulae
                     ].filter(obj => obj.hasOwnProperty('discovered'));
                     this.chunkManager.restoreDiscoveryState(flattenedObjects);
                     
@@ -507,7 +514,7 @@ export class Game {
                     if (!overlayClicked) {
                         // Handle stellar map interactions (simplified) - only if not panning
                         const discovered = this.getDiscoveredObjects();
-                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, this.input);
+                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, this.input);
                     }
                 }
             }
@@ -525,7 +532,7 @@ export class Game {
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets);
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae);
             
             // Also update statistics overlay hover state
             this.stellarMap.updateStatisticsOverlayHover(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas);
@@ -552,7 +559,7 @@ export class Game {
         // Get active celestial objects for physics and discovery (cache for render phase)
         this.cachedActiveObjects = this.chunkManager.getAllActiveObjects();
         const activeObjects = this.cachedActiveObjects;
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets, ...activeObjects.roguePlanets];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets, ...activeObjects.roguePlanets, ...activeObjects.darkNebulae];
         
         // Update orbital positions and animations for all celestial objects
         this.updateCelestialObjects(activeObjects, deltaTime);
@@ -633,6 +640,67 @@ export class Game {
                 wormhole.update(deltaTime);
             }
         }
+        
+        // Update Dark Nebula ambient sound reduction based on proximity
+        this.updateDarkNebulaAmbientEffects(activeObjects.darkNebulae);
+    }
+
+    /**
+     * Update Dark Nebula ambient sound effects based on ship proximity
+     * Creates "dead zone" audio effect by reducing ambient volume near Dark Nebulae
+     */
+    private updateDarkNebulaAmbientEffects(darkNebulae: any[]): void {
+        if (!darkNebulae || darkNebulae.length === 0) {
+            // No dark nebulae nearby, restore full ambient volume if it was reduced
+            if (this.currentAmbientReduction > 0) {
+                this.currentAmbientReduction = Math.max(0, this.currentAmbientReduction - 0.02); // Gradual restoration
+                const newVolume = this.baseAmbientVolume * (1 - this.currentAmbientReduction);
+                this.soundManager.setAmbientVolume(newVolume);
+            }
+            return;
+        }
+
+        // Find the closest Dark Nebula and calculate sound reduction
+        let closestDistance = Infinity;
+        let maxReduction = 0;
+
+        for (const darkNebula of darkNebulae) {
+            const distance = Math.sqrt(
+                Math.pow(this.camera.x - darkNebula.x, 2) + 
+                Math.pow(this.camera.y - darkNebula.y, 2)
+            );
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                
+                // Calculate reduction based on proximity and nebula properties
+                const effectRadius = darkNebula.radius * 1.5; // Effective audio range is larger than visual
+                const occlusionStrength = darkNebula.occlusionStrength || 0.6; // Default if not set
+                
+                if (distance <= effectRadius) {
+                    // Calculate reduction: stronger at center, fading to edges
+                    const proximityFactor = 1 - (distance / effectRadius);
+                    maxReduction = Math.max(maxReduction, proximityFactor * occlusionStrength * 0.8); // Max 80% reduction
+                }
+            }
+        }
+
+        // Smoothly transition ambient volume based on the strongest effect
+        const targetReduction = maxReduction;
+        const transitionSpeed = 0.02; // Gradual transition for smooth audio
+
+        if (targetReduction > this.currentAmbientReduction) {
+            // Entering nebula - gradual sound reduction
+            this.currentAmbientReduction = Math.min(targetReduction, this.currentAmbientReduction + transitionSpeed);
+        } else if (targetReduction < this.currentAmbientReduction) {
+            // Leaving nebula - gradual sound restoration
+            this.currentAmbientReduction = Math.max(targetReduction, this.currentAmbientReduction - transitionSpeed);
+        }
+
+        // Apply the ambient volume reduction
+        const newVolume = this.baseAmbientVolume * (1 - this.currentAmbientReduction);
+        this.soundManager.setAmbientVolume(newVolume);
+        
     }
 
     /**
@@ -698,6 +766,7 @@ export class Game {
             blackHoles: this.chunkManager.getDiscoveredBlackHoles(),
             comets: this.chunkManager.getDiscoveredComets(),
             roguePlanets: this.chunkManager.getDiscoveredRoguePlanets(),
+            darkNebulae: this.chunkManager.getDiscoveredDarkNebulae(),
             regions: this.chunkManager.getDiscoveredRegions()
         };
     }
@@ -954,6 +1023,13 @@ export class Game {
             // }
         }
         
+        // Render dark nebulae (star-occluding layer - must render after starfield but before other objects) - culling disabled
+        for (const obj of activeObjects.darkNebulae) {
+            // if (this.isObjectInScreen(obj, screenBounds)) {
+                obj.render(this.renderer, this.camera);
+            // }
+        }
+        
         // Then render asteroid gardens (mid-background layer) - culling disabled
         for (const obj of activeObjects.asteroidGardens) {
             // if (this.isObjectInScreen(obj, screenBounds)) {
@@ -1033,7 +1109,7 @@ export class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discovered = this.getDiscoveredObjects();
-        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets);
+        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
@@ -1476,7 +1552,9 @@ export class Game {
                     ...activeObjects.asteroidGardens,
                     ...activeObjects.wormholes,
                     ...activeObjects.blackholes,
-                    ...activeObjects.comets
+                    ...activeObjects.comets,
+                    ...activeObjects.roguePlanets,
+                    ...activeObjects.darkNebulae
                 ].filter(obj => obj.hasOwnProperty('discovered'));
                 this.chunkManager.restoreDiscoveryState(flattenedObjects);
                 

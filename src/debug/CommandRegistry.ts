@@ -206,7 +206,7 @@ export class CommandRegistry {
             description: 'Show available types for spawning objects',
             parameters: [
                 { name: 'object_type', type: 'enum', optional: false, 
-                  values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'wormhole'],
+                  values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'wormhole'],
                   description: 'Object type to list variants for' }
             ],
             execute: (params: string[], context: CommandContext) => {
@@ -247,7 +247,7 @@ export class CommandRegistry {
             description: 'Spawn celestial objects for testing',
             parameters: [
                 { name: 'object_type', type: 'enum', optional: false,
-                  values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'wormhole'],
+                  values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'wormhole'],
                   description: 'Type of object to spawn' },
                 { name: 'variant', type: 'string', optional: true,
                   description: 'Specific variant (use "list <type>" to see options)' },
@@ -261,7 +261,7 @@ export class CommandRegistry {
                 const words = partial.split(' ');
                 if (words.length === 1) {
                     // Complete object type
-                    const types = ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'wormhole'];
+                    const types = ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'wormhole'];
                     return types.filter(type => type.startsWith(words[0]));
                 } else if (words.length === 2) {
                     // Complete variant based on object type
@@ -410,6 +410,7 @@ export class CommandRegistry {
             blackhole: ['stellar', 'intermediate', 'supermassive'],
             comet: ['ice', 'dust', 'rocky', 'organic'],
             'rogue-planet': ['ice', 'rock', 'volcanic'],
+            'dark-nebula': ['dense-core', 'wispy', 'globular'],
             wormhole: ['(no variants - generates linked pair)']
         };
         
@@ -527,6 +528,11 @@ export class CommandRegistry {
                     console.log(`🪐 Spawned ${variant || 'random'} rogue planet for testing`);
                     break;
                     
+                case 'dark-nebula':
+                    DebugSpawner.spawnDarkNebula(context.camera, context.chunkManager, variant, true);
+                    console.log(`🌫️ Spawned ${variant || 'random'} dark nebula for testing`);
+                    break;
+                    
                 default:
                     console.log(`❌ Unknown object type: ${objectType}`);
                     break;
@@ -545,6 +551,7 @@ export class CommandRegistry {
             blackhole: ['stellar-mass', 'supermassive'],
             comet: ['ice', 'dust', 'rocky', 'organic'],
             'rogue-planet': ['ice', 'rock', 'volcanic'],
+            'dark-nebula': ['dense-core', 'wispy', 'globular'],
             wormhole: []
         };
         

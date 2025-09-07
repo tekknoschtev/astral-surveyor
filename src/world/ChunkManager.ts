@@ -9,7 +9,7 @@ import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids
 import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import { Comet, selectCometType } from '../celestial/comets.js';
-import { RoguePlanet } from '../celestial/RegionSpecificObjects.js';
+import { RoguePlanet, DarkNebula } from '../celestial/RegionSpecificObjects.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { ErrorService } from '../services/ErrorService.js';
 import { RegionGenerator, type RegionInfo } from './RegionGenerator.js';
@@ -43,6 +43,7 @@ interface Chunk {
     comets: Comet[];
     // Region-specific objects (Phase 0: rogue-planet only)
     roguePlanets: RoguePlanet[];
+    darkNebulae: DarkNebula[];
 }
 
 interface ActiveObjects {
@@ -57,6 +58,7 @@ interface ActiveObjects {
     comets: Comet[];
     // Region-specific objects (Phase 0: rogue-planet only)
     roguePlanets: RoguePlanet[];
+    darkNebulae: DarkNebula[];
 }
 
 interface NebulaTypeData {
@@ -207,6 +209,16 @@ interface DiscoveredRoguePlanet {
     radius: number;
 }
 
+interface DiscoveredDarkNebula {
+    x: number;
+    y: number;
+    variant: 'dense-core' | 'wispy' | 'globular';
+    objectName?: string;
+    timestamp: number;
+    type: 'dark-nebula';
+    radius: number;
+}
+
 interface CompanionWeight {
     type: typeof StarTypes[keyof typeof StarTypes];
     weight: number;
@@ -324,7 +336,8 @@ export class ChunkManager {
             blackholes: [], // Ultra-rare cosmic phenomena with universe reset
             comets: [], // Elliptical orbital objects around stars
             // Region-specific objects (Phase 0: rogue-planet only)
-            roguePlanets: []
+            roguePlanets: [],
+            darkNebulae: []
         };
 
         // Generate stars for this chunk
@@ -542,6 +555,7 @@ export class ChunkManager {
 
         // Generate region-specific objects for this chunk
         this.generateRoguePlanetsForChunk(chunkX, chunkY, chunk);
+        this.generateDarkNebulaeForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -562,6 +576,7 @@ export class ChunkManager {
             comets: [],
             // Region-specific objects (Phase 0 placeholders)
             roguePlanets: [],
+            darkNebulae: [],
         };
         
         const chunkKey = this.getChunkKey(chunkX, chunkY);
@@ -785,6 +800,7 @@ export class ChunkManager {
             comets: [],
             // Region-specific objects (Phase 0 placeholders)
             roguePlanets: [],
+            darkNebulae: [],
         };
         
         for (const chunk of this.activeChunks.values()) {
@@ -799,6 +815,7 @@ export class ChunkManager {
             objects.comets.push(...chunk.comets);
             // Region-specific objects (Phase 0: rogue-planet only)
             objects.roguePlanets.push(...chunk.roguePlanets);
+            objects.darkNebulae.push(...chunk.darkNebulae);
         }
 
         return objects;
@@ -2132,7 +2149,13 @@ export class ChunkManager {
                 if (debugObj.type === 'rogue-planet' && debugObj.object instanceof RoguePlanet) {
                     const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
                     if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
-                        chunk.roguePlanets.push(debugObj.object);
+                        // Check if this debug object is already in the chunk to avoid duplicates
+                        const alreadyExists = chunk.roguePlanets.some(existingPlanet => 
+                            existingPlanet.x === debugObj.object.x && existingPlanet.y === debugObj.object.y
+                        );
+                        if (!alreadyExists) {
+                            chunk.roguePlanets.push(debugObj.object);
+                        }
                         // Continue to check for natural rogue planets too
                     }
                 }
@@ -2179,6 +2202,63 @@ export class ChunkManager {
 
         // Add to chunk
         chunk.roguePlanets.push(roguePlanet);
+    }
+
+    // Generate dark nebulae for a chunk - dust clouds that obscure background stars
+    generateDarkNebulaeForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // First, check for debug dark nebulae in this chunk
+        if (this.debugObjects) {
+            for (const debugObj of this.debugObjects) {
+                if (debugObj.type === 'dark-nebula' && debugObj.object instanceof DarkNebula) {
+                    const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
+                    if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
+                        chunk.darkNebulae.push(debugObj.object);
+                        // Continue to check for natural dark nebulae too
+                    }
+                }
+            }
+        }
+
+        // Use separate seed for dark nebula generation
+        const darkNebulaSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x13FE45BD;
+        const darkNebulaRng = new SeededRandom(darkNebulaSeed);
+
+        // Dark nebulae are region-exclusive: only spawn in The Void (0.8% rate)
+        // Check if we're in a region that supports dark nebulae
+        const regionInfo = this.getChunkRegion(chunkX, chunkY);
+        let spawnChance = 0.0; // Default: no dark nebulae in most regions
+        
+        if (regionInfo && regionInfo.regionType === 'void') {
+            // The Void region - dark dust clouds creating "dead zones" in space
+            spawnChance = 0.008; // 0.8% chance per chunk (as per design document)
+        }
+        
+        if (spawnChance === 0.0 || darkNebulaRng.next() > spawnChance) {
+            return; // No dark nebula in this chunk
+        }
+
+        // Determine variant based on probabilities
+        const variantRoll = darkNebulaRng.next();
+        let variant: 'dense-core' | 'wispy' | 'globular';
+        
+        if (variantRoll < 0.4) {
+            variant = 'dense-core'; // 40% - complete star occlusion
+        } else if (variantRoll < 0.9) {
+            variant = 'wispy'; // 50% - partial occlusion with irregular edges
+        } else {
+            variant = 'globular'; // 10% - nearly perfect circular shape
+        }
+
+        // Position dark nebula randomly in chunk with some margin
+        const margin = 100; // Larger margin due to nebula size
+        const x = chunkX * this.chunkSize + darkNebulaRng.nextFloat(margin, this.chunkSize - margin);
+        const y = chunkY * this.chunkSize + darkNebulaRng.nextFloat(margin, this.chunkSize - margin);
+
+        // Create the dark nebula
+        const darkNebula = new DarkNebula(x, y, variant);
+
+        // Add to chunk
+        chunk.darkNebulae.push(darkNebula);
     }
 
     // Clear all chunks but preserve discovered objects (for game loading)
@@ -2325,6 +2405,54 @@ export class ChunkManager {
         return discoveredRoguePlanets;
     }
 
+    getDiscoveredDarkNebulae(): DiscoveredDarkNebula[] {
+        const discoveredDarkNebulae: DiscoveredDarkNebula[] = [];
+        
+        // Get all discovered objects that are dark nebulae
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('dark-nebula_')) {
+                // Extract coordinates from dark nebula ID
+                // Format: dark-nebula_x_y (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const darkNebulaX = parseInt(parts[1]);
+                    const darkNebulaY = parseInt(parts[2]);
+                    
+                    // Try to find dark nebula in active chunks first
+                    const darkNebula = this.findDarkNebulaByCoordinates(darkNebulaX, darkNebulaY);
+                    
+                    if (darkNebula) {
+                        // Use active dark nebula data
+                        const darkNebulaData: DiscoveredDarkNebula = {
+                            x: darkNebula.x,
+                            y: darkNebula.y,
+                            variant: darkNebula.variant,
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp,
+                            type: 'dark-nebula',
+                            radius: darkNebula.radius
+                        };
+                        discoveredDarkNebulae.push(darkNebulaData);
+                    } else {
+                        // Use stored discovery data as fallback
+                        const fallbackData: DiscoveredDarkNebula = {
+                            x: darkNebulaX,
+                            y: darkNebulaY,
+                            variant: 'wispy', // Default variant
+                            objectName: discoveryData.objectName,
+                            timestamp: discoveryData.timestamp,
+                            type: 'dark-nebula',
+                            radius: 200 // Default radius
+                        };
+                        discoveredDarkNebulae.push(fallbackData);
+                    }
+                }
+            }
+        }
+        
+        return discoveredDarkNebulae;
+    }
+
     private findRoguePlanetByCoordinates(x: number, y: number): any {
         // Search through all active chunks for a rogue planet with matching coordinates
         for (const [chunkKey, chunk] of this.activeChunks) {
@@ -2336,6 +2464,19 @@ export class ChunkManager {
         }
         return null;
     }
+
+    private findDarkNebulaByCoordinates(x: number, y: number): any {
+        // Search through all active chunks for a dark nebula with matching coordinates
+        for (const [chunkKey, chunk] of this.activeChunks) {
+            for (const darkNebula of chunk.darkNebulae) {
+                if (Math.floor(darkNebula.x) === x && Math.floor(darkNebula.y) === y) {
+                    return darkNebula;
+                }
+            }
+        }
+        return null;
+    }
+
     markRegionDiscovered(regionType: string, regionName: string, discoveryX: number, discoveryY: number, influence: number): void {
         // Only mark a region as discovered once (first discovery)
         if (!this.discoveredRegions.has(regionType)) {

@@ -408,3 +408,261 @@ export class RoguePlanet extends CelestialObject {
     }
 }
 
+// Phase 2: DarkNebula class with star occlusion rendering system
+// Supports three variants: dense-core, wispy, and globular with unique visual effects
+
+interface DarkNebulaVisualEffects {
+    occludesStars?: boolean;
+    hasWispyEdges?: boolean;
+    hasStaticEffect?: boolean;
+    hasIrregularShape?: boolean;
+    hasBrownTones?: boolean;
+}
+
+export class DarkNebula extends CelestialObject {
+    variant: 'dense-core' | 'wispy' | 'globular';
+    radius: number;
+    color: string;
+    occlusionStrength: number; // 0.0 to 1.0, affects star dimming
+    shape: 'circular' | 'irregular';
+    visualEffects: DarkNebulaVisualEffects;
+    discoveryTimestamp?: number;
+    
+    // Pre-calculated irregular shape vertices (deterministic based on position)
+    shapeVertices: Array<{angle: number, radius: number}> = [];
+
+    constructor(x: number, y: number, variant: 'dense-core' | 'wispy' | 'globular' = 'wispy') {
+        super(x, y, 'dark-nebula');
+        this.variant = variant;
+        this.initializeProperties();
+        this.initializeVisualFeatures();
+    }
+
+    private initializeProperties(): void {
+        // Set properties based on variant
+        switch (this.variant) {
+            case 'dense-core':
+                this.radius = 180; // Large, irregular areas
+                this.color = '#2F1B14'; // Dark brown
+                this.occlusionStrength = 1.0; // Complete star occlusion
+                this.shape = 'irregular';
+                this.visualEffects = {
+                    occludesStars: true,
+                    hasIrregularShape: true,
+                    hasBrownTones: true
+                };
+                this.discoveryDistance = 80;
+                this.discoveryValue = 35; // As per Phase 2 design document
+                break;
+            case 'wispy':
+                this.radius = 220; // Larger but more diffuse
+                this.color = '#3D2B1F'; // Lighter brown
+                this.occlusionStrength = 0.6; // Partial star dimming
+                this.shape = 'irregular';
+                this.visualEffects = {
+                    occludesStars: true,
+                    hasWispyEdges: true,
+                    hasIrregularShape: true,
+                    hasBrownTones: true
+                };
+                this.discoveryDistance = 80;
+                this.discoveryValue = 35; // As per Phase 2 design document
+                break;
+            case 'globular':
+                this.radius = 160; // Medium, nearly perfect circle
+                this.color = '#4A3420'; // Medium brown
+                this.occlusionStrength = 0.8; // Strong star dimming
+                this.shape = 'circular';
+                this.visualEffects = {
+                    occludesStars: true,
+                    hasBrownTones: true
+                };
+                this.discoveryDistance = 80;
+                this.discoveryValue = 35; // As per Phase 2 design document
+                break;
+        }
+    }
+
+    private initializeVisualFeatures(): void {
+        // Generate deterministic irregular shape vertices if needed
+        if (this.shape === 'irregular') {
+            const positionSeed = hashPosition(this.x, this.y);
+            const rng = new SeededRandom(positionSeed + 4000);
+            
+            const vertexCount = 16 + Math.floor(rng.next() * 8); // 16-24 vertices
+            for (let i = 0; i < vertexCount; i++) {
+                const angle = (i / vertexCount) * Math.PI * 2;
+                const radiusVariation = 0.6 + rng.next() * 0.8; // 60%-140% of base radius
+                this.shapeVertices.push({
+                    angle: angle,
+                    radius: this.radius * radiusVariation
+                });
+            }
+        }
+    }
+
+    render(renderer: Renderer, camera: Camera): void {
+        const ctx = renderer.ctx;
+        const [screenX, screenY] = camera.worldToScreen(this.x, this.y, ctx.canvas.width, ctx.canvas.height);
+        
+        // Check if dark nebula is visible on screen (with larger margins due to size)
+        const margin = this.radius + 100;
+        if (screenX < -margin || screenX > ctx.canvas.width + margin || 
+            screenY < -margin || screenY > ctx.canvas.height + margin) {
+            return;
+        }
+
+        // Render star occlusion effect (dark void appearance)
+        this.renderStarOcclusion(ctx, screenX, screenY);
+        
+        // Render subtle dust effects for wispy variants (much more subtle than before)
+        if (this.variant === 'wispy') {
+            this.renderSubtleDustEffects(ctx, screenX, screenY);
+        }
+        
+        // Apply discovery indicator if applicable
+        if (this.discovered) {
+            this.renderDiscoveryIndicator(renderer, screenX, screenY);
+        }
+    }
+
+    private renderStarOcclusion(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+        if (!this.visualEffects.occludesStars) return;
+        
+        ctx.save();
+        
+        // Use multiply blend mode to darken the background stars, creating the effect of dust blocking light
+        ctx.globalCompositeOperation = 'multiply';
+        
+        if (this.shape === 'circular') {
+            // Create circular darkness gradient
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
+            
+            // Dense core - very dark center fading to transparent edges
+            const coreDarkness = 1.0 - this.occlusionStrength; // 0.0 = black, 1.0 = no effect
+            gradient.addColorStop(0, `rgb(${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)})`);
+            gradient.addColorStop(0.6, `rgb(${Math.floor((coreDarkness + 0.3) * 255)}, ${Math.floor((coreDarkness + 0.3) * 255)}, ${Math.floor((coreDarkness + 0.3) * 255)})`);
+            gradient.addColorStop(1, 'rgb(255, 255, 255)'); // No darkening at edges
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Create irregular darkness shape
+            ctx.beginPath();
+            for (let i = 0; i < this.shapeVertices.length; i++) {
+                const vertex = this.shapeVertices[i];
+                const x = centerX + Math.cos(vertex.angle) * vertex.radius;
+                const y = centerY + Math.sin(vertex.angle) * vertex.radius;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.closePath();
+            
+            // Create gradient that follows the irregular shape
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, this.radius);
+            
+            const coreDarkness = 1.0 - this.occlusionStrength;
+            gradient.addColorStop(0, `rgb(${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)}, ${Math.floor(coreDarkness * 255)})`);
+            gradient.addColorStop(0.7, `rgb(${Math.floor((coreDarkness + 0.2) * 255)}, ${Math.floor((coreDarkness + 0.2) * 255)}, ${Math.floor((coreDarkness + 0.2) * 255)})`);
+            gradient.addColorStop(1, 'rgb(255, 255, 255)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+
+    private renderSubtleDustEffects(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
+        ctx.save();
+        
+        // Very subtle dust wisps only for the wispy variant
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.12; // Much more subtle than the original 0.4
+        
+        // Draw very faint wispy tendrils extending from the dark core
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 5000);
+        
+        for (let i = 0; i < 6; i++) {
+            const angle = rng.next() * Math.PI * 2;
+            const length = this.radius * (0.2 + rng.next() * 0.3);
+            const startX = centerX + Math.cos(angle) * this.radius * 0.7;
+            const startY = centerY + Math.sin(angle) * this.radius * 0.7;
+            const endX = startX + Math.cos(angle) * length;
+            const endY = startY + Math.sin(angle) * length;
+            
+            const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+            gradient.addColorStop(0, '#4A3420'); // Very muted brown
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 3 + rng.next() * 2;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `dark-nebula-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 8,
+            rarity: visualizationService.getObjectRarity('dark-nebula'),
+            objectType: 'dark-nebula',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 8,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+    }
+
+    // Utility method to lighten a color for gradients
+    private lightenColor(color: string, factor: number): string {
+        // Simple color lightening - converts hex to rgb and increases brightness
+        const hex = color.replace('#', '');
+        const r = Math.min(255, Math.floor(parseInt(hex.substr(0, 2), 16) * (1 + factor)));
+        const g = Math.min(255, Math.floor(parseInt(hex.substr(2, 2), 16) * (1 + factor)));
+        const b = Math.min(255, Math.floor(parseInt(hex.substr(4, 2), 16) * (1 + factor)));
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+}
+
