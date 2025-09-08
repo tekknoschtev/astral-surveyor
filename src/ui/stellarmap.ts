@@ -129,6 +129,7 @@ class StellarMapHoverSystem {
         'planet': { threshold: 15, renderSize: 3, priority: 1 },
         'rogue-planet': { threshold: 15, renderSize: 3, priority: 2 },
         'dark-nebula': { threshold: 18, renderSize: 4, priority: 3 },
+        'protostar': { threshold: 20, renderSize: 5, priority: 3.5 },
         'crystal-garden': { threshold: 16, renderSize: 4, priority: 4 },
         'nebula': { threshold: 20, renderSize: 5, priority: 5 },
         'wormhole': { threshold: 12, renderSize: 3, priority: 6 },
@@ -200,15 +201,14 @@ class StellarMapHoverSystem {
         const objMapX = mapX + mapWidth/2 + (this.hoveredObject.x - centerX) * worldToMapScale;
         const objMapY = mapY + mapHeight/2 + (this.hoveredObject.y - centerY) * worldToMapScale;
 
-        // Render hover effect
+        // Render hover effect (consistent with existing object hover styles)
         ctx.save();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#d4a57480'; // Semi-transparent amber like other objects (currentPositionColor + '80')
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(objMapX, objMapY, config.renderSize * 2, 0, Math.PI * 2);
+        const hoverRadius = Math.max(5, config.renderSize + 1);
+        ctx.arc(objMapX, objMapY, hoverRadius, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.setLineDash([]);
         ctx.restore();
     }
 }
@@ -247,6 +247,8 @@ export class StellarMap {
     selectedDarkNebula: any | null;
     hoveredDarkNebula: any | null;
     selectedCrystalGarden: any | null;
+    selectedProtostar: any | null;
+    hoveredProtostar: any | null;
     hoveredCrystalGarden: any | null;
     namingService: NamingService | null;
     
@@ -320,6 +322,8 @@ export class StellarMap {
         this.selectedDarkNebula = null;
         this.hoveredDarkNebula = null;
         this.selectedCrystalGarden = null;
+        this.selectedProtostar = null;
+        this.hoveredProtostar = null;
         this.hoveredCrystalGarden = null;
         this.namingService = null; // Will be injected
         
@@ -514,7 +518,7 @@ export class StellarMap {
         this.panStartY = 0;
     }
     
-    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, input?: Input): boolean {
+    handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null, input?: Input): boolean {
         if (!discoveredStars) return false;
         
         // Calculate map bounds
@@ -765,9 +769,32 @@ export class StellarMap {
                 }
             }
         }
+
+        // Check for protostar clicks
+        let closestProtostar: any | null = null;
+        let closestProtostarDistance = Infinity;
+
+        if (discoveredProtostars) {
+            for (const protostar of discoveredProtostars) {
+                const protostarMapX = mapX + mapWidth/2 + (protostar.x - this.centerX) * worldToMapScale;
+                const protostarMapY = mapY + mapHeight/2 + (protostar.y - this.centerY) * worldToMapScale;
+                
+                // Protostars are medium-large objects with jets
+                const protostarClickThreshold = Math.max(15, clickThreshold * 1.2);
+                if (protostarMapX >= mapX && protostarMapX <= mapX + mapWidth && 
+                    protostarMapY >= mapY && protostarMapY <= mapY + mapHeight) {
+                    
+                    const distance = Math.sqrt((mouseX - protostarMapX)**2 + (mouseY - protostarMapY)**2);
+                    if (distance <= protostarClickThreshold && distance < closestProtostarDistance) {
+                        closestProtostar = protostar;
+                        closestProtostarDistance = distance;
+                    }
+                }
+            }
+        }
         
-        // Select the closest object (prioritize order: planets > rogue planets > dark nebulae > crystal gardens > wormholes > nebulae > comets > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestRoguePlanetDistance, closestDarkNebulaDistance, closestCrystalGardenDistance)) {
+        // Select the closest object (prioritize order: planets > rogue planets > dark nebulae > protostars > crystal gardens > wormholes > nebulae > comets > black holes > asteroid gardens > stars)
+        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestRoguePlanetDistance, closestDarkNebulaDistance, closestProtostarDistance, closestCrystalGardenDistance)) {
             this.selectedPlanet = closestPlanet;
             this.selectedStar = null;
             this.selectedNebula = null;
@@ -777,8 +804,10 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
-        } else if (closestRoguePlanet && closestRoguePlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestDarkNebulaDistance, closestCrystalGardenDistance)) {
+        } else if (closestRoguePlanet && closestRoguePlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestDarkNebulaDistance, closestProtostarDistance, closestCrystalGardenDistance)) {
             this.selectedRoguePlanet = closestRoguePlanet;
             this.selectedStar = null;
             this.selectedPlanet = null;
@@ -788,8 +817,10 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
-        } else if (closestDarkNebula && closestDarkNebulaDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestCrystalGardenDistance)) {
+        } else if (closestDarkNebula && closestDarkNebulaDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestProtostarDistance, closestCrystalGardenDistance)) {
             this.selectedDarkNebula = closestDarkNebula;
             this.selectedStar = null;
             this.selectedPlanet = null;
@@ -799,6 +830,19 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
+            this.selectedProtostar = null;
+            this.selectedCrystalGarden = null;
+        } else if (closestProtostar && closestProtostarDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestCrystalGardenDistance)) {
+            this.selectedProtostar = closestProtostar;
+            this.selectedStar = null;
+            this.selectedPlanet = null;
+            this.selectedNebula = null;
+            this.selectedWormhole = null;
+            this.selectedBlackHole = null;
+            this.selectedAsteroidGarden = null;
+            this.selectedComet = null;
+            this.selectedRoguePlanet = null;
+            this.selectedDarkNebula = null;
             this.selectedCrystalGarden = null;
         } else if (closestCrystalGarden && closestCrystalGardenDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedCrystalGarden = closestCrystalGarden;
@@ -811,6 +855,7 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
         } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedWormhole = closestWormhole;
             this.selectedStar = null;
@@ -821,6 +866,7 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
         } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
             this.selectedNebula = closestNebula;
@@ -832,6 +878,7 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
         } else if (closestComet && closestCometDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
             this.selectedComet = closestComet;
@@ -843,6 +890,7 @@ export class StellarMap {
             this.selectedAsteroidGarden = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
         } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
             this.selectedBlackHole = closestBlackHole;
@@ -854,6 +902,7 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
         } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
             this.selectedAsteroidGarden = closestAsteroidGarden;
@@ -865,6 +914,7 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
         } else if (closestStar) {
             this.selectedStar = closestStar;
@@ -876,6 +926,7 @@ export class StellarMap {
             this.selectedComet = null;
             this.selectedRoguePlanet = null;
             this.selectedDarkNebula = null;
+            this.selectedProtostar = null;
             this.selectedCrystalGarden = null;
         } else {
             this.selectedStar = null;
@@ -912,7 +963,7 @@ export class StellarMap {
         this.updateCursor(canvas);
     }
     
-    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null): void {
+    detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -938,7 +989,8 @@ export class StellarMap {
             'comet': (discoveredComets || []).map(obj => ({...obj, type: 'comet'})),
             'rogue-planet': (discoveredRoguePlanets || []).map(obj => ({...obj, type: 'rogue-planet'})),
             'dark-nebula': (discoveredDarkNebulae || []).map(obj => ({...obj, type: 'dark-nebula'})),
-            'crystal-garden': (discoveredCrystalGardens || []).map(obj => ({...obj, type: 'crystal-garden'}))
+            'crystal-garden': (discoveredCrystalGardens || []).map(obj => ({...obj, type: 'crystal-garden'})),
+            'protostar': (discoveredProtostars || []).map(obj => ({...obj, type: 'protostar'}))
         };
 
         // Use centralized hover detection
@@ -953,7 +1005,7 @@ export class StellarMap {
     }
 
     // NEW: Centralized hover detection using the new hover system
-    private detectHoverTargetNew(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null): void {
+    private detectHoverTargetNew(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
         if (!this.visible) return;
         
         // Calculate map bounds and scaling
@@ -979,7 +1031,8 @@ export class StellarMap {
             'comet': (discoveredComets || []).map(obj => ({...obj, type: 'comet'})),
             'rogue-planet': (discoveredRoguePlanets || []).map(obj => ({...obj, type: 'rogue-planet'})),
             'dark-nebula': (discoveredDarkNebulae || []).map(obj => ({...obj, type: 'dark-nebula'})),
-            'crystal-garden': (discoveredCrystalGardens || []).map(obj => ({...obj, type: 'crystal-garden'}))
+            'crystal-garden': (discoveredCrystalGardens || []).map(obj => ({...obj, type: 'crystal-garden'})),
+            'protostar': (discoveredProtostars || []).map(obj => ({...obj, type: 'protostar'}))
         };
 
         // Use the new centralized hover system
@@ -998,6 +1051,7 @@ export class StellarMap {
         this.hoveredComet = null;
         this.hoveredRoguePlanet = null;
         this.hoveredDarkNebula = null;
+        this.hoveredProtostar = null;
         this.hoveredCrystalGarden = null;
     }
 
@@ -1040,6 +1094,9 @@ export class StellarMap {
                 case 'crystal-garden':
                     this.hoveredCrystalGarden = hoveredObject as unknown;
                     break;
+                case 'protostar':
+                    this.hoveredProtostar = hoveredObject as unknown;
+                    break;
             }
         }
     }
@@ -1075,7 +1132,7 @@ export class StellarMap {
     }
     
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet || this.hoveredRoguePlanet || this.hoveredDarkNebula || this.hoveredCrystalGarden) {
+        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet || this.hoveredRoguePlanet || this.hoveredDarkNebula || this.hoveredCrystalGarden || this.hoveredProtostar) {
             canvas.style.cursor = 'pointer';
         } else if (this.visible) {
             // Use crosshair for map navigation when visible
@@ -1147,7 +1204,7 @@ export class StellarMap {
         // No need to refresh data on zoom changes
     }
 
-    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null): void {
+    render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
         if (!this.visible) return;
 
         const { canvas, ctx } = renderer;
@@ -1239,6 +1296,11 @@ export class StellarMap {
             if (discoveredCrystalGardens && discoveredCrystalGardens.length > 0) {
                 this.renderDiscoveredCrystalGardens(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredCrystalGardens);
             }
+
+            // Draw discovered protostars
+            if (discoveredProtostars && discoveredProtostars.length > 0) {
+                this.renderDiscoveredProtostars(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, discoveredProtostars);
+            }
         }
 
         // Draw inspector mode objects (all objects for seed analysis)
@@ -1264,6 +1326,8 @@ export class StellarMap {
         
         // Draw map UI
         this.renderMapUI(ctx, canvas);
+        
+        // Note: Individual objects handle their own hover visual effects
         
         // Restore context state
         ctx.restore();
@@ -2702,6 +2766,71 @@ export class StellarMap {
         }
     }
 
+    renderProtostarInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        if (!this.selectedProtostar || !this.namingService) return;
+        
+        // Panel dimensions and position (same as other panels)
+        const panelWidth = 300;
+        const panelHeight = 140;
+        const panelX = canvas.width - panelWidth - 20;
+        const panelY = 60;
+        
+        // Draw panel background (same style as other panels)
+        ctx.fillStyle = '#000000E0';
+        ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel content (same style as other panels)
+        ctx.fillStyle = '#b0c4d4';
+        ctx.font = '12px "Courier New", monospace';
+        
+        let lineY = panelY + 20;
+        const lineHeight = 14;
+        
+        // Protostar designation
+        const protostarName = this.namingService.generateDisplayName(this.selectedProtostar);
+        ctx.fillText(`Designation: ${protostarName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Stellar classification
+        const classification = this.selectedProtostar.stellarClassification || 'Unknown';
+        ctx.fillText(`Classification: ${classification}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Protostar variant/evolutionary stage
+        const variantName = this.selectedProtostar.variant ? 
+            `Class ${this.selectedProtostar.variant.split('-')[1]} Protostar` :
+            'Protostar';
+        ctx.fillText(`Type: ${variantName}`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Core temperature
+        const temperature = this.selectedProtostar.coreTemperature || 'Unknown';
+        ctx.fillText(`Core Temperature: ${temperature}K`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Special properties based on variant
+        if (this.selectedProtostar.variant === 'class-1' || this.selectedProtostar.variant === 'class-2') {
+            ctx.fillText(`Features: Polar Jets Active`, panelX + 10, lineY);
+        } else {
+            ctx.fillText(`Features: Accretion Disk`, panelX + 10, lineY);
+        }
+        lineY += lineHeight;
+        
+        // Position
+        ctx.fillText(`Position: (${Math.round(this.selectedProtostar.x)}, ${Math.round(this.selectedProtostar.y)})`, panelX + 10, lineY);
+        lineY += lineHeight;
+        
+        // Discovery timestamp if available
+        if (this.selectedProtostar.discoveryTimestamp) {
+            const date = new Date(this.selectedProtostar.discoveryTimestamp);
+            const dateStr = date.toLocaleDateString();
+            ctx.fillText(`Discovered: ${dateStr}`, panelX + 10, lineY);
+        }
+    }
+
     renderDiscoveredCrystalGardens(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredCrystalGardens: any[]): void {
         if (!discoveredCrystalGardens) return;
 
@@ -2818,6 +2947,204 @@ export class StellarMap {
         ctx.textAlign = 'center';
         ctx.fillText(gardenName, gardenMapX, labelY);
         ctx.textAlign = 'left'; // Reset alignment
+    }
+
+    renderDiscoveredProtostars(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredProtostars: any[]): void {
+        if (!discoveredProtostars) return;
+
+        for (const protostar of discoveredProtostars) {
+            // Convert world coordinates to map coordinates
+            const protostarMapX = mapX + mapWidth/2 + (protostar.x - this.centerX) * scale;
+            const protostarMapY = mapY + mapHeight/2 + (protostar.y - this.centerY) * scale;
+            
+            // Calculate protostar size based on radius and zoom level
+            const baseSize = Math.max(10, protostar.radius * scale * 0.5);
+            const protostarSize = Math.max(6, baseSize * Math.min(1.3, this.zoomLevel * 0.9));
+            
+            // Check if protostar is within map bounds (with margin for jets)
+            const margin = protostarSize + 20; // Extra margin for polar jets
+            if (protostarMapX >= mapX - margin && protostarMapX <= mapX + mapWidth + margin &&
+                protostarMapY >= mapY - margin && protostarMapY <= mapY + mapHeight + margin) {
+                
+                ctx.save();
+                
+                // Get protostar colors based on variant
+                const protostarColors = this.getProtostarColors(protostar.variant);
+                
+                // Draw polar jets first (background layer)
+                if (protostar.variant === 'class-1' || protostar.variant === 'class-2') {
+                    this.renderProtostarJets(ctx, protostarMapX, protostarMapY, protostarSize, protostarColors, protostar);
+                }
+                
+                // Draw accretion disk
+                this.renderProtostarDisk(ctx, protostarMapX, protostarMapY, protostarSize, protostarColors);
+                
+                // Create core gradient
+                const coreGradient = ctx.createRadialGradient(
+                    protostarMapX, protostarMapY, 0,
+                    protostarMapX, protostarMapY, protostarSize * 0.6
+                );
+                coreGradient.addColorStop(0, protostarColors.core);
+                coreGradient.addColorStop(0.4, protostarColors.core + '80');
+                coreGradient.addColorStop(1, protostarColors.core + '20');
+                
+                // Draw core
+                ctx.fillStyle = coreGradient;
+                ctx.beginPath();
+                ctx.arc(protostarMapX, protostarMapY, protostarSize * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add glow effect
+                ctx.shadowColor = protostarColors.core;
+                ctx.shadowBlur = protostarSize * 0.8;
+                ctx.fillStyle = protostarColors.core + '40';
+                ctx.beginPath();
+                ctx.arc(protostarMapX, protostarMapY, protostarSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Add hover highlight if this protostar is hovered (but not selected)
+                if (this.hoveredProtostar === protostar && this.selectedProtostar !== protostar) {
+                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent amber
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    const hoverRadius = Math.max(5, protostarSize + 1);
+                    ctx.arc(protostarMapX, protostarMapY, hoverRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Add selection highlight if this protostar is selected (takes precedence over hover)
+                if (this.selectedProtostar === protostar) {
+                    ctx.strokeStyle = this.currentPositionColor; // Full amber
+                    ctx.lineWidth = 2;
+                    const selectionRadius = protostarSize + 3;
+                    ctx.beginPath();
+                    ctx.arc(protostarMapX, protostarMapY, selectionRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Check for selection and draw label if needed
+                if (this.zoomLevel > 1.5) {
+                    this.renderProtostarLabel(ctx, protostar, protostarMapX, protostarMapY);
+                }
+                
+                ctx.restore();
+            }
+        }
+    }
+
+    private getProtostarColors(variant: 'class-0' | 'class-1' | 'class-2'): {core: string, jet: string, disk: string} {
+        switch (variant) {
+            case 'class-0':
+                return { core: '#8B0000', jet: '#FF4500', disk: '#8B4513' };
+            case 'class-1':
+                return { core: '#FF4500', jet: '#FFD700', disk: '#CD853F' };
+            case 'class-2':
+                return { core: '#FFD700', jet: '#FFFF00', disk: '#F0E68C' };
+            default:
+                return { core: '#FF4500', jet: '#FFD700', disk: '#CD853F' };
+        }
+    }
+
+    private renderProtostarJets(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {core: string, jet: string, disk: string}, protostar: any): void {
+        // Use deterministic angle based on world position
+        const seed = Math.floor(protostar.x + protostar.y * 1000);
+        const jetAngle = (seed % 360) * (Math.PI / 180);
+        
+        const jetLength = size * 3;
+        const jetWidth = size * 0.3;
+        
+        // Draw two opposing jets
+        for (let i = 0; i < 2; i++) {
+            const angle = jetAngle + (i * Math.PI);
+            const jetEndX = centerX + Math.cos(angle) * jetLength;
+            const jetEndY = centerY + Math.sin(angle) * jetLength;
+            
+            // Create gradient for jet
+            const jetGradient = ctx.createLinearGradient(centerX, centerY, jetEndX, jetEndY);
+            jetGradient.addColorStop(0, colors.jet + '80');
+            jetGradient.addColorStop(0.5, colors.jet + '40');
+            jetGradient.addColorStop(1, colors.jet + '10');
+            
+            ctx.fillStyle = jetGradient;
+            ctx.beginPath();
+            ctx.ellipse(
+                centerX + Math.cos(angle) * jetLength * 0.5,
+                centerY + Math.sin(angle) * jetLength * 0.5,
+                jetLength * 0.5,
+                jetWidth,
+                angle,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
+    }
+
+    private renderProtostarDisk(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {core: string, jet: string, disk: string}): void {
+        const diskSize = size * 1.8;
+        
+        // Create disk gradient
+        const diskGradient = ctx.createRadialGradient(
+            centerX, centerY, size * 0.6,
+            centerX, centerY, diskSize
+        );
+        diskGradient.addColorStop(0, 'transparent');
+        diskGradient.addColorStop(0.3, colors.disk + '30');
+        diskGradient.addColorStop(0.7, colors.disk + '60');
+        diskGradient.addColorStop(1, colors.disk + '20');
+        
+        ctx.fillStyle = diskGradient;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, diskSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    renderProtostarLabel(ctx: CanvasRenderingContext2D, protostar: any, protostarMapX: number, protostarMapY: number): void {
+        if (!this.namingService) return;
+        
+        const protostarName = this.namingService.generateDisplayName(protostar);
+        
+        // Calculate offset position for scientific diagram style (same as other objects)
+        const offsetDistance = 35; // Distance from protostar center
+        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
+        
+        // Calculate label position
+        const labelX = protostarMapX + Math.cos(offsetAngle) * offsetDistance;
+        const labelY = protostarMapY + Math.sin(offsetAngle) * offsetDistance;
+        
+        // Draw connecting line from protostar edge to text
+        ctx.strokeStyle = '#aaaaaa'; // Gray line like other objects
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Start line from edge of protostar (approximate size)
+        const protostarSize = 10; // Approximate protostar visual size
+        const lineStartX = protostarMapX + Math.cos(offsetAngle) * (protostarSize + 2);
+        const lineStartY = protostarMapY + Math.sin(offsetAngle) * (protostarSize + 2);
+        // End line just before the text starts
+        const lineEndX = labelX - 5; // Small gap before text
+        const lineEndY = labelY;
+        ctx.moveTo(lineStartX, lineStartY);
+        ctx.lineTo(lineEndX, lineEndY);
+        ctx.stroke();
+        
+        // Set text properties like other objects
+        ctx.font = this.getLabelFont();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        
+        // Draw text background for readability (same as nebulae/crystal gardens)
+        const textWidth = ctx.measureText(protostarName).width;
+        const bgPadding = 3;
+        ctx.fillStyle = '#000000B0';
+        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
+        
+        // Draw label text (same color as other objects)
+        ctx.fillStyle = '#e8f4fd';
+        ctx.fillText(protostarName, labelX, labelY);
+        
+        // Reset text alignment and baseline
+        ctx.textBaseline = 'alphabetic';
     }
 
     renderAsteroidField(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {rocks: string[], accents: string[]}, worldX: number, worldY: number): void {
@@ -3211,6 +3538,8 @@ export class StellarMap {
             this.renderRoguePlanetInfoPanel(ctx, canvas);
         } else if (this.selectedDarkNebula && this.namingService) {
             this.renderDarkNebulaInfoPanel(ctx, canvas);
+        } else if (this.selectedProtostar && this.namingService) {
+            this.renderProtostarInfoPanel(ctx, canvas);
         } else if (this.selectedCrystalGarden && this.namingService) {
             this.renderCrystalGardenInfoPanel(ctx, canvas);
         }

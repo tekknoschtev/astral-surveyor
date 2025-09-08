@@ -27,6 +27,7 @@ export interface ChunkAnalysis {
     roguePlanets: number;
     darkNebulae: number;
     crystalGardens: number;
+    protostars: number;
     starSystems: number;
     binarySystems: number;
 }
@@ -55,6 +56,7 @@ export interface RegionAnalysis {
         roguePlanets: number;
         darkNebulae: number;
         crystalGardens: number;
+        protostars: number;
         starSystems: number;
         binarySystems: number;
     };
@@ -73,6 +75,7 @@ export interface RegionAnalysis {
         roguePlanets: number;
         darkNebulae: number;
         crystalGardens: number;
+        protostars: number;
         starSystems: number;
         binarySystems: number;
     };
@@ -89,7 +92,7 @@ export interface RegionAnalysis {
  * Individual celestial object data for detailed inspection
  */
 export interface CelestialObjectData {
-    type: 'backgroundStar' | 'celestialStar' | 'planet' | 'moon' | 'nebula' | 'asteroidGarden' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
+    type: 'backgroundStar' | 'celestialStar' | 'planet' | 'moon' | 'nebula' | 'asteroidGarden' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
     x: number;
     y: number;
     chunkX: number;
@@ -149,6 +152,7 @@ export class SeedInspectorService {
                 roguePlanets: 0,
                 darkNebulae: 0,
                 crystalGardens: 0,
+                protostars: 0,
                 starSystems: 0,
                 binarySystems: 0
             };
@@ -205,6 +209,7 @@ export class SeedInspectorService {
                     roguePlanets: totals.roguePlanets / totalChunks,
                     darkNebulae: totals.darkNebulae / totalChunks,
                     crystalGardens: totals.crystalGardens / totalChunks,
+                    protostars: totals.protostars / totalChunks,
                     starSystems: totals.starSystems / totalChunks,
                     binarySystems: totals.binarySystems / totalChunks
                 },
@@ -268,6 +273,7 @@ export class SeedInspectorService {
             roguePlanets: chunk.roguePlanets ? chunk.roguePlanets.length : 0,
             darkNebulae: chunk.darkNebulae ? chunk.darkNebulae.length : 0,
             crystalGardens: chunk.crystalGardens ? chunk.crystalGardens.length : 0,
+            protostars: chunk.protostars ? chunk.protostars.length : 0,
             starSystems: Math.max(1, Math.ceil(chunk.celestialStars.length / 2)), // Estimate systems from stars
             binarySystems
         };
@@ -520,6 +526,32 @@ export class SeedInspectorService {
                             });
                         }
                     }
+
+                    // Add protostars
+                    if (chunk.protostars) {
+                        for (const protostar of chunk.protostars) {
+                            objects.push({
+                                type: 'protostar',
+                                x: protostar.x,
+                                y: protostar.y,
+                                chunkX,
+                                chunkY,
+                                properties: {
+                                    variant: protostar.variant,
+                                    stellarClassification: protostar.stellarClassification,
+                                    radius: protostar.radius,
+                                    coreColor: protostar.coreColor,
+                                    nebulaColor: protostar.nebulaColor,
+                                    coreTemperature: protostar.coreTemperature,
+                                    jetIntensity: protostar.jetIntensity,
+                                    accretionDiskSize: protostar.accretionDiskSize,
+                                    instabilityFactor: protostar.instabilityFactor,
+                                    jetCount: protostar.polarJets ? protostar.polarJets.length : 0
+                                },
+                                cosmicRegion
+                            });
+                        }
+                    }
                 }
             }
 
@@ -542,13 +574,13 @@ export class SeedInspectorService {
     exportAnalysisCSV(analysis: RegionAnalysis): string {
         const headers = [
             'ChunkX', 'ChunkY', 'BackgroundStars', 'CelestialStars', 'Planets', 'Moons',
-            'Nebulae', 'AsteroidGardens', 'Wormholes', 'BlackHoles', 'Comets', 'RoguePlanets', 'DarkNebulae', 'CrystalGardens', 'StarSystems', 'BinarySystems'
+            'Nebulae', 'AsteroidGardens', 'Wormholes', 'BlackHoles', 'Comets', 'RoguePlanets', 'DarkNebulae', 'CrystalGardens', 'Protostars', 'StarSystems', 'BinarySystems'
         ];
         
         const rows = analysis.chunks.map(chunk => [
             chunk.x, chunk.y, chunk.backgroundStars, chunk.celestialStars, chunk.planets,
             chunk.moons, chunk.nebulae, chunk.asteroidGardens, chunk.wormholes,
-            chunk.blackholes, chunk.comets, chunk.roguePlanets, chunk.darkNebulae, chunk.crystalGardens, chunk.starSystems, chunk.binarySystems
+            chunk.blackholes, chunk.comets, chunk.roguePlanets, chunk.darkNebulae, chunk.crystalGardens, chunk.protostars, chunk.starSystems, chunk.binarySystems
         ]);
 
         return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');

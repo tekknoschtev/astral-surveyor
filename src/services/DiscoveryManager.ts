@@ -13,7 +13,7 @@ export interface DiscoveryEntry {
     id: string;
     name: string;
     type: string;
-    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
     coordinates: {
         x: number;
         y: number;
@@ -54,7 +54,7 @@ export interface DiscoveryStatistics {
 export interface DiscoveryFilter {
     category?: DiscoveryCategory;
     rarity?: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
-    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
+    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
     hasNotes?: boolean;
     dateRange?: {
         start: number;
@@ -64,7 +64,7 @@ export interface DiscoveryFilter {
 
 // Interface for celestial objects in discovery context
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
     x: number;
     y: number;
     id?: string;
@@ -329,6 +329,14 @@ export class DiscoveryManager {
             }
             return 'uncommon'; // Pure and mixed variants
         }
+        if (obj.type === 'protostar') {
+            // Protostars are rare discoveries in Star-Forge Cluster regions
+            const variant = obj.variant || 'class-1';
+            if (variant === 'class-2') {
+                return 'ultra-rare'; // Nearly formed stars are extremely rare
+            }
+            return 'rare'; // Class 0 and Class I variants
+        }
         return 'common';
     }
 
@@ -392,6 +400,17 @@ export class DiscoveryManager {
                 default:
                     return 'Mixed Crystal Garden';
             }
+        } else if (obj.type === 'protostar') {
+            const variant = obj.variant || 'class-1';
+            switch (variant) {
+                case 'class-0':
+                    return 'Class 0 Protostar';
+                case 'class-2':
+                    return 'Class II Protostar';
+                case 'class-1':
+                default:
+                    return 'Class I Protostar';
+            }
         }
         return 'Unknown';
     }
@@ -429,6 +448,15 @@ export class DiscoveryManager {
             return true;
         } else if (obj.type === 'rogue-planet') {
             // All rogue planets are rare discoveries - lonely worlds drifting in deep space
+            return true;
+        } else if (obj.type === 'dark-nebula') {
+            // All dark nebulae are notable discoveries - voids in space that occlude stars
+            return true;
+        } else if (obj.type === 'crystal-garden') {
+            // All crystal gardens are notable discoveries - spectacular crystalline formations
+            return true;
+        } else if (obj.type === 'protostar') {
+            // All protostars are rare discoveries - witnessing stellar birth in action
             return true;
         }
         return false;
@@ -469,6 +497,9 @@ export class DiscoveryManager {
         } else if (obj.type === 'crystal-garden') {
             // Play unique crystal garden discovery sound - crystalline chimes, harmonic resonance
             this.soundManager.playCrystalGardenDiscovery(obj.variant || 'pure');
+        } else if (obj.type === 'protostar') {
+            // Play unique protostar discovery sound - rhythmic pulsing with chaotic overtones
+            this.soundManager.playProtostarDiscovery(obj.variant || 'class-1');
         }
         
         // Play additional rare discovery sound for special objects

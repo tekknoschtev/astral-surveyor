@@ -9,7 +9,7 @@ import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids
 import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import { Comet, selectCometType } from '../celestial/comets.js';
-import { RoguePlanet, DarkNebula, CrystalGarden } from '../celestial/RegionSpecificObjects.js';
+import { RoguePlanet, DarkNebula, CrystalGarden, Protostar } from '../celestial/RegionSpecificObjects.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { ErrorService } from '../services/ErrorService.js';
 import { RegionGenerator, type RegionInfo } from './RegionGenerator.js';
@@ -45,6 +45,7 @@ interface Chunk {
     roguePlanets: RoguePlanet[];
     darkNebulae: DarkNebula[];
     crystalGardens: CrystalGarden[];
+    protostars: Protostar[];
 }
 
 interface ActiveObjects {
@@ -61,6 +62,7 @@ interface ActiveObjects {
     roguePlanets: RoguePlanet[];
     darkNebulae: DarkNebula[];
     crystalGardens: CrystalGarden[];
+    protostars: Protostar[];
 }
 
 interface NebulaTypeData {
@@ -233,6 +235,19 @@ interface DiscoveredCrystalGarden {
     discoveryTimestamp: number;
 }
 
+interface DiscoveredProtostar {
+    name: string;
+    type: 'protostar';
+    x: number;
+    y: number;
+    variant: 'class-0' | 'class-1' | 'class-2';
+    radius: number;
+    stellarClassification: string;
+    coreColor: string;
+    coreTemperature: number;
+    discoveryTimestamp: number;
+}
+
 interface CompanionWeight {
     type: typeof StarTypes[keyof typeof StarTypes];
     weight: number;
@@ -349,10 +364,11 @@ export class ChunkManager {
             wormholes: [], // Extremely rare spacetime anomalies for FTL travel
             blackholes: [], // Ultra-rare cosmic phenomena with universe reset
             comets: [], // Elliptical orbital objects around stars
-            // Region-specific objects (Phase 0: rogue-planet only)
+            // Region-specific objects
             roguePlanets: [],
             darkNebulae: [],
-            crystalGardens: []
+            crystalGardens: [],
+            protostars: []
         };
 
         // Generate stars for this chunk
@@ -572,6 +588,7 @@ export class ChunkManager {
         this.generateRoguePlanetsForChunk(chunkX, chunkY, chunk);
         this.generateDarkNebulaeForChunk(chunkX, chunkY, chunk);
         this.generateCrystalGardensForChunk(chunkX, chunkY, chunk);
+        this.generateProtostarsForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -590,10 +607,11 @@ export class ChunkManager {
             wormholes: [],
             blackholes: [],
             comets: [],
-            // Region-specific objects (Phase 0 placeholders)
+            // Region-specific objects
             roguePlanets: [],
             darkNebulae: [],
             crystalGardens: [],
+            protostars: [],
         };
         
         const chunkKey = this.getChunkKey(chunkX, chunkY);
@@ -815,10 +833,11 @@ export class ChunkManager {
             wormholes: [], 
             blackholes: [], 
             comets: [],
-            // Region-specific objects (Phase 0 placeholders)
+            // Region-specific objects
             roguePlanets: [],
             darkNebulae: [],
             crystalGardens: [],
+            protostars: [],
         };
         
         for (const chunk of this.activeChunks.values()) {
@@ -835,6 +854,7 @@ export class ChunkManager {
             objects.roguePlanets.push(...chunk.roguePlanets);
             objects.darkNebulae.push(...chunk.darkNebulae);
             objects.crystalGardens.push(...chunk.crystalGardens);
+            objects.protostars.push(...chunk.protostars);
         }
 
         return objects;
@@ -2342,6 +2362,67 @@ export class ChunkManager {
         chunk.crystalGardens.push(crystalGarden);
     }
 
+    // Generate protostars for a chunk - stellar formation objects in dense star formation regions
+    generateProtostarsForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // First, check for debug protostars in this chunk
+        if (this.debugObjects) {
+            for (const debugObj of this.debugObjects) {
+                if (debugObj.type === 'protostar' && debugObj.object instanceof Protostar) {
+                    const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
+                    if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
+                        chunk.protostars.push(debugObj.object);
+                    }
+                }
+            }
+        }
+
+        // Get regional information for this chunk
+        const regionGenerator = new RegionGenerator();
+        const chunkWorldX = chunkX * this.chunkSize + this.chunkSize / 2;
+        const chunkWorldY = chunkY * this.chunkSize + this.chunkSize / 2;
+        const regionInfo = regionGenerator.getRegionAt(chunkWorldX, chunkWorldY);
+        
+        // Protostars only spawn in STAR_FORGE_CLUSTER regions (per Phase 4 design)
+        if (regionInfo.regionType !== 'star_forge_cluster') {
+            return; // Early exit - no protostars in other regions
+        }
+
+        // Use separate seed for protostar generation
+        const protostarSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x8FABE12C;
+        const protostarRng = new SeededRandom(protostarSeed);
+
+        // Phase 4 design: 0.8% spawn rate per chunk in Star-Forge Cluster regions
+        const baseSpawnRate = 0.008; // 0.8%
+        
+        // Check if we should spawn a protostar in this chunk
+        if (protostarRng.next() > baseSpawnRate) {
+            return; // No protostar spawns in this chunk
+        }
+
+        // Determine variant based on Phase 4 design probabilities:
+        // Class 0 (50%), Class I (40%), Class II (10%)
+        let variant: 'class-0' | 'class-1' | 'class-2';
+        const variantRoll = protostarRng.next();
+        if (variantRoll < 0.5) {
+            variant = 'class-0';
+        } else if (variantRoll < 0.9) {
+            variant = 'class-1';
+        } else {
+            variant = 'class-2';
+        }
+
+        // Position protostar randomly in chunk with margin for jets and accretion disk
+        const margin = 120; // Margin for stellar jets and surrounding effects
+        const x = chunkX * this.chunkSize + protostarRng.nextFloat(margin, this.chunkSize - margin);
+        const y = chunkY * this.chunkSize + protostarRng.nextFloat(margin, this.chunkSize - margin);
+
+        // Create the protostar
+        const protostar = new Protostar(x, y, variant);
+
+        // Add to chunk
+        chunk.protostars.push(protostar);
+    }
+
     // Clear all chunks but preserve discovered objects (for game loading)
     clearAllChunks(): void {
         this.activeChunks.clear();
@@ -2569,6 +2650,42 @@ export class ChunkManager {
         return discoveredCrystalGardens;
     }
 
+    getDiscoveredProtostars(): DiscoveredProtostar[] {
+        const discoveredProtostars: DiscoveredProtostar[] = [];
+        
+        // Get all discovered objects that are protostars
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('protostar_')) {
+                // Extract coordinates from protostar ID
+                // Format: protostar_x_y (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const protostarX = parseInt(parts[1]);
+                    const protostarY = parseInt(parts[2]);
+                    
+                    // Find the actual protostar object
+                    const protostar = this.findProtostarByCoordinates(protostarX, protostarY);
+                    if (protostar) {
+                        discoveredProtostars.push({
+                            name: discoveryData.objectName || 'Protostar',
+                            type: 'protostar',
+                            x: protostar.x,
+                            y: protostar.y,
+                            variant: protostar.variant,
+                            radius: protostar.radius,
+                            stellarClassification: protostar.stellarClassification,
+                            coreColor: protostar.coreColor,
+                            coreTemperature: protostar.coreTemperature,
+                            discoveryTimestamp: discoveryData.timestamp
+                        });
+                    }
+                }
+            }
+        }
+        
+        return discoveredProtostars;
+    }
+
     private findRoguePlanetByCoordinates(x: number, y: number): any {
         // Search through all active chunks for a rogue planet with matching coordinates
         for (const [chunkKey, chunk] of this.activeChunks) {
@@ -2599,6 +2716,18 @@ export class ChunkManager {
             for (const crystalGarden of chunk.crystalGardens) {
                 if (Math.floor(crystalGarden.x) === x && Math.floor(crystalGarden.y) === y) {
                     return crystalGarden;
+                }
+            }
+        }
+        return null;
+    }
+
+    private findProtostarByCoordinates(x: number, y: number): any {
+        // Search through all active chunks for a protostar with matching coordinates
+        for (const [chunkKey, chunk] of this.activeChunks) {
+            for (const protostar of chunk.protostars) {
+                if (Math.floor(protostar.x) === x && Math.floor(protostar.y) === y) {
+                    return protostar;
                 }
             }
         }
@@ -2712,4 +2841,4 @@ export class ChunkManager {
 }
 
 // Export interfaces for use by other modules
-export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet, DiscoveredRegion, DiscoveredCrystalGarden };
+export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet, DiscoveredRegion, DiscoveredCrystalGarden, DiscoveredProtostar };

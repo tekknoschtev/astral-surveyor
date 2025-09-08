@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
 }
 
 interface Star extends CelestialObject {
@@ -81,6 +81,12 @@ interface DarkNebula extends CelestialObject {
 interface CrystalGarden extends CelestialObject {
     type: 'crystal-garden';
     variant?: 'pure' | 'mixed' | 'rare-earth';
+}
+
+interface Protostar extends CelestialObject {
+    type: 'protostar';
+    variant?: 'class-0' | 'class-1' | 'class-2';
+    stellarClassification?: string;
 }
 
 // Full designation result for detailed information
@@ -476,6 +482,8 @@ export class NamingService {
             return this.generateDarkNebulaName(object as DarkNebula);
         } else if (object.type === 'crystal-garden') {
             return this.generateCrystalGardenName(object as CrystalGarden);
+        } else if (object.type === 'protostar') {
+            return this.generateProtostarName(object as Protostar);
         }
         
         return 'Unknown Object';
@@ -593,6 +601,18 @@ export class NamingService {
                 type: 'Crystal Garden',
                 classification: `${variantType} crystalline formation with light refraction`
             };
+        } else if (object.type === 'protostar') {
+            const protostar = object as Protostar;
+            const protostarName = this.generateProtostarName(protostar);
+            const coordName = this.generateCoordinateDesignation(protostar.x, protostar.y);
+            const variantType = this.getProtostarVariantName(protostar.variant);
+            const stellarClassification = protostar.stellarClassification || 'Unknown';
+            return {
+                catalog: protostarName,
+                coordinate: coordName,
+                type: 'Protostar',
+                classification: `${variantType} stellar formation object (${stellarClassification})`
+            };
         }
         
         return null;
@@ -633,6 +653,9 @@ export class NamingService {
         } else if (object.type === 'crystal-garden') {
             // Rare-earth crystal gardens are notable due to exotic formations and spectacular light effects
             return object.variant === 'rare-earth';
+        } else if (object.type === 'protostar') {
+            // Class II protostars are notable as nearly formed stars, Class 0 are also notable for deep embedding
+            return object.variant === 'class-2' || object.variant === 'class-0';
         }
         
         return false;
@@ -859,5 +882,56 @@ export class NamingService {
         
         const mineralIndex = positionSeed % mineralList.length;
         return mineralList[mineralIndex];
+    }
+
+    /**
+     * Generate protostar designation following stellar nomenclature convention
+     * Examples: "Proto-Cepheus A", "Proto-Vega B", "Proto-Betelgeuse C"
+     */
+    generateProtostarName(protostar: Protostar): string {
+        // Use existing stellar classification if available, otherwise generate one
+        const stellarClassification = protostar.stellarClassification || this.generateStellarClassification(protostar.x, protostar.y);
+        return `Proto-${stellarClassification}`;
+    }
+
+    /**
+     * Get readable variant name for protostar classification
+     */
+    private getProtostarVariantName(variant?: 'class-0' | 'class-1' | 'class-2'): string {
+        switch (variant) {
+            case 'class-0':
+                return 'Class 0';
+            case 'class-2':
+                return 'Class II';
+            case 'class-1':
+            default:
+                return 'Class I';
+        }
+    }
+
+    /**
+     * Generate stellar classification name for protostars based on position
+     * Follows astronomical naming conventions with constellation names and Greek letters
+     */
+    private generateStellarClassification(x: number, y: number): string {
+        const positionSeed = Math.abs(Math.floor(x / 100) * 73 + Math.floor(y / 100) * 37) % 1000;
+        
+        // Constellation names commonly used in stellar classification
+        const constellations = [
+            'Cepheus', 'Vega', 'Altair', 'Rigel', 'Betelgeuse', 'Sirius', 'Procyon',
+            'Aldebaran', 'Antares', 'Spica', 'Pollux', 'Arcturus', 'Capella',
+            'Deneb', 'Canopus', 'Achernar', 'Hadar', 'Acrux', 'Gacrux', 'Bellatrix',
+            'Elnath', 'Alnilam', 'Alnitak', 'Saiph', 'Mintaka', 'Dubhe', 'Merak',
+            'Phecda', 'Megrez', 'Alioth', 'Mizar', 'Alkaid', 'Alphecca', 'Gemma',
+            'Unukalhai', 'Rasalhague', 'Shaula', 'Sargas', 'Kaus Australis', 'Nunki'
+        ];
+        
+        // Greek letter designations for stellar objects
+        const greekLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
+        
+        const constellationIndex = positionSeed % constellations.length;
+        const letterIndex = Math.floor(positionSeed / constellations.length) % greekLetters.length;
+        
+        return `${constellations[constellationIndex]} ${greekLetters[letterIndex]}`;
     }
 }
