@@ -26,6 +26,7 @@ interface SoundConfig {
     reverbTime?: number;
     reverbDecay?: number;
     reverbWetness?: number;
+    harmonics?: Array<{ frequency: number; volume: number; waveform: OscillatorType }>;
 }
 
 // Sound generation options
@@ -379,6 +380,28 @@ export class SoundManager {
                 reverbTime: 2.3,      // Moderate, clear reverb
                 reverbDecay: 2.6,     // Clean, dynamic decay
                 reverbWetness: 0.45   // Clear spatial movement
+            },
+
+            // === CRYSTAL GARDEN DISCOVERIES ===
+            // Pure harmonic crystalline chimes with resonant overtones
+            // High-mid frequency range with harmonic series for crystal resonance
+            'crystal_garden_discovery': {
+                type: 'oscillator',
+                frequency: 659.3,     // Clear crystalline tone (E5) 
+                duration: 3.2,        // Extended for crystal resonance
+                attack: 0.3,          // Gentle crystalline emergence
+                decay: 0.1,           // Quick to pure crystal sustain
+                sustain: 0.7,         // Strong crystalline presence
+                release: 1.8,         // Long harmonic fade like crystal resonance
+                volume: 0.42,         // Clear but harmonious
+                waveform: 'sine',     // Pure crystalline tone
+                reverbTime: 3.5,      // Extended reverb for crystal echoes
+                reverbDecay: 4.0,     // Long crystalline decay
+                reverbWetness: 0.55,  // Enhanced spatial crystalline presence
+                harmonics: [
+                    { frequency: 987.8, volume: 0.3, waveform: 'sine' },  // Perfect fifth (B5)
+                    { frequency: 1318.5, volume: 0.2, waveform: 'sine' }  // Octave (E6)
+                ]
             },
 
             // === ASTEROID FIELD DISCOVERIES ===  
@@ -1000,6 +1023,50 @@ export class SoundManager {
     playCometDiscovery(): void {
         const config = this.getSoundConfig('comet_discovery');
         if (config) this.playOscillatorSound(config);
+    }
+
+    playCrystalGardenDiscovery(variant: string = 'pure'): void {
+        const config = this.getSoundConfig('crystal_garden_discovery');
+        if (config) {
+            // Crystal garden variant-specific harmonic patterns
+            const variations: Record<string, { freqMultiplier: number, harmonyMultiplier: number, durationMod: number, volumeMod: number, description: string }> = {
+                'pure': { 
+                    freqMultiplier: 1.0,     // Clear crystalline tones
+                    harmonyMultiplier: 1.5,  // Perfect fifth + octave for pure crystal resonance
+                    durationMod: 1.2,        // Longer resonance for pure crystals
+                    volumeMod: 1.1,          // Brighter for pure formations
+                    description: 'Pure crystal garden - clear harmonic resonance'
+                },
+                'mixed': { 
+                    freqMultiplier: 0.94,    // Slightly lower for mixed minerals
+                    harmonyMultiplier: 1.33, // Complex harmonic blend
+                    durationMod: 1.0,        // Standard duration
+                    volumeMod: 1.0,          // Standard volume
+                    description: 'Mixed crystal garden - complex mineral harmonics'
+                },
+                'rare-earth': { 
+                    freqMultiplier: 1.26,    // Higher frequency for rare elements
+                    harmonyMultiplier: 1.78, // Rich harmonic series for rare minerals
+                    durationMod: 1.3,        // Longer for rare discovery
+                    volumeMod: 1.15,         // Brighter for rarity
+                    description: 'Rare earth crystal garden - exotic mineral resonance'
+                }
+            };
+
+            const variation = variations[variant] || variations['pure'];
+            const modifiedConfig = {
+                ...config,
+                frequency: config.frequency * variation.freqMultiplier,
+                harmonics: config.harmonics?.map(h => ({
+                    ...h,
+                    frequency: h.frequency * variation.harmonyMultiplier
+                })),
+                duration: config.duration * variation.durationMod,
+                volume: config.volume * variation.volumeMod
+            };
+            
+            this.playOscillatorSound(modifiedConfig);
+        }
     }
 
     playAsteroidDiscovery(): void {

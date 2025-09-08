@@ -5,7 +5,7 @@
 interface CelestialObject {
     x: number;
     y: number;
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'wormhole' | 'asteroids' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
 }
 
 interface Star extends CelestialObject {
@@ -76,6 +76,11 @@ interface RoguePlanet extends CelestialObject {
 interface DarkNebula extends CelestialObject {
     type: 'dark-nebula';
     variant?: 'dense-core' | 'wispy' | 'globular';
+}
+
+interface CrystalGarden extends CelestialObject {
+    type: 'crystal-garden';
+    variant?: 'pure' | 'mixed' | 'rare-earth';
 }
 
 // Full designation result for detailed information
@@ -469,6 +474,8 @@ export class NamingService {
             return this.generateRoguePlanetName(object as RoguePlanet);
         } else if (object.type === 'dark-nebula') {
             return this.generateDarkNebulaName(object as DarkNebula);
+        } else if (object.type === 'crystal-garden') {
+            return this.generateCrystalGardenName(object as CrystalGarden);
         }
         
         return 'Unknown Object';
@@ -575,6 +582,17 @@ export class NamingService {
                 type: 'Dark Nebula',
                 classification: `${variantType} dust cloud with stellar occlusion`
             };
+        } else if (object.type === 'crystal-garden') {
+            const crystalGarden = object as CrystalGarden;
+            const crystalGardenName = this.generateCrystalGardenName(crystalGarden);
+            const coordName = this.generateCoordinateDesignation(crystalGarden.x, crystalGarden.y);
+            const variantType = this.getCrystalGardenVariantName(crystalGarden.variant);
+            return {
+                catalog: crystalGardenName,
+                coordinate: coordName,
+                type: 'Crystal Garden',
+                classification: `${variantType} crystalline formation with light refraction`
+            };
         }
         
         return null;
@@ -612,6 +630,9 @@ export class NamingService {
         } else if (object.type === 'dark-nebula') {
             // Dense-core dark nebulae are notable due to complete stellar occlusion
             return object.variant === 'dense-core';
+        } else if (object.type === 'crystal-garden') {
+            // Rare-earth crystal gardens are notable due to exotic formations and spectacular light effects
+            return object.variant === 'rare-earth';
         }
         
         return false;
@@ -773,5 +794,70 @@ export class NamingService {
             default:
                 return 'wispy';
         }
+    }
+
+    /**
+     * Generate crystal garden designation following mineral nomenclature convention
+     * Examples: "Quartz Crystal Garden", "Amethyst Crystal Garden", "Olivine Crystal Garden"
+     */
+    generateCrystalGardenName(crystalGarden: CrystalGarden): string {
+        // Generate deterministic mineral name based on position
+        const mineralName = this.generateMineralName(crystalGarden.x, crystalGarden.y, crystalGarden.variant);
+        return `${mineralName} Crystal Garden`;
+    }
+
+    /**
+     * Get readable variant name for crystal garden classification
+     */
+    private getCrystalGardenVariantName(variant?: 'pure' | 'mixed' | 'rare-earth'): string {
+        switch (variant) {
+            case 'pure':
+                return 'pure-form';
+            case 'rare-earth':
+                return 'rare-earth';
+            case 'mixed':
+            default:
+                return 'mixed-composition';
+        }
+    }
+
+    /**
+     * Generate mineral name for crystal gardens based on position and variant
+     */
+    private generateMineralName(x: number, y: number, variant?: 'pure' | 'mixed' | 'rare-earth'): string {
+        const positionSeed = Math.abs(Math.floor(x / 100) * 73 + Math.floor(y / 100) * 37) % 1000;
+        
+        let mineralList: string[];
+        
+        switch (variant) {
+            case 'pure':
+                // Pure crystal types - common single minerals
+                mineralList = [
+                    'Quartz', 'Calcite', 'Fluorite', 'Gypsum', 'Barite', 'Celestine',
+                    'Pyrite', 'Galena', 'Sphalerite', 'Hematite', 'Magnetite', 'Malachite'
+                ];
+                break;
+            case 'mixed':
+                // Mixed crystal types - common combinations and colored variants
+                mineralList = [
+                    'Amethyst', 'Citrine', 'Rose Quartz', 'Smoky Quartz', 'Tiger\'s Eye', 'Agate',
+                    'Jasper', 'Carnelian', 'Onyx', 'Chalcedony', 'Aventurine', 'Amazonite',
+                    'Sodalite', 'Lapis Lazuli', 'Turquoise', 'Malachite', 'Azurite', 'Chrysocolla'
+                ];
+                break;
+            case 'rare-earth':
+                // Rare earth and exotic minerals
+                mineralList = [
+                    'Moldavite', 'Labradorite', 'Moonstone', 'Sunstone', 'Spectrolite', 'Ammolite',
+                    'Bixbite', 'Painite', 'Jadeite', 'Red Beryl', 'Taaffeite', 'Jeremejevite',
+                    'Benitoite', 'Padparadscha', 'Alexandrite', 'Tanzanite', 'Olivine', 'Peridot'
+                ];
+                break;
+            default:
+                mineralList = ['Quartz', 'Calcite', 'Fluorite'];
+        }
+        
+        const mineralIndex = positionSeed % mineralList.length;
+        return mineralList[mineralIndex];
     }
 }

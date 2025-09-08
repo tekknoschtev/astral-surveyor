@@ -13,7 +13,7 @@ export interface DiscoveryEntry {
     id: string;
     name: string;
     type: string;
-    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet' | 'dark-nebula';
+    objectType: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'region' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
     coordinates: {
         x: number;
         y: number;
@@ -54,7 +54,7 @@ export interface DiscoveryStatistics {
 export interface DiscoveryFilter {
     category?: DiscoveryCategory;
     rarity?: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
-    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
+    objectType?: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
     hasNotes?: boolean;
     dateRange?: {
         start: number;
@@ -64,7 +64,7 @@ export interface DiscoveryFilter {
 
 // Interface for celestial objects in discovery context
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
     x: number;
     y: number;
     id?: string;
@@ -82,7 +82,7 @@ interface CelestialObject {
     nebulaType?: string;
     gardenType?: string;
     gardenTypeData?: { name: string };
-    variant?: 'ice' | 'rock' | 'volcanic'; // For rogue planets
+    variant?: string; // For region-specific objects (rogue planets, dark nebulae, crystal gardens)
     updatePosition?(deltaTime: number): void;
     update?(deltaTime: number): void;
     checkDiscovery?(camera: Camera, canvasWidth: number, canvasHeight: number): boolean;
@@ -313,6 +313,22 @@ export class DiscoveryManager {
             }
             return 'rare'; // Ice and rock variants are rare but not ultra-rare
         }
+        if (obj.type === 'dark-nebula') {
+            // Dark nebulae are uncommon discoveries in Void regions
+            const variant = obj.variant || 'wispy';
+            if (variant === 'dense-core') {
+                return 'rare'; // Dense-core nebulae completely occlude stars
+            }
+            return 'uncommon';
+        }
+        if (obj.type === 'crystal-garden') {
+            // Crystal gardens are uncommon discoveries in Asteroid Graveyard regions
+            const variant = obj.variant || 'mixed';
+            if (variant === 'rare-earth') {
+                return 'ultra-rare'; // Rare-earth crystals with spectacular light effects
+            }
+            return 'uncommon'; // Pure and mixed variants
+        }
         return 'common';
     }
 
@@ -353,6 +369,28 @@ export class DiscoveryManager {
                 case 'rock':
                 default:
                     return 'Rocky Rogue Planet';
+            }
+        } else if (obj.type === 'dark-nebula') {
+            const variant = obj.variant || 'wispy';
+            switch (variant) {
+                case 'dense-core':
+                    return 'Dense-Core Dark Nebula';
+                case 'globular':
+                    return 'Globular Dark Nebula';
+                case 'wispy':
+                default:
+                    return 'Wispy Dark Nebula';
+            }
+        } else if (obj.type === 'crystal-garden') {
+            const variant = obj.variant || 'mixed';
+            switch (variant) {
+                case 'pure':
+                    return 'Pure Crystal Garden';
+                case 'rare-earth':
+                    return 'Rare-Earth Crystal Garden';
+                case 'mixed':
+                default:
+                    return 'Mixed Crystal Garden';
             }
         }
         return 'Unknown';
@@ -428,6 +466,9 @@ export class DiscoveryManager {
             const displayType = variant === 'ice' ? 'Frozen World' : 
                                variant === 'volcanic' ? 'Volcanic World' : 'Rocky World';
             this.soundManager.playPlanetDiscovery(displayType);
+        } else if (obj.type === 'crystal-garden') {
+            // Play unique crystal garden discovery sound - crystalline chimes, harmonic resonance
+            this.soundManager.playCrystalGardenDiscovery(obj.variant || 'pure');
         }
         
         // Play additional rare discovery sound for special objects

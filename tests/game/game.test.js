@@ -458,7 +458,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       
@@ -519,7 +521,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -578,7 +582,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -612,7 +618,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -643,7 +651,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -678,7 +688,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -711,7 +723,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -747,7 +760,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -782,7 +796,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [mockBlackHole],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -897,7 +912,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
     });
@@ -945,7 +962,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [{ render: vi.fn() }],
         comets: [{ render: vi.fn() }],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -1005,7 +1023,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       game.discoveryLogbook.isMouseOver = vi.fn().mockReturnValue(false);
@@ -1065,7 +1085,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       game.stellarMap.isVisible = vi.fn().mockReturnValue(false);
@@ -1095,7 +1117,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       game.camera.velocityX = 100;
@@ -1137,7 +1160,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -1260,7 +1284,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [mockBlackHole],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       const initialVelocityX = game.camera.velocityX;
@@ -1299,7 +1324,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [mockBlackHole],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -1339,7 +1365,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [mockBlackHole],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -1368,7 +1395,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [mockBlackHole],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
 
       await game.update(0.016);
@@ -1531,7 +1559,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -1606,7 +1636,8 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: []
       });
       
       const destinationPreviewSpy = vi.spyOn(game, 'getDestinationPreviewObjects').mockReturnValue([]);
@@ -1656,7 +1687,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
 
       expect(() => game.update(0.016)).not.toThrow();
@@ -1674,7 +1707,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.getDiscoveredStars = vi.fn().mockReturnValue([]);
       game.chunkManager.getDiscoveredPlanets = vi.fn().mockReturnValue([]);
@@ -1706,7 +1741,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       game.chunkManager.restoreDiscoveryState = vi.fn();
       
@@ -1815,7 +1852,9 @@ describe('Game System - Main Game Loop and Orchestration', () => {
         blackholes: [],
         comets: [],
         roguePlanets: [],
-        darkNebulae: []
+        darkNebulae: [],
+        crystalGardens: [],
+        crystalGardens: []
       });
       
       await game.checkForExistingSave();
