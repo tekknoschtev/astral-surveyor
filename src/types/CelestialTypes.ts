@@ -3,7 +3,7 @@
 
 // Base celestial object interface
 export interface CelestialObjectData {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
     x: number;
     y: number;
     id?: string;
@@ -101,8 +101,27 @@ export interface DarkNebulaData extends CelestialObjectData {
     dustDensity?: number;
 }
 
+export interface CrystalGardenData extends CelestialObjectData {
+    type: 'crystal-garden';
+    variant: 'pure' | 'mixed' | 'rare-earth';
+    size: number;
+    mineralType?: string;
+    refractionIntensity?: number;
+}
+
+export interface ProtostarData extends CelestialObjectData {
+    type: 'protostar';
+    variant: 'class-0' | 'class-1' | 'class-2';
+    stellarClassification: string;
+    size: number;
+    coreTemperature?: number;
+    jetIntensity?: number;
+    accretionDiskSize?: number;
+    instabilityFactor?: number;
+}
+
 // Union type for all celestial objects
-export type AnyCelestialData = StarData | PlanetData | MoonData | NebulaData | AsteroidData | WormholeData | BlackHoleData | RoguePlanetData | DarkNebulaData;
+export type AnyCelestialData = StarData | PlanetData | MoonData | NebulaData | AsteroidData | WormholeData | BlackHoleData | RoguePlanetData | DarkNebulaData | CrystalGardenData | ProtostarData;
 
 // Discovery-related types
 export interface DiscoveryEvent {
@@ -173,7 +192,9 @@ export interface ActiveObjects {
     wormholes: WormholeData[];
     blackholes: BlackHoleData[];
     asteroidGardens: AsteroidData[];
-    // Region-specific objects (Phase 0: rogue-planet only)
+    // Region-specific objects
     roguePlanets: RoguePlanetData[];
     darkNebulae: DarkNebulaData[];
+    crystalGardens: CrystalGardenData[];
+    protostars: ProtostarData[];
 }

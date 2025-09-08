@@ -1195,3 +1195,459 @@ export class CrystalGarden extends CelestialObject {
     }
 }
 
+// Phase 4: Protostar class with dynamic stellar formation effects
+// Supports three evolutionary variants: Class 0, Class I, and Class II
+
+interface ProtostarJet {
+    angle: number;        // Direction of the jet (0 or π for opposite poles)
+    length: number;       // Jet extension length
+    width: number;        // Jet base width
+    intensity: number;    // Brightness multiplier
+    particleSpeed: number;// Animation speed for particle effects
+    color: string;        // Jet color based on temperature
+}
+
+interface ProtostarVisualEffects {
+    hasFlickeringCore?: boolean;
+    hasPolarJets?: boolean;
+    hasAccretionDisk?: boolean;
+    hasNebulaEnvelope?: boolean;
+    hasInstability?: boolean;
+    hasStellarWind?: boolean;
+}
+
+export class Protostar extends CelestialObject {
+    variant: 'class-0' | 'class-1' | 'class-2';
+    stellarClassification: string;
+    radius: number;
+    coreColor: string;
+    nebulaColor: string;
+    coreTemperature: number;
+    jetIntensity: number;
+    accretionDiskSize: number;
+    instabilityFactor: number;
+    visualEffects: ProtostarVisualEffects;
+    discoveryTimestamp?: number;
+    
+    // Dynamic animation properties
+    animationPhase: number = 0;
+    flickerPhase: number = 0;
+    jetPhase: number = 0;
+    
+    // Deterministic visual features
+    polarJets: ProtostarJet[] = [];
+    diskRotationSpeed: number;
+    
+    constructor(x: number, y: number, variant: 'class-0' | 'class-1' | 'class-2' = 'class-1') {
+        super(x, y, 'protostar');
+        this.variant = variant;
+        this.initializeProperties();
+        this.generateVisualFeatures();
+    }
+
+    private initializeProperties(): void {
+        // Set properties based on evolutionary class (per Phase 4 design document)
+        this.discoveryDistance = 70;
+        this.discoveryValue = 90;
+        
+        switch (this.variant) {
+            case 'class-0':
+                // Very early stage, mostly infrared, deeply embedded
+                this.radius = 25; // Large due to envelope
+                this.stellarClassification = this.generateStellarName();
+                this.coreColor = '#8B0000'; // Deep red
+                this.nebulaColor = '#4A0000'; // Very dark red envelope
+                this.coreTemperature = 1000; // Cool
+                this.jetIntensity = 0.3; // Weak jets
+                this.accretionDiskSize = 60; // Large disk
+                this.instabilityFactor = 0.8; // Very unstable
+                this.visualEffects = {
+                    hasFlickeringCore: true,
+                    hasNebulaEnvelope: true,
+                    hasAccretionDisk: true,
+                    hasInstability: true
+                };
+                break;
+            case 'class-1':
+                // Visible protostar with strong jets
+                this.radius = 20; // Medium size
+                this.stellarClassification = this.generateStellarName();
+                this.coreColor = '#FF4500'; // Orange-red
+                this.nebulaColor = '#FF6347'; // Tomato envelope
+                this.coreTemperature = 2000; // Warmer
+                this.jetIntensity = 1.0; // Strong jets
+                this.accretionDiskSize = 45; // Medium disk
+                this.instabilityFactor = 0.6; // Moderately unstable
+                this.visualEffects = {
+                    hasFlickeringCore: true,
+                    hasPolarJets: true,
+                    hasAccretionDisk: true,
+                    hasNebulaEnvelope: true,
+                    hasInstability: true,
+                    hasStellarWind: true
+                };
+                break;
+            case 'class-2':
+                // Nearly formed star, weak surrounding disk
+                this.radius = 15; // Smaller, more condensed
+                this.stellarClassification = this.generateStellarName();
+                this.coreColor = '#FFD700'; // Yellow-white
+                this.nebulaColor = '#FFA500'; // Orange envelope
+                this.coreTemperature = 3000; // Hot
+                this.jetIntensity = 0.5; // Moderate jets
+                this.accretionDiskSize = 30; // Small disk
+                this.instabilityFactor = 0.3; // More stable
+                this.visualEffects = {
+                    hasFlickeringCore: false, // More stable core
+                    hasPolarJets: true,
+                    hasAccretionDisk: true,
+                    hasStellarWind: true
+                };
+                break;
+        }
+    }
+
+    private generateStellarName(): string {
+        // Generate stellar classification following astronomical naming conventions
+        const constellations = [
+            'Cepheus', 'Vega', 'Altair', 'Rigel', 'Betelgeuse', 'Sirius', 'Procyon',
+            'Aldebaran', 'Antares', 'Spica', 'Pollux', 'Arcturus', 'Capella'
+        ];
+        const variants = ['A', 'B', 'C', 'D', 'E'];
+        
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 5000);
+        
+        const constellation = constellations[Math.floor(rng.next() * constellations.length)];
+        const variant = variants[Math.floor(rng.next() * variants.length)];
+        
+        return `${constellation} ${variant}`;
+    }
+
+    private generateVisualFeatures(): void {
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 5100);
+        
+        // Generate polar jets if applicable
+        if (this.visualEffects.hasPolarJets) {
+            // Create two opposing jets
+            for (let i = 0; i < 2; i++) {
+                const baseAngle = i * Math.PI; // 0 and π radians (opposite directions)
+                const angleVariation = (rng.next() - 0.5) * 0.2; // Small random variation
+                
+                this.polarJets.push({
+                    angle: baseAngle + angleVariation,
+                    length: 60 + rng.next() * 40, // 60-100px jet length
+                    width: 8 + rng.next() * 6,    // 8-14px base width
+                    intensity: 0.7 + rng.next() * 0.3,
+                    particleSpeed: 2 + rng.next() * 3,
+                    color: this.variant === 'class-0' ? '#8B4513' : '#87CEEB' // Brown for Class 0, sky blue for others
+                });
+            }
+        }
+        
+        // Set disk rotation speed
+        this.diskRotationSpeed = 0.5 + rng.next() * 1.5; // 0.5-2.0 rotation speed
+    }
+
+    render(renderer: Renderer, camera: Camera): void {
+        // Update animation phases
+        this.animationPhase += 0.02;
+        this.flickerPhase += 0.05 + this.instabilityFactor * 0.03;
+        this.jetPhase += 0.03;
+        
+        const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
+        
+        // Skip rendering if object is far off screen
+        if (screenX < -200 || screenX > renderer.canvas.width + 200 || 
+            screenY < -200 || screenY > renderer.canvas.height + 200) {
+            return;
+        }
+        
+        const ctx = renderer.ctx;
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        
+        // Render accretion disk first (behind core)
+        if (this.visualEffects.hasAccretionDisk) {
+            this.renderAccretionDisk(ctx);
+        }
+        
+        // Render nebula envelope
+        if (this.visualEffects.hasNebulaEnvelope) {
+            this.renderNebulaEnvelope(ctx);
+        }
+        
+        // Render polar jets (behind core but in front of disk)
+        if (this.visualEffects.hasPolarJets) {
+            this.renderPolarJets(ctx);
+        }
+        
+        // Render core with flickering effect
+        this.renderCore(ctx);
+        
+        // Render stellar wind effects
+        if (this.visualEffects.hasStellarWind) {
+            this.renderStellarWind(ctx);
+        }
+        
+        ctx.restore();
+        
+        // Render discovery indicators
+        this.renderDiscoveryIndicators(renderer, screenX, screenY);
+    }
+
+    private renderAccretionDisk(ctx: CanvasRenderingContext2D): void {
+        // Spiral accretion disk with rotation animation
+        const diskRadius = this.accretionDiskSize;
+        const rotation = this.animationPhase * this.diskRotationSpeed;
+        
+        ctx.save();
+        ctx.rotate(rotation);
+        
+        // Create radial gradient for disk
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, diskRadius);
+        gradient.addColorStop(0, 'transparent');
+        gradient.addColorStop(0.3, this.darkenColor(this.nebulaColor, 0.5) + '40'); // Semi-transparent
+        gradient.addColorStop(0.7, this.darkenColor(this.nebulaColor, 0.3) + '60');
+        gradient.addColorStop(1, 'transparent');
+        
+        // Draw disk with spiral pattern
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, diskRadius, diskRadius * 0.3, 0, 0, 2 * Math.PI); // Flattened disk
+        ctx.fill();
+        
+        // Add spiral arms
+        ctx.strokeStyle = this.lightenColor(this.nebulaColor, 0.2) + '80';
+        ctx.lineWidth = 2;
+        for (let arm = 0; arm < 3; arm++) {
+            ctx.beginPath();
+            for (let angle = 0; angle < 4 * Math.PI; angle += 0.1) {
+                const armAngle = angle + arm * (2 * Math.PI / 3);
+                const radius = (diskRadius * 0.8) * (angle / (4 * Math.PI));
+                const x = Math.cos(armAngle) * radius;
+                const y = Math.sin(armAngle) * radius * 0.3; // Flattened
+                if (angle === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+    private renderNebulaEnvelope(ctx: CanvasRenderingContext2D): void {
+        // Surrounding gas envelope with irregular shape
+        const envelopeRadius = this.radius * 2.5;
+        
+        // Create radial gradient for nebula
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, envelopeRadius);
+        gradient.addColorStop(0, 'transparent');
+        gradient.addColorStop(0.4, this.nebulaColor + '40');
+        gradient.addColorStop(0.8, this.nebulaColor + '60');
+        gradient.addColorStop(1, 'transparent');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, envelopeRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Add wispy tendrils
+        ctx.strokeStyle = this.nebulaColor + '80';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const tendrilLength = envelopeRadius + 20;
+            ctx.beginPath();
+            ctx.moveTo(
+                Math.cos(angle) * this.radius,
+                Math.sin(angle) * this.radius
+            );
+            ctx.quadraticCurveTo(
+                Math.cos(angle + 0.5) * (tendrilLength * 0.7),
+                Math.sin(angle + 0.5) * (tendrilLength * 0.7),
+                Math.cos(angle) * tendrilLength,
+                Math.sin(angle) * tendrilLength
+            );
+            ctx.stroke();
+        }
+    }
+
+    private renderPolarJets(ctx: CanvasRenderingContext2D): void {
+        // High-energy particle streams from both poles
+        this.polarJets.forEach(jet => {
+            ctx.save();
+            ctx.rotate(jet.angle);
+            
+            // Jet stream with particle effects
+            const jetLength = jet.length;
+            const jetWidth = jet.width;
+            
+            // Create linear gradient for jet
+            const gradient = ctx.createLinearGradient(0, 0, 0, jetLength);
+            gradient.addColorStop(0, jet.color + 'FF'); // Solid at base
+            gradient.addColorStop(0.7, jet.color + '80'); // Semi-transparent
+            gradient.addColorStop(1, jet.color + '00'); // Transparent at tip
+            
+            // Draw main jet stream
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(-jetWidth/2, 0);
+            ctx.lineTo(jetWidth/2, 0);
+            ctx.lineTo(jetWidth/4, jetLength);
+            ctx.lineTo(-jetWidth/4, jetLength);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Add particle effects along jet
+            ctx.fillStyle = this.lightenColor(jet.color, 0.3) + 'CC';
+            for (let i = 0; i < 8; i++) {
+                const particleY = (i / 8) * jetLength + (this.jetPhase * jet.particleSpeed * 10) % jetLength;
+                const particleX = (Math.sin(this.jetPhase * 3 + i) * jetWidth * 0.2);
+                const particleSize = 2 + Math.sin(this.jetPhase * 2 + i) * 1;
+                
+                ctx.beginPath();
+                ctx.arc(particleX, particleY, particleSize, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        });
+    }
+
+    private renderCore(ctx: CanvasRenderingContext2D): void {
+        let coreRadius = this.radius;
+        let coreColor = this.coreColor;
+        
+        // Apply flickering effect for unstable protostars
+        if (this.visualEffects.hasFlickeringCore) {
+            const flicker = Math.sin(this.flickerPhase) * this.instabilityFactor;
+            coreRadius *= (1 + flicker * 0.3); // Size variation
+            
+            // Color temperature variation
+            const temperatureFlicker = Math.sin(this.flickerPhase * 1.3) * this.instabilityFactor;
+            if (temperatureFlicker > 0.3) {
+                coreColor = this.lightenColor(coreColor, temperatureFlicker * 0.4);
+            } else if (temperatureFlicker < -0.3) {
+                coreColor = this.darkenColor(coreColor, Math.abs(temperatureFlicker) * 0.3);
+            }
+        }
+        
+        // Create radial gradient for core
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, coreRadius);
+        gradient.addColorStop(0, this.lightenColor(coreColor, 0.6)); // Bright center
+        gradient.addColorStop(0.5, coreColor); // Main color
+        gradient.addColorStop(1, this.darkenColor(coreColor, 0.4)); // Darker edge
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, coreRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Add core glow for brighter variants
+        if (this.variant !== 'class-0') {
+            ctx.shadowColor = coreColor;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = coreColor + '60';
+            ctx.beginPath();
+            ctx.arc(0, 0, coreRadius * 1.3, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    private renderStellarWind(ctx: CanvasRenderingContext2D): void {
+        // Radial stellar wind particles
+        ctx.save();
+        
+        const windRadius = this.radius * 3;
+        const particleCount = 12;
+        
+        ctx.fillStyle = this.lightenColor(this.coreColor, 0.5) + '60';
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (i / particleCount) * Math.PI * 2 + this.animationPhase;
+            const distance = this.radius + (this.animationPhase * 20) % windRadius;
+            const particleSize = 2 * (1 - distance / windRadius); // Shrink with distance
+            
+            const x = Math.cos(angle) * distance;
+            const y = Math.sin(angle) * distance;
+            
+            if (particleSize > 0.5) {
+                ctx.beginPath();
+                ctx.arc(x, y, particleSize, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+        
+        ctx.restore();
+    }
+
+    private renderDiscoveryIndicators(renderer: Renderer, screenX: number, screenY: number): void {
+        if (!this.discovered) return;
+        
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `protostar-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 15, // Larger radius for protostars due to jets
+            rarity: visualizationService.getObjectRarity('protostar'),
+            objectType: 'protostar',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+        
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 15, // Larger indicator for protostars
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+        
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+    }
+
+    // Utility methods for color manipulation
+    private lightenColor(color: string, factor: number): string {
+        if (color.startsWith('#')) {
+            const hex = color.replace('#', '');
+            const r = Math.min(255, Math.floor(parseInt(hex.substr(0, 2), 16) * (1 + factor)));
+            const g = Math.min(255, Math.floor(parseInt(hex.substr(2, 2), 16) * (1 + factor)));
+            const b = Math.min(255, Math.floor(parseInt(hex.substr(4, 2), 16) * (1 + factor)));
+            // Return as hex for proper transparency support
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+        return color;
+    }
+
+    private darkenColor(color: string, factor: number): string {
+        if (color.startsWith('#')) {
+            const hex = color.replace('#', '');
+            const r = Math.max(0, Math.floor(parseInt(hex.substr(0, 2), 16) * (1 - factor)));
+            const g = Math.max(0, Math.floor(parseInt(hex.substr(2, 2), 16) * (1 - factor)));
+            const b = Math.max(0, Math.floor(parseInt(hex.substr(4, 2), 16) * (1 - factor)));
+            // Return as hex for proper transparency support
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+        return color;
+    }
+}
+

@@ -8,7 +8,7 @@ import { Star, Planet, StarTypes, PlanetTypes } from '../celestial/celestial.js'
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import { Comet, selectCometType, CometTypes } from '../celestial/comets.js';
-import { RoguePlanet, DarkNebula, CrystalGarden } from '../celestial/RegionSpecificObjects.js';
+import { RoguePlanet, DarkNebula, CrystalGarden, Protostar } from '../celestial/RegionSpecificObjects.js';
 import { NamingService } from '../naming/naming.js';
 import type { Camera } from '../camera/camera.js';
 import type { ChunkManager } from '../world/world.js';
@@ -714,6 +714,59 @@ export class DebugSpawner {
     }
 
     /**
+     * Spawn a protostar near the player for testing stellar formation
+     * Creates protostars with all three evolutionary variants
+     */
+    static spawnProtostar(camera: Camera, chunkManager: ChunkManager, variant?: 'class-0' | 'class-1' | 'class-2', debugModeEnabled: boolean = true): void {
+        // Only allow when debug mode is enabled
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            // Generate position near player but not too close (allow for stellar jets and effects)
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Place 200-400 pixels away at random angle (account for jets extending ~100px)
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 200 + Math.random() * 200;
+            const x = playerX + Math.cos(angle) * distance;
+            const y = playerY + Math.sin(angle) * distance;
+
+            // Determine variant (random if not specified)
+            let selectedVariant: 'class-0' | 'class-1' | 'class-2' = 'class-1';
+            if (variant) {
+                selectedVariant = variant;
+            } else {
+                // Match natural spawn probabilities: Class 0 (50%), Class I (40%), Class II (10%)
+                const variantRoll = Math.random();
+                if (variantRoll < 0.5) {
+                    selectedVariant = 'class-0';
+                } else if (variantRoll < 0.9) {
+                    selectedVariant = 'class-1';
+                } else {
+                    selectedVariant = 'class-2';
+                }
+            }
+
+            // Create the protostar
+            const protostar = new Protostar(x, y, selectedVariant);
+            protostar.discovered = true;
+
+            this.addObjectToChunk(chunkManager, 'protostar', protostar, x, y);
+            
+            // Log with stellar classification name
+            const stellarName = protostar.stellarClassification || 'Unknown';
+            console.log(`⭐ DEBUG: Spawned ${selectedVariant} protostar "${stellarName}" at (${Math.round(x)}, ${Math.round(y)})`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning protostar:', error);
+        }
+    }
+
+    /**
      * Helper method to add objects to the appropriate chunk
      */
     private static addObjectToChunk(chunkManager: ChunkManager, objectType: string, object: any, x: number, y: number): void {
@@ -775,6 +828,9 @@ export class DebugSpawner {
                     break;
                 case 'crystal-garden':
                     chunk.crystalGardens.push(object);
+                    break;
+                case 'protostar':
+                    chunk.protostars.push(object);
                     break;
             }
         }

@@ -213,7 +213,7 @@ export class CommandRegistry {
                 this.showObjectTypesList(params[0]);
             },
             autocomplete: (partial: string) => {
-                const types = ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'wormhole'];
+                const types = ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'protostar', 'wormhole'];
                 return types.filter(type => type.startsWith(partial));
             }
         });
@@ -247,7 +247,7 @@ export class CommandRegistry {
             description: 'Spawn celestial objects for testing',
             parameters: [
                 { name: 'object_type', type: 'enum', optional: false,
-                  values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'wormhole'],
+                  values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'protostar', 'wormhole'],
                   description: 'Type of object to spawn' },
                 { name: 'variant', type: 'string', optional: true,
                   description: 'Specific variant (use "list <type>" to see options)' },
@@ -261,7 +261,7 @@ export class CommandRegistry {
                 const words = partial.split(' ');
                 if (words.length === 1) {
                     // Complete object type
-                    const types = ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'wormhole'];
+                    const types = ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'protostar', 'wormhole'];
                     return types.filter(type => type.startsWith(words[0]));
                 } else if (words.length === 2) {
                     // Complete variant based on object type
@@ -539,6 +539,11 @@ export class CommandRegistry {
                     console.log(`💎 Spawned ${variant || 'random'} crystal garden for testing`);
                     break;
                     
+                case 'protostar':
+                    DebugSpawner.spawnProtostar(context.camera, context.chunkManager, variant as 'class-0' | 'class-1' | 'class-2', true);
+                    console.log(`⭐ Spawned ${variant || 'random'} protostar for testing`);
+                    break;
+                    
                 default:
                     console.log(`❌ Unknown object type: ${objectType}`);
                     break;
@@ -559,6 +564,7 @@ export class CommandRegistry {
             'rogue-planet': ['ice', 'rock', 'volcanic'],
             'dark-nebula': ['dense-core', 'wispy', 'globular'],
             'crystal-garden': ['pure', 'mixed', 'rare-earth'],
+            protostar: ['class-0', 'class-1', 'class-2'],
             wormhole: []
         };
         

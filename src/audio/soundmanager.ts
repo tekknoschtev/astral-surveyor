@@ -404,6 +404,29 @@ export class SoundManager {
                 ]
             },
 
+            // === PROTOSTAR DISCOVERIES ===
+            // Rhythmic pulsing with chaotic overtones representing stellar formation
+            // Variable frequency with instability patterns for different evolutionary classes
+            'protostar_discovery': {
+                type: 'oscillator',
+                frequency: 440.0,     // Base stellar tone (A4)
+                duration: 4.5,        // Extended for stellar formation complexity
+                attack: 0.4,          // Gradual stellar emergence
+                decay: 0.2,           // Quick to unstable core
+                sustain: 0.8,         // Strong stellar presence with flickering
+                release: 2.1,         // Long stellar wind fade
+                volume: 0.45,         // Prominent for stellar birth
+                waveform: 'sawtooth', // Rich harmonic content for complexity
+                reverbTime: 4.2,      // Extended stellar environment
+                reverbDecay: 3.5,     // Deep space stellar resonance
+                reverbWetness: 0.65,  // Rich spatial presence
+                harmonics: [
+                    { frequency: 880.0, volume: 0.35, waveform: 'sine' },    // Octave for core brightness
+                    { frequency: 1320.0, volume: 0.25, waveform: 'triangle' }, // Major third for stellar warmth
+                    { frequency: 220.0, volume: 0.3, waveform: 'square' }     // Sub-harmonic for jet activity
+                ]
+            },
+
             // === ASTEROID FIELD DISCOVERIES ===  
             // Pure practical tones for scattered rocky debris
             // Mid-range with solid, grounded presence
@@ -1060,6 +1083,53 @@ export class SoundManager {
                 harmonics: config.harmonics?.map(h => ({
                     ...h,
                     frequency: h.frequency * variation.harmonyMultiplier
+                })),
+                duration: config.duration * variation.durationMod,
+                volume: config.volume * variation.volumeMod
+            };
+            
+            this.playOscillatorSound(modifiedConfig);
+        }
+    }
+
+    playProtostarDiscovery(variant: string = 'class-1'): void {
+        const config = this.getSoundConfig('protostar_discovery');
+        if (config) {
+            // Protostar variant-specific rhythmic patterns
+            const variations: Record<string, { freqMultiplier: number, pulseRate: number, chaosLevel: number, durationMod: number, volumeMod: number, description: string }> = {
+                'class-0': { 
+                    freqMultiplier: 0.75,    // Lower frequency for cooler Class 0
+                    pulseRate: 0.8,          // Slower pulsing for early stage
+                    chaosLevel: 0.9,         // High chaos for instability
+                    durationMod: 1.3,        // Longer for deep IR signature
+                    volumeMod: 0.8,          // Quieter for embedded stage
+                    description: 'Class 0 protostar - deep infrared instability'
+                },
+                'class-1': { 
+                    freqMultiplier: 1.0,     // Standard frequency for visible protostar
+                    pulseRate: 1.2,          // Active pulsing with jets
+                    chaosLevel: 0.7,         // Moderate chaos
+                    durationMod: 1.0,        // Standard duration
+                    volumeMod: 1.0,          // Standard volume
+                    description: 'Class I protostar - visible stellar formation with jets'
+                },
+                'class-2': { 
+                    freqMultiplier: 1.4,     // Higher frequency for hotter Class II
+                    pulseRate: 1.1,          // Stabilizing rhythm
+                    chaosLevel: 0.4,         // Less chaos as star forms
+                    durationMod: 0.9,        // Shorter for nearly formed star
+                    volumeMod: 1.2,          // Brighter for advanced stage
+                    description: 'Class II protostar - nearly formed stellar object'
+                }
+            };
+
+            const variation = variations[variant] || variations['class-1'];
+            const modifiedConfig = {
+                ...config,
+                frequency: config.frequency * variation.freqMultiplier,
+                harmonics: config.harmonics?.map((h, index) => ({
+                    ...h,
+                    frequency: h.frequency * variation.freqMultiplier * (1 + Math.sin(Date.now() * 0.01 + index) * variation.chaosLevel * 0.1)
                 })),
                 duration: config.duration * variation.durationMod,
                 volume: config.volume * variation.volumeMod

@@ -43,7 +43,7 @@ interface GameStartingPosition {
 
 // Interface for objects in the active game world (these are class instances, not data)
 interface CelestialObject {
-    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden';
+    type: 'star' | 'planet' | 'moon' | 'nebula' | 'asteroids' | 'wormhole' | 'blackhole' | 'comet' | 'rogue-planet' | 'dark-nebula' | 'crystal-garden' | 'protostar';
     x: number;
     y: number;
     id?: string;
@@ -85,6 +85,7 @@ interface ActiveObjects {
     roguePlanets: CelestialObject[];
     darkNebulae: CelestialObject[];
     crystalGardens: CelestialObject[];
+    protostars: CelestialObject[];
 }
 
 
@@ -326,7 +327,8 @@ export class Game {
                         ...activeObjects.blackholes,
                         ...activeObjects.comets,
                         ...activeObjects.roguePlanets,
-                        ...activeObjects.darkNebulae
+                        ...activeObjects.darkNebulae,
+                        ...activeObjects.protostars
                     ].filter(obj => obj.hasOwnProperty('discovered'));
                     this.chunkManager.restoreDiscoveryState(flattenedObjects);
                     
@@ -515,7 +517,7 @@ export class Game {
                     if (!overlayClicked) {
                         // Handle stellar map interactions (simplified) - only if not panning
                         const discovered = this.getDiscoveredObjects();
-                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, discovered.crystalGardens, this.input);
+                        this.stellarMap.handleStarSelection(this.input.getMouseX(), this.input.getMouseY(), discovered.stars, this.renderer.canvas, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, discovered.crystalGardens, discovered.protostars, this.input);
                     }
                 }
             }
@@ -533,7 +535,7 @@ export class Game {
         // Always update hover state when stellar map is visible (for cursor feedback)
         if (this.stellarMap.isVisible()) {
             const discovered = this.getDiscoveredObjects();
-            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, discovered.crystalGardens);
+            this.stellarMap.detectHoverTarget(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas, discovered.stars, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, discovered.crystalGardens, discovered.protostars);
             
             // Also update statistics overlay hover state
             this.stellarMap.updateStatisticsOverlayHover(this.input.getMouseX(), this.input.getMouseY(), this.renderer.canvas);
@@ -560,7 +562,7 @@ export class Game {
         // Get active celestial objects for physics and discovery (cache for render phase)
         this.cachedActiveObjects = this.chunkManager.getAllActiveObjects();
         const activeObjects = this.cachedActiveObjects;
-        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets, ...activeObjects.roguePlanets, ...activeObjects.darkNebulae, ...activeObjects.crystalGardens];
+        const celestialObjects: CelestialObject[] = [...activeObjects.planets, ...activeObjects.moons, ...activeObjects.celestialStars, ...activeObjects.nebulae, ...activeObjects.asteroidGardens, ...activeObjects.wormholes, ...activeObjects.blackholes, ...activeObjects.comets, ...activeObjects.roguePlanets, ...activeObjects.darkNebulae, ...activeObjects.crystalGardens, ...activeObjects.protostars];
         
         // Update orbital positions and animations for all celestial objects
         this.updateCelestialObjects(activeObjects, deltaTime);
@@ -769,6 +771,7 @@ export class Game {
             roguePlanets: this.chunkManager.getDiscoveredRoguePlanets(),
             darkNebulae: this.chunkManager.getDiscoveredDarkNebulae(),
             crystalGardens: this.chunkManager.getDiscoveredCrystalGardens(),
+            protostars: this.chunkManager.getDiscoveredProtostars(),
             regions: this.chunkManager.getDiscoveredRegions()
         };
     }
@@ -1098,6 +1101,11 @@ export class Game {
             // }
         }
         
+        // Render protostars (stellar formation objects - prominent with jets and disks) - culling disabled  
+        for (const obj of activeObjects.protostars) {
+            obj.render(this.renderer, this.camera);
+        }
+        
         // Render black holes (ultra-prominent cosmic phenomena - dominating layer) - culling disabled
         for (const obj of activeObjects.blackholes) {
             // if (this.isObjectInScreen(obj, screenBounds)) {
@@ -1118,7 +1126,7 @@ export class Game {
         
         // Render stellar map overlay (renders on top of everything)
         const discovered = this.getDiscoveredObjects();
-        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, discovered.crystalGardens);
+        this.stellarMap.render(this.renderer, this.camera, discovered.stars, this.gameStartingPosition, discovered.planets, discovered.nebulae, discovered.wormholes, discovered.asteroidGardens, discovered.blackHoles, discovered.comets, discovered.roguePlanets, discovered.darkNebulae, discovered.crystalGardens, discovered.protostars);
         
         // Render touch UI (renders on top of everything else)
         this.touchUI.render(this.renderer);
@@ -1563,7 +1571,8 @@ export class Game {
                     ...activeObjects.blackholes,
                     ...activeObjects.comets,
                     ...activeObjects.roguePlanets,
-                    ...activeObjects.darkNebulae
+                    ...activeObjects.darkNebulae,
+                    ...activeObjects.protostars
                 ].filter(obj => obj.hasOwnProperty('discovered'));
                 this.chunkManager.restoreDiscoveryState(flattenedObjects);
                 
