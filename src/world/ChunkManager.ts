@@ -9,7 +9,7 @@ import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids
 import { Wormhole, generateWormholePair } from '../celestial/wormholes.js';
 import { BlackHole, generateBlackHole } from '../celestial/blackholes.js';
 import { Comet, selectCometType } from '../celestial/comets.js';
-import { RoguePlanet, DarkNebula } from '../celestial/RegionSpecificObjects.js';
+import { RoguePlanet, DarkNebula, CrystalGarden } from '../celestial/RegionSpecificObjects.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { ErrorService } from '../services/ErrorService.js';
 import { RegionGenerator, type RegionInfo } from './RegionGenerator.js';
@@ -41,9 +41,10 @@ interface Chunk {
     wormholes: Wormhole[];
     blackholes: BlackHole[];
     comets: Comet[];
-    // Region-specific objects (Phase 0: rogue-planet only)
+    // Region-specific objects
     roguePlanets: RoguePlanet[];
     darkNebulae: DarkNebula[];
+    crystalGardens: CrystalGarden[];
 }
 
 interface ActiveObjects {
@@ -56,9 +57,10 @@ interface ActiveObjects {
     wormholes: Wormhole[];
     blackholes: BlackHole[];
     comets: Comet[];
-    // Region-specific objects (Phase 0: rogue-planet only)
+    // Region-specific objects
     roguePlanets: RoguePlanet[];
     darkNebulae: DarkNebula[];
+    crystalGardens: CrystalGarden[];
 }
 
 interface NebulaTypeData {
@@ -219,6 +221,18 @@ interface DiscoveredDarkNebula {
     radius: number;
 }
 
+interface DiscoveredCrystalGarden {
+    name: string;
+    type: 'crystal-garden';
+    x: number;
+    y: number;
+    variant: 'pure' | 'mixed' | 'rare-earth';
+    radius: number;
+    primaryColor: string;
+    crystalCount: number;
+    discoveryTimestamp: number;
+}
+
 interface CompanionWeight {
     type: typeof StarTypes[keyof typeof StarTypes];
     weight: number;
@@ -337,7 +351,8 @@ export class ChunkManager {
             comets: [], // Elliptical orbital objects around stars
             // Region-specific objects (Phase 0: rogue-planet only)
             roguePlanets: [],
-            darkNebulae: []
+            darkNebulae: [],
+            crystalGardens: []
         };
 
         // Generate stars for this chunk
@@ -556,6 +571,7 @@ export class ChunkManager {
         // Generate region-specific objects for this chunk
         this.generateRoguePlanetsForChunk(chunkX, chunkY, chunk);
         this.generateDarkNebulaeForChunk(chunkX, chunkY, chunk);
+        this.generateCrystalGardensForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
@@ -577,6 +593,7 @@ export class ChunkManager {
             // Region-specific objects (Phase 0 placeholders)
             roguePlanets: [],
             darkNebulae: [],
+            crystalGardens: [],
         };
         
         const chunkKey = this.getChunkKey(chunkX, chunkY);
@@ -801,6 +818,7 @@ export class ChunkManager {
             // Region-specific objects (Phase 0 placeholders)
             roguePlanets: [],
             darkNebulae: [],
+            crystalGardens: [],
         };
         
         for (const chunk of this.activeChunks.values()) {
@@ -813,9 +831,10 @@ export class ChunkManager {
             objects.wormholes.push(...chunk.wormholes);
             objects.blackholes.push(...chunk.blackholes);
             objects.comets.push(...chunk.comets);
-            // Region-specific objects (Phase 0: rogue-planet only)
+            // Region-specific objects
             objects.roguePlanets.push(...chunk.roguePlanets);
             objects.darkNebulae.push(...chunk.darkNebulae);
+            objects.crystalGardens.push(...chunk.crystalGardens);
         }
 
         return objects;
@@ -2261,6 +2280,68 @@ export class ChunkManager {
         chunk.darkNebulae.push(darkNebula);
     }
 
+    // Generate crystal gardens for a chunk - sparkling crystal formations that refract starlight
+    generateCrystalGardensForChunk(chunkX: number, chunkY: number, chunk: Chunk): void {
+        // First, check for debug crystal gardens in this chunk
+        if (this.debugObjects) {
+            for (const debugObj of this.debugObjects) {
+                if (debugObj.type === 'crystal-garden' && debugObj.object instanceof CrystalGarden) {
+                    const objChunkCoords = this.getChunkCoords(debugObj.x, debugObj.y);
+                    if (objChunkCoords.x === chunkX && objChunkCoords.y === chunkY) {
+                        chunk.crystalGardens.push(debugObj.object);
+                        // Continue to check for natural crystal gardens too
+                    }
+                }
+            }
+        }
+
+        // Get region info for this chunk to determine spawning
+        const regionGenerator = new RegionGenerator();
+        const chunkWorldX = chunkX * this.chunkSize + this.chunkSize / 2;
+        const chunkWorldY = chunkY * this.chunkSize + this.chunkSize / 2;
+        const regionInfo = regionGenerator.getRegionAt(chunkWorldX, chunkWorldY);
+        
+        // Crystal gardens only spawn in ASTEROID_GRAVEYARD regions (per Phase 3 design)
+        if (regionInfo.regionType !== 'asteroid_graveyard') {
+            return; // Early exit - no crystal gardens in other regions
+        }
+
+        // Use separate seed for crystal garden generation
+        const crystalGardenSeed = hashPosition(chunkX * this.chunkSize, chunkY * this.chunkSize) ^ 0x7CADE91F;
+        const crystalGardenRng = new SeededRandom(crystalGardenSeed);
+
+        // Phase 3 design: 1.2% spawn rate per chunk in Asteroid Graveyard regions
+        const baseSpawnRate = 0.012; // 1.2%
+        
+        // Check if we should spawn a crystal garden in this chunk
+        if (crystalGardenRng.next() > baseSpawnRate) {
+            return; // No crystal garden spawns in this chunk
+        }
+
+        // Determine variant based on Phase 3 design probabilities:
+        // Pure (40%), Mixed (50%), Rare Earth (10%)
+        let variant: 'pure' | 'mixed' | 'rare-earth';
+        const variantRoll = crystalGardenRng.next();
+        if (variantRoll < 0.4) {
+            variant = 'pure';
+        } else if (variantRoll < 0.9) {
+            variant = 'mixed';
+        } else {
+            variant = 'rare-earth';
+        }
+
+        // Position crystal garden randomly in chunk with margin for light effects
+        const margin = 80; // Margin for light refraction effects
+        const x = chunkX * this.chunkSize + crystalGardenRng.nextFloat(margin, this.chunkSize - margin);
+        const y = chunkY * this.chunkSize + crystalGardenRng.nextFloat(margin, this.chunkSize - margin);
+
+        // Create the crystal garden
+        const crystalGarden = new CrystalGarden(x, y, variant);
+
+        // Add to chunk
+        chunk.crystalGardens.push(crystalGarden);
+    }
+
     // Clear all chunks but preserve discovered objects (for game loading)
     clearAllChunks(): void {
         this.activeChunks.clear();
@@ -2453,6 +2534,41 @@ export class ChunkManager {
         return discoveredDarkNebulae;
     }
 
+    getDiscoveredCrystalGardens(): DiscoveredCrystalGarden[] {
+        const discoveredCrystalGardens: DiscoveredCrystalGarden[] = [];
+        
+        // Get all discovered objects that are crystal gardens
+        for (const [objId, discoveryData] of this.discoveredObjects) {
+            if (objId.startsWith('crystal-garden_')) {
+                // Extract coordinates from crystal garden ID
+                // Format: crystal-garden_x_y (from getObjectId)
+                const parts = objId.split('_');
+                if (parts.length >= 3) {
+                    const crystalGardenX = parseInt(parts[1]);
+                    const crystalGardenY = parseInt(parts[2]);
+                    
+                    // Find the actual crystal garden object
+                    const crystalGarden = this.findCrystalGardenByCoordinates(crystalGardenX, crystalGardenY);
+                    if (crystalGarden) {
+                        discoveredCrystalGardens.push({
+                            name: discoveryData.objectName || 'Crystal Garden',
+                            type: 'crystal-garden',
+                            x: crystalGarden.x,
+                            y: crystalGarden.y,
+                            variant: crystalGarden.variant,
+                            radius: crystalGarden.radius,
+                            primaryColor: crystalGarden.primaryColor,
+                            crystalCount: crystalGarden.crystalClusters ? crystalGarden.crystalClusters.length : 0,
+                            discoveryTimestamp: discoveryData.timestamp
+                        });
+                    }
+                }
+            }
+        }
+        
+        return discoveredCrystalGardens;
+    }
+
     private findRoguePlanetByCoordinates(x: number, y: number): any {
         // Search through all active chunks for a rogue planet with matching coordinates
         for (const [chunkKey, chunk] of this.activeChunks) {
@@ -2471,6 +2587,18 @@ export class ChunkManager {
             for (const darkNebula of chunk.darkNebulae) {
                 if (Math.floor(darkNebula.x) === x && Math.floor(darkNebula.y) === y) {
                     return darkNebula;
+                }
+            }
+        }
+        return null;
+    }
+
+    private findCrystalGardenByCoordinates(x: number, y: number): any {
+        // Search through all active chunks for a crystal garden with matching coordinates
+        for (const [chunkKey, chunk] of this.activeChunks) {
+            for (const crystalGarden of chunk.crystalGardens) {
+                if (Math.floor(crystalGarden.x) === x && Math.floor(crystalGarden.y) === y) {
+                    return crystalGarden;
                 }
             }
         }
@@ -2584,4 +2712,4 @@ export class ChunkManager {
 }
 
 // Export interfaces for use by other modules
-export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet, DiscoveredRegion };
+export type { ChunkCoords, BackgroundStar, Chunk, ActiveObjects, DiscoveryData, DiscoveredStar, DiscoveredPlanet, DiscoveredNebula, DiscoveredAsteroidGarden, DiscoveredMoon, DiscoveredWormhole, DiscoveredBlackHole, DiscoveredComet, DiscoveredRegion, DiscoveredCrystalGarden };

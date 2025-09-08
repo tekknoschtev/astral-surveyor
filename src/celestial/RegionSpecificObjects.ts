@@ -666,3 +666,532 @@ export class DarkNebula extends CelestialObject {
     }
 }
 
+// Phase 3: CrystalGarden class with light refraction and twinkling effects
+// Supports three variants: pure, mixed, and rare-earth with unique visual effects
+
+interface CrystalCluster {
+    offsetX: number;
+    offsetY: number;
+    size: number;
+    color: string;
+    refractionIntensity: number;
+    rotationSpeed: number;
+    baseRotation: number;
+    shape: 'octahedral' | 'prismatic' | 'cubic' | 'hexagonal';
+    facetCount: number;
+}
+
+interface CrystalGardenVisualEffects {
+    hasLightRefraction?: boolean;
+    hasTwinkling?: boolean;
+    hasPrismaticRays?: boolean;
+    hasRainbowEffects?: boolean;
+    hasMusicalResonance?: boolean;
+    hasGeometricFacets?: boolean;
+}
+
+export class CrystalGarden extends CelestialObject {
+    variant: 'pure' | 'mixed' | 'rare-earth';
+    radius: number;
+    primaryColor: string;
+    crystalClusters: CrystalCluster[] = [];
+    visualEffects: CrystalGardenVisualEffects;
+    discoveryTimestamp?: number;
+    
+    // Dynamic animation properties
+    animationPhase: number = 0;
+    twinklePhase: number = 0;
+    
+    constructor(x: number, y: number, variant: 'pure' | 'mixed' | 'rare-earth' = 'pure') {
+        super(x, y, 'crystal-garden');
+        this.variant = variant;
+        this.initializeProperties();
+        this.generateCrystalClusters();
+    }
+
+    private initializeProperties(): void {
+        // Set properties based on variant (per Phase 3 design document)
+        this.discoveryDistance = 65;
+        this.discoveryValue = 30;
+        
+        switch (this.variant) {
+            case 'pure':
+                this.radius = 45; // Moderate-sized fields
+                this.primaryColor = '#E6F3FF'; // Pure crystal blue
+                this.visualEffects = {
+                    hasLightRefraction: true,
+                    hasTwinkling: true,
+                    hasGeometricFacets: true
+                };
+                break;
+            case 'mixed':
+                this.radius = 55; // Larger, more diverse fields
+                this.primaryColor = '#F0E6FF'; // Amethyst base
+                this.visualEffects = {
+                    hasLightRefraction: true,
+                    hasTwinkling: true,
+                    hasRainbowEffects: true,
+                    hasGeometricFacets: true
+                };
+                break;
+            case 'rare-earth':
+                this.radius = 40; // Smaller but more spectacular
+                this.primaryColor = '#FFE6F0'; // Rose crystal
+                this.visualEffects = {
+                    hasLightRefraction: true,
+                    hasTwinkling: true,
+                    hasPrismaticRays: true,
+                    hasRainbowEffects: true,
+                    hasMusicalResonance: true,
+                    hasGeometricFacets: true
+                };
+                break;
+        }
+    }
+
+    private generateCrystalClusters(): void {
+        // Generate deterministic crystal patterns based on position
+        const positionSeed = hashPosition(this.x, this.y);
+        const rng = new SeededRandom(positionSeed + 6000);
+        
+        // Number of crystal clusters varies by variant
+        const clusterCount = this.variant === 'pure' ? 8 + Math.floor(rng.next() * 4) :
+                           this.variant === 'mixed' ? 12 + Math.floor(rng.next() * 6) :
+                           6 + Math.floor(rng.next() * 3); // rare-earth: fewer but more spectacular
+        
+        const crystalColors = this.getCrystalColors();
+        
+        for (let i = 0; i < clusterCount; i++) {
+            // Position crystals in circular pattern with some variation
+            const angle = (i / clusterCount) * Math.PI * 2 + (rng.next() - 0.5) * 0.8;
+            const distance = rng.next() * this.radius * 0.8;
+            
+            const cluster: CrystalCluster = {
+                offsetX: Math.cos(angle) * distance,
+                offsetY: Math.sin(angle) * distance,
+                size: 3 + rng.next() * 6,
+                color: crystalColors[Math.floor(rng.next() * crystalColors.length)],
+                refractionIntensity: 0.6 + rng.next() * 0.4,
+                rotationSpeed: 0.5 + rng.next() * 1.5,
+                baseRotation: rng.next() * Math.PI * 2,
+                shape: this.getRandomShape(rng),
+                facetCount: 6 + Math.floor(rng.next() * 4)
+            };
+            
+            this.crystalClusters.push(cluster);
+        }
+    }
+
+    private getCrystalColors(): string[] {
+        switch (this.variant) {
+            case 'pure':
+                // Single crystal type - blues and whites
+                return ['#E6F3FF', '#CCE7FF', '#B3DBFF', '#FFFFFF'];
+            case 'mixed':
+                // Multiple crystal types - varied colors
+                return ['#E6F3FF', '#F0E6FF', '#FFE6F0', '#E6FFE6', '#FFF0E6', '#FFFFFF'];
+            case 'rare-earth':
+                // Exotic formations - unique rare colors
+                return ['#FFE6F0', '#F0FFE6', '#E6F0FF', '#FFFFE6', '#FFE6FF', '#F5F5DC'];
+            default:
+                return ['#FFFFFF'];
+        }
+    }
+
+    private getRandomShape(rng: SeededRandom): 'octahedral' | 'prismatic' | 'cubic' | 'hexagonal' {
+        const shapes: ('octahedral' | 'prismatic' | 'cubic' | 'hexagonal')[] = 
+            ['octahedral', 'prismatic', 'cubic', 'hexagonal'];
+        return shapes[Math.floor(rng.next() * shapes.length)];
+    }
+
+    render(renderer: Renderer, camera: Camera): void {
+        const [screenX, screenY] = camera.worldToScreen(this.x, this.y, renderer.canvas.width, renderer.canvas.height);
+        
+        // Only render if on screen (with margin for light effects)
+        const margin = this.radius + 50;
+        if (screenX < -margin || screenX > renderer.canvas.width + margin || 
+            screenY < -margin || screenY > renderer.canvas.height + margin) {
+            return;
+        }
+
+        // Update animation phases
+        this.updateAnimations();
+        
+        // Render prismatic rays first (background effect)
+        if (this.visualEffects.hasPrismaticRays) {
+            this.renderPrismaticRays(renderer, screenX, screenY);
+        }
+        
+        // Render each crystal cluster
+        this.crystalClusters.forEach((cluster, index) => {
+            this.renderCrystalCluster(renderer, screenX, screenY, cluster, index);
+        });
+        
+        // Render overall light refraction effects
+        if (this.visualEffects.hasLightRefraction) {
+            this.renderLightRefractionField(renderer, screenX, screenY);
+        }
+        
+        // Apply discovery indicator if discovered
+        if (this.discovered) {
+            this.renderDiscoveryIndicator(renderer, screenX, screenY);
+        }
+    }
+
+    private updateAnimations(): void {
+        // Slow, continuous animation for twinkling and rotation
+        const currentTime = Date.now() * 0.001; // Convert to seconds
+        this.animationPhase = currentTime * 0.3; // Slow rotation
+        this.twinklePhase = currentTime * 2.0; // Faster twinkling
+    }
+
+    private renderCrystalCluster(renderer: Renderer, centerX: number, centerY: number, 
+                                cluster: CrystalCluster, index: number): void {
+        const ctx = renderer.ctx;
+        const clusterX = centerX + cluster.offsetX;
+        const clusterY = centerY + cluster.offsetY;
+        
+        ctx.save();
+        
+        // Calculate current rotation
+        const currentRotation = cluster.baseRotation + this.animationPhase * cluster.rotationSpeed;
+        
+        // Draw the crystal with geometric facets
+        this.drawGeometricCrystal(ctx, clusterX, clusterY, cluster, currentRotation);
+        
+        // Add twinkling effect
+        if (this.visualEffects.hasTwinkling) {
+            this.drawTwinkleEffect(ctx, clusterX, clusterY, cluster, index);
+        }
+        
+        // Add refraction effects around the crystal
+        if (this.visualEffects.hasLightRefraction) {
+            this.drawCrystalRefraction(ctx, clusterX, clusterY, cluster);
+        }
+        
+        ctx.restore();
+    }
+
+    private drawGeometricCrystal(ctx: CanvasRenderingContext2D, x: number, y: number, 
+                                cluster: CrystalCluster, rotation: number): void {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        
+        // Draw crystal based on shape
+        switch (cluster.shape) {
+            case 'octahedral':
+                this.drawOctahedralCrystal(ctx, cluster);
+                break;
+            case 'prismatic':
+                this.drawPrismaticCrystal(ctx, cluster);
+                break;
+            case 'cubic':
+                this.drawCubicCrystal(ctx, cluster);
+                break;
+            case 'hexagonal':
+                this.drawHexagonalCrystal(ctx, cluster);
+                break;
+        }
+        
+        ctx.restore();
+    }
+
+    private drawOctahedralCrystal(ctx: CanvasRenderingContext2D, cluster: CrystalCluster): void {
+        // Octahedral crystal - diamond-like shape with facets
+        const size = cluster.size;
+        
+        // Main crystal body
+        ctx.fillStyle = cluster.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size * 0.6, 0);
+        ctx.lineTo(0, size);
+        ctx.lineTo(-size * 0.6, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add facet lines for geometric detail
+        ctx.strokeStyle = this.lightenColor(cluster.color, 0.3);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Highlight facets
+        ctx.fillStyle = this.lightenColor(cluster.color, 0.6);
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size * 0.3, -size * 0.5);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    private drawPrismaticCrystal(ctx: CanvasRenderingContext2D, cluster: CrystalCluster): void {
+        // Prismatic crystal - elongated hexagonal shape
+        const size = cluster.size;
+        const height = size * 1.4;
+        
+        // Main crystal body
+        ctx.fillStyle = cluster.color;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const x = Math.cos(angle) * size * 0.5;
+            const y = Math.sin(angle) * size * 0.3 - height * 0.5;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add length to make it prismatic
+        ctx.fillStyle = this.darkenColor(cluster.color, 0.2);
+        ctx.fillRect(-size * 0.25, -height * 0.5, size * 0.5, height);
+    }
+
+    private drawCubicCrystal(ctx: CanvasRenderingContext2D, cluster: CrystalCluster): void {
+        // Cubic crystal - geometric cube with 3D effect
+        const size = cluster.size;
+        
+        // Main face
+        ctx.fillStyle = cluster.color;
+        ctx.fillRect(-size * 0.5, -size * 0.5, size, size);
+        
+        // Side face (3D effect)
+        ctx.fillStyle = this.darkenColor(cluster.color, 0.3);
+        ctx.beginPath();
+        ctx.moveTo(size * 0.5, -size * 0.5);
+        ctx.lineTo(size * 0.8, -size * 0.8);
+        ctx.lineTo(size * 0.8, size * 0.2);
+        ctx.lineTo(size * 0.5, size * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Top face (3D effect)
+        ctx.fillStyle = this.lightenColor(cluster.color, 0.2);
+        ctx.beginPath();
+        ctx.moveTo(-size * 0.5, -size * 0.5);
+        ctx.lineTo(-size * 0.2, -size * 0.8);
+        ctx.lineTo(size * 0.8, -size * 0.8);
+        ctx.lineTo(size * 0.5, -size * 0.5);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    private drawHexagonalCrystal(ctx: CanvasRenderingContext2D, cluster: CrystalCluster): void {
+        // Hexagonal crystal - six-sided geometric shape
+        const size = cluster.size;
+        
+        ctx.fillStyle = cluster.color;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const x = Math.cos(angle) * size;
+            const y = Math.sin(angle) * size;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add facet lines
+        ctx.strokeStyle = this.lightenColor(cluster.color, 0.4);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    private drawTwinkleEffect(ctx: CanvasRenderingContext2D, x: number, y: number, 
+                             cluster: CrystalCluster, index: number): void {
+        // Animated twinkling sparkles
+        const twinklePhase = this.twinklePhase + index * 0.5; // Offset each crystal's twinkle
+        const twinkleIntensity = (Math.sin(twinklePhase) + 1) * 0.5; // 0 to 1
+        
+        if (twinkleIntensity > 0.7) { // Only show sparkles at peak brightness
+            ctx.save();
+            ctx.globalAlpha = twinkleIntensity;
+            ctx.fillStyle = '#FFFFFF';
+            
+            // Draw sparkle points
+            const sparkleSize = cluster.size * 0.3;
+            
+            // Four-pointed star sparkle
+            ctx.beginPath();
+            ctx.moveTo(x - sparkleSize, y);
+            ctx.lineTo(x - sparkleSize * 0.3, y - sparkleSize * 0.3);
+            ctx.lineTo(x, y - sparkleSize);
+            ctx.lineTo(x + sparkleSize * 0.3, y - sparkleSize * 0.3);
+            ctx.lineTo(x + sparkleSize, y);
+            ctx.lineTo(x + sparkleSize * 0.3, y + sparkleSize * 0.3);
+            ctx.lineTo(x, y + sparkleSize);
+            ctx.lineTo(x - sparkleSize * 0.3, y + sparkleSize * 0.3);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+        }
+    }
+
+    private drawCrystalRefraction(ctx: CanvasRenderingContext2D, x: number, y: number, 
+                                 cluster: CrystalCluster): void {
+        // Create subtle light refraction effects around each crystal
+        ctx.save();
+        ctx.globalAlpha = 0.3 * cluster.refractionIntensity;
+        ctx.globalCompositeOperation = 'screen';
+        
+        // Create radial gradient for refraction halo
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, cluster.size * 2);
+        
+        if (this.visualEffects.hasRainbowEffects && this.variant === 'mixed') {
+            // Rainbow refraction for mixed crystals
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            gradient.addColorStop(0.3, 'rgba(255, 200, 255, 0.4)');
+            gradient.addColorStop(0.6, 'rgba(200, 255, 255, 0.2)');
+            gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+        } else {
+            // Simple white refraction
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        }
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, cluster.size * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+
+    private renderPrismaticRays(renderer: Renderer, centerX: number, centerY: number): void {
+        // Render spectacular light rays extending from the crystal garden (rare-earth only)
+        if (this.variant !== 'rare-earth') return;
+        
+        const ctx = renderer.ctx;
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.globalCompositeOperation = 'screen';
+        
+        // Create 6 prismatic rays extending from the center
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2 + this.animationPhase * 0.2;
+            const rayLength = this.radius * 1.8;
+            
+            const gradient = ctx.createLinearGradient(
+                centerX, centerY,
+                centerX + Math.cos(angle) * rayLength,
+                centerY + Math.sin(angle) * rayLength
+            );
+            
+            // Prismatic colors
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
+            const rayColor = colors[i];
+            
+            gradient.addColorStop(0, rayColor);
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+                centerX + Math.cos(angle) * rayLength,
+                centerY + Math.sin(angle) * rayLength
+            );
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+    private renderLightRefractionField(renderer: Renderer, centerX: number, centerY: number): void {
+        // Overall field-wide light refraction effect
+        const ctx = renderer.ctx;
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.globalCompositeOperation = 'screen';
+        
+        // Create shimmering field effect
+        const shimmerGradient = ctx.createRadialGradient(
+            centerX, centerY, 0, 
+            centerX, centerY, this.radius
+        );
+        
+        shimmerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        shimmerGradient.addColorStop(0.5, 'rgba(200, 230, 255, 0.2)');
+        shimmerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = shimmerGradient;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+
+    private renderDiscoveryIndicator(renderer: Renderer, screenX: number, screenY: number): void {
+        // Use unified discovery visualization system
+        const visualizationService = new DiscoveryVisualizationService();
+        const objectId = `crystal-garden-${this.x}-${this.y}`;
+        const currentTime = Date.now();
+        
+        const indicatorData = visualizationService.getDiscoveryIndicatorData(objectId, {
+            x: screenX,
+            y: screenY,
+            baseRadius: this.radius + 10,
+            rarity: visualizationService.getObjectRarity('crystal-garden'),
+            objectType: 'crystal-garden',
+            discoveryTimestamp: this.discoveryTimestamp || currentTime,
+            currentTime: currentTime
+        });
+
+        // Render base discovery indicator
+        renderer.drawDiscoveryIndicator(
+            screenX, 
+            screenY, 
+            this.radius + 10,
+            indicatorData.config.color,
+            indicatorData.config.lineWidth,
+            indicatorData.config.opacity,
+            indicatorData.config.dashPattern
+        );
+
+        // Render discovery pulse if active
+        if (indicatorData.discoveryPulse?.isVisible) {
+            renderer.drawDiscoveryPulse(
+                screenX,
+                screenY,
+                indicatorData.discoveryPulse.radius,
+                indicatorData.config.pulseColor || indicatorData.config.color,
+                indicatorData.discoveryPulse.opacity
+            );
+        }
+    }
+
+    // Utility methods for color manipulation
+    private lightenColor(color: string, factor: number): string {
+        // Simple color lightening
+        if (color.startsWith('#')) {
+            const hex = color.replace('#', '');
+            const r = Math.min(255, Math.floor(parseInt(hex.substr(0, 2), 16) * (1 + factor)));
+            const g = Math.min(255, Math.floor(parseInt(hex.substr(2, 2), 16) * (1 + factor)));
+            const b = Math.min(255, Math.floor(parseInt(hex.substr(4, 2), 16) * (1 + factor)));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        return color;
+    }
+
+    private darkenColor(color: string, factor: number): string {
+        // Simple color darkening
+        if (color.startsWith('#')) {
+            const hex = color.replace('#', '');
+            const r = Math.max(0, Math.floor(parseInt(hex.substr(0, 2), 16) * (1 - factor)));
+            const g = Math.max(0, Math.floor(parseInt(hex.substr(2, 2), 16) * (1 - factor)));
+            const b = Math.max(0, Math.floor(parseInt(hex.substr(4, 2), 16) * (1 - factor)));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        return color;
+    }
+}
+

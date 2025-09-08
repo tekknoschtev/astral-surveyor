@@ -26,6 +26,7 @@ interface ISoundManager {
     playStarDiscovery(starType: string): void;
     playPlanetDiscovery(planetType: string): void;
     playNebulaDiscovery(nebulaType: string): void;
+    playCrystalGardenDiscovery(variant: string): void;
     setVolume?(channel: string, volume: number): void;
     stopAmbient?(): void;
     
@@ -262,6 +263,21 @@ export class AudioService implements IAudioService {
     }
 
     /**
+     * Play crystal garden discovery sound
+     */
+    playCrystalGardenDiscovery(variant: string = 'pure'): void {
+        this.ensureNotDisposed();
+        
+        if (this.shouldPlaySound()) {
+            try {
+                this.soundManager.playCrystalGardenDiscovery(variant);
+            } catch (error) {
+                console.warn('Failed to play crystal garden discovery sound:', error);
+            }
+        }
+    }
+
+    /**
      * Play discovery sound based on object type
      */
     playDiscoverySound(objectType: string): void {
@@ -277,6 +293,8 @@ export class AudioService implements IAudioService {
                 this.playPlanetDiscovery(objectType);
             } else if (objectType.includes('nebula') || objectType.includes('Nebula')) {
                 this.playNebulaDiscovery(objectType);
+            } else if (objectType === 'crystal-garden') {
+                this.playCrystalGardenDiscovery('pure'); // Default variant, actual variant passed from DiscoveryManager
             } else {
                 // Default to star discovery for unknown types
                 console.warn(`Unknown object type for discovery sound: ${objectType}`);

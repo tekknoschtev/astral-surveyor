@@ -8,7 +8,7 @@ import { Star, Planet, StarTypes, PlanetTypes } from '../celestial/celestial.js'
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';
 import { AsteroidGarden, selectAsteroidGardenType } from '../celestial/asteroids.js';
 import { Comet, selectCometType, CometTypes } from '../celestial/comets.js';
-import { RoguePlanet, DarkNebula } from '../celestial/RegionSpecificObjects.js';
+import { RoguePlanet, DarkNebula, CrystalGarden } from '../celestial/RegionSpecificObjects.js';
 import { NamingService } from '../naming/naming.js';
 import type { Camera } from '../camera/camera.js';
 import type { ChunkManager } from '../world/world.js';
@@ -653,6 +653,65 @@ export class DebugSpawner {
         console.log(`🌫️ DEBUG: Spawned ${selectedVariant} dark nebula at (${Math.round(x)}, ${Math.round(y)})`);
     }
 
+    /**
+     * Spawn a crystal garden near the player for testing (Phase 3)
+     */
+    static spawnCrystalGarden(camera: Camera, chunkManager: ChunkManager, variant?: string, debugModeEnabled: boolean = true): void {
+        if (!debugModeEnabled) {
+            console.warn('Debug spawning requires debug mode to be enabled');
+            return;
+        }
+
+        try {
+            const playerX = camera.x;
+            const playerY = camera.y;
+            
+            // Spawn at good viewing distance for light effects
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 350 + Math.random() * 300; // 350-650 pixels - good for crystal refraction viewing
+            const x = playerX + Math.cos(angle) * distance;
+            const y = playerY + Math.sin(angle) * distance;
+
+            // Determine variant (Phase 3 design: Pure 40%, Mixed 50%, Rare Earth 10%)
+            let selectedVariant: 'pure' | 'mixed' | 'rare-earth';
+            
+            if (variant) {
+                // Use specified variant
+                const variantMapping = {
+                    'pure': 'pure' as const,
+                    'mixed': 'mixed' as const,
+                    'rare-earth': 'rare-earth' as const
+                };
+                
+                if (variantMapping[variant]) {
+                    selectedVariant = variantMapping[variant];
+                } else {
+                    console.log(`❌ Unknown crystal garden variant: ${variant}. Using random variant.`);
+                    selectedVariant = 'pure'; // Default fallback
+                }
+            } else {
+                // Random variant following Phase 3 probabilities
+                const roll = Math.random();
+                if (roll < 0.4) {
+                    selectedVariant = 'pure';
+                } else if (roll < 0.9) {
+                    selectedVariant = 'mixed';
+                } else {
+                    selectedVariant = 'rare-earth';
+                }
+            }
+
+            // Create the crystal garden
+            const crystalGarden = new CrystalGarden(x, y, selectedVariant);
+            crystalGarden.discovered = true;
+
+            this.addObjectToChunk(chunkManager, 'crystal-garden', crystalGarden, x, y);
+            console.log(`💎 DEBUG: Spawned ${selectedVariant} crystal garden at (${Math.round(x)}, ${Math.round(y)})`);
+            
+        } catch (error) {
+            console.error('❌ DEBUG: Error spawning crystal garden:', error);
+        }
+    }
 
     /**
      * Helper method to add objects to the appropriate chunk
@@ -713,6 +772,9 @@ export class DebugSpawner {
                     break;
                 case 'dark-nebula':
                     chunk.darkNebulae.push(object);
+                    break;
+                case 'crystal-garden':
+                    chunk.crystalGardens.push(object);
                     break;
             }
         }
