@@ -374,7 +374,9 @@ export class StellarMap {
             'blackhole': true,
             'comet': true,
             'rogue-planet': true,
-            'dark-nebula': true
+            'dark-nebula': true,
+            'crystal-garden': true,
+            'protostar': true
         };
         this.hoveredObjectTypeIndex = -1;
         this.showDiscoveredObjects = true;
@@ -4844,7 +4846,9 @@ export class StellarMap {
                 'blackhole': 0,
                 'comet': 0,
                 'rogue-planet': 0,
-                'dark-nebula': 0
+                'dark-nebula': 0,
+                'crystal-garden': 0,
+                'protostar': 0
             };
 
             // Count objects from revealed chunks
@@ -4853,7 +4857,7 @@ export class StellarMap {
                 // Track for debugging
                 debugObjectCounts[obj.type] = (debugObjectCounts[obj.type] || 0) + 1;
                 
-                if (objectCounts.hasOwnProperty(obj.type)) {
+                if (Object.prototype.hasOwnProperty.call(objectCounts, obj.type)) {
                     objectCounts[obj.type]++;
                 } else {
                     objectCounts[obj.type] = 1;
@@ -4868,7 +4872,8 @@ export class StellarMap {
                                objectCounts.moon + objectCounts.nebula + 
                                objectCounts.asteroidGarden + objectCounts.wormhole + 
                                objectCounts.blackhole + objectCounts.comet + 
-                               objectCounts['rogue-planet'] + objectCounts['dark-nebula'];
+                               objectCounts['rogue-planet'] + objectCounts['dark-nebula'] +
+                               objectCounts['crystal-garden'] + objectCounts['protostar'];
 
             // Calculate area from revealed chunks count
             const revealedChunkCount = this.getRevealedChunkCount(this.inspectorSeed);
@@ -4915,7 +4920,9 @@ export class StellarMap {
             blackhole: '#ff0000',           // Red for black holes
             comet: '#88ccff',               // Light blue for comets
             'rogue-planet': '#cc88aa',      // Muted purple for rogue planets
-            'dark-nebula': '#6a4a3a'        // Medium brown for dark nebulae (visible against black space)
+            'dark-nebula': '#6a4a3a',       // Medium brown for dark nebulae (visible against black space)
+            'crystal-garden': '#44ffcc',    // Cyan-green for crystal gardens (light refraction theme)
+            'protostar': '#ffaa44'          // Orange-yellow for protostars (stellar formation theme)
         };
         return colors[objectType] || '#ffffff';
     }

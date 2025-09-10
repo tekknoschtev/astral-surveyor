@@ -180,6 +180,7 @@ export class SeedInspectorService {
                     totals.roguePlanets += analysis.roguePlanets;
                     totals.darkNebulae += analysis.darkNebulae;
                     totals.crystalGardens += analysis.crystalGardens;
+                    totals.protostars += analysis.protostars;
                     totals.starSystems += analysis.starSystems;
                     totals.binarySystems += analysis.binarySystems;
                 }
