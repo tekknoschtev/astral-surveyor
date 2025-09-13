@@ -10,6 +10,8 @@ import { Ship, ThrusterParticles, StarParticles } from './ship/ship.js';
 import { DiscoveryDisplay } from './ui/ui.js';
 import { DiscoveryLogbook } from './ui/discoverylogbook.js';
 import { StellarMap } from './ui/stellarmap.js';
+import { LocalMinimap } from './ui/minimap.js';
+import { DiscoveryService } from './services/DiscoveryService.js';
 import { NamingService } from './naming/naming.js';
 import { TouchUI } from './ui/touchui.js';
 import { SoundManager } from './audio/soundmanager.js';
@@ -101,6 +103,8 @@ export class Game {
     discoveryDisplay: DiscoveryDisplay;
     discoveryLogbook: DiscoveryLogbook;
     stellarMap: StellarMap;
+    localMinimap: LocalMinimap;
+    discoveryService: DiscoveryService;
     namingService: NamingService;
     touchUI: TouchUI;
     soundManager: SoundManager;
@@ -174,6 +178,8 @@ export class Game {
         this.discoveryDisplay = new DiscoveryDisplay(this.chunkManager);
         this.discoveryLogbook = new DiscoveryLogbook();
         this.stellarMap = new StellarMap();
+        this.discoveryService = new DiscoveryService();
+        this.localMinimap = new LocalMinimap(this.chunkManager, this.discoveryService);
         this.namingService = new NamingService();
         this.stellarMap.setNamingService(this.namingService);
         this.stellarMap.setChunkManager(this.chunkManager);
@@ -439,6 +445,11 @@ export class Game {
             this.discoveryLogbook.toggle();
         }
         
+        // Handle minimap toggle (N key)
+        if (this.input.wasJustPressed('KeyN')) {
+            this.localMinimap.toggle();
+        }
+        
         // H key mute removed - use settings menu instead
         
         // Handle debug commands (development builds only)
@@ -591,6 +602,7 @@ export class Game {
         // Ship movement sounds disabled for now - will be tweaked in future
         // this.updateShipAudio();
         this.discoveryDisplay.update(deltaTime);
+        this.localMinimap.update(deltaTime);
         this.discoveryLogbook.update(deltaTime, this.input);
         this.stellarMap.update(deltaTime, this.camera, this.input);
         this.touchUI.update(deltaTime, this.renderer.canvas, this.stellarMap, this.discoveryLogbook);
@@ -1122,6 +1134,7 @@ export class Game {
         this.thrusterParticles.render(this.renderer);
         this.ship.render(this.renderer, this.camera.rotation, this.camera.x, this.camera.y, activeObjects.celestialStars as any);
         this.discoveryDisplay.render(this.renderer, this.camera);
+        this.localMinimap.render(this.renderer, this.camera);
         this.discoveryLogbook.render(this.renderer, this.camera);
         
         // Render stellar map overlay (renders on top of everything)
