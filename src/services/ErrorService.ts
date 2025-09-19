@@ -7,7 +7,7 @@
  */
 
 import { ErrorBoundary, Logger, ErrorRecord, HealthStatus, GracefulDegradation } from './ErrorBoundary.js';
-import { EventDispatcher, IEventDispatcher } from './EventSystem.js';
+// Removed EventSystem dependency for simplified architecture
 import { LoggerService, LogLevel } from './LoggerService.js';
 
 /**
@@ -106,13 +106,16 @@ class StructuredLogger implements Logger {
  */
 export class ErrorService {
     private errorBoundary: ErrorBoundary;
-    private eventDispatcher: IEventDispatcher;
     private loggerService: LoggerService;
     private disposed: boolean = false;
     private degradedServices: Set<string> = new Set();
 
-    constructor(eventDispatcher?: IEventDispatcher, loggerService?: LoggerService) {
-        this.eventDispatcher = eventDispatcher || new EventDispatcher();
+    // Simplified callback-based error notification
+    private errorCallbacks: ((data: any) => void)[] = [];
+    private criticalCallbacks: ((data: any) => void)[] = [];
+    private degradedCallbacks: ((data: any) => void)[] = [];
+
+    constructor(loggerService?: LoggerService) {
         this.loggerService = loggerService || new LoggerService({
             minLevel: LogLevel.WARN, // Focus on warnings and errors for error handling
             enableConsole: true,
@@ -247,12 +250,20 @@ export class ErrorService {
         
         // Handle critical errors
         if (classification.severity === 'critical') {
-            this.eventDispatcher.emit(ErrorEvents.CRITICAL_ERROR, {
+            // Notify critical error callbacks
+            const criticalData = {
                 service,
                 operation,
                 error,
                 recoverable: classification.recoverable,
                 userMessage
+            };
+            this.criticalCallbacks.forEach(callback => {
+                try {
+                    callback(criticalData);
+                } catch (callbackError) {
+                    console.error('Error in critical error callback:', callbackError);
+                }
             });
         }
     }
@@ -293,19 +304,10 @@ export class ErrorService {
             this.degradedServices.delete(service);
             this.errorBoundary.resetCircuit(service);
             
-            this.eventDispatcher.emit(ErrorEvents.SERVICE_RECOVERED, {
-                service,
-                timestamp: new Date()
-            });
+            // Could add recovery callbacks here if needed
         }
     }
 
-    /**
-     * Get the event dispatcher for external use
-     */
-    getEventDispatcher(): IEventDispatcher {
-        return this.eventDispatcher;
-    }
 
     /**
      * Get the logger service for direct logging
@@ -318,21 +320,21 @@ export class ErrorService {
      * Subscribe to error events
      */
     onError(callback: (data: ErrorEventData) => void): void {
-        this.eventDispatcher.on(ErrorEvents.ERROR_OCCURRED, callback);
+        this.errorCallbacks.push(callback);
     }
 
     /**
      * Subscribe to service degradation events
      */
     onServiceDegraded(callback: (data: ServiceDegradationData) => void): void {
-        this.eventDispatcher.on(ErrorEvents.SERVICE_DEGRADED, callback);
+        this.degradedCallbacks.push(callback);
     }
 
     /**
      * Subscribe to critical error events
      */
     onCriticalError(callback: (data: ErrorEventData) => void): void {
-        this.eventDispatcher.on(ErrorEvents.CRITICAL_ERROR, callback);
+        this.criticalCallbacks.push(callback);
     }
 
     /**
@@ -342,7 +344,10 @@ export class ErrorService {
         if (this.disposed) return;
         
         this.errorBoundary.dispose();
-        this.eventDispatcher.dispose();
+        // Clear all callbacks
+        this.errorCallbacks.length = 0;
+        this.criticalCallbacks.length = 0;
+        this.degradedCallbacks.length = 0;
         this.loggerService.dispose();
         this.degradedServices.clear();
         this.disposed = true;
@@ -365,7 +370,14 @@ export class ErrorService {
             userMessage
         };
         
-        this.eventDispatcher.emit(ErrorEvents.ERROR_OCCURRED, eventData);
+        // Notify error callbacks
+        this.errorCallbacks.forEach(callback => {
+            try {
+                callback(eventData);
+            } catch (callbackError) {
+                console.error('Error in error callback:', callbackError);
+            }
+        });
     }
 
     private handleServiceDegradation(service: string, operation: string): void {
@@ -383,7 +395,14 @@ export class ErrorService {
                 timestamp: new Date()
             };
             
-            this.eventDispatcher.emit(ErrorEvents.SERVICE_DEGRADED, degradationData);
+            // Notify degraded service callbacks
+            this.degradedCallbacks.forEach(callback => {
+                try {
+                    callback(degradationData);
+                } catch (callbackError) {
+                    console.error('Error in degraded service callback:', callbackError);
+                }
+            });
         }
     }
 

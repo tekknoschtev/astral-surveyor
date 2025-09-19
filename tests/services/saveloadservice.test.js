@@ -11,7 +11,7 @@ describe('SaveLoadService', () => {
     let mockCamera;
     let mockDiscoveryLogbook;
     let mockChunkManager;
-    let mockDiscoveryManager;
+    let mockSimplifiedDiscoveryService;
     let mockSettingsService;
 
     beforeEach(() => {
@@ -66,8 +66,8 @@ describe('SaveLoadService', () => {
             restoreDiscoveryState: vi.fn()
         };
 
-        // Mock discovery manager
-        mockDiscoveryManager = {
+        // Mock simplified discovery service
+        mockSimplifiedDiscoveryService = {
             exportDiscoveryData: vi.fn(() => ({
                 discoveries: [
                     {
@@ -96,7 +96,7 @@ describe('SaveLoadService', () => {
             mockCamera,
             mockDiscoveryLogbook,
             mockChunkManager,
-            mockDiscoveryManager,
+            mockSimplifiedDiscoveryService,
             mockSettingsService
         );
     });
@@ -217,7 +217,7 @@ describe('SaveLoadService', () => {
             expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledWith(
                 'ASV-100 G', 'star', 1640000000000
             );
-            expect(mockDiscoveryManager.importDiscoveryData).toHaveBeenCalledWith({
+            expect(mockSimplifiedDiscoveryService.importDiscoveryData).toHaveBeenCalledWith({
                 discoveries: expect.any(Array),
                 idCounter: 1
             });

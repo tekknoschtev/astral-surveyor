@@ -9,7 +9,7 @@ import { resetUniverse, generateSafeSpawnPosition } from '../utils/random.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
 import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
 import type { SoundManager } from '../audio/soundmanager.js';
-import type { DiscoveryManager } from './DiscoveryManager.js';
+import type { SimplifiedDiscoveryService } from './SimplifiedDiscoveryService.js';
 
 // Interface for wormhole traversal destination
 interface TraversalDestination {
@@ -60,9 +60,9 @@ export class StateManager {
     gameStartingPosition: GameStartingPosition;
     
     // Discovery manager for processing beta wormhole discoveries
-    private discoveryManager?: DiscoveryManager;
+    private discoveryManager?: SimplifiedDiscoveryService;
 
-    constructor(gameStartingPosition: GameStartingPosition, discoveryManager?: DiscoveryManager) {
+    constructor(gameStartingPosition: GameStartingPosition, discoveryManager?: SimplifiedDiscoveryService) {
         this.gameStartingPosition = gameStartingPosition;
         this.discoveryManager = discoveryManager;
         this.debugModeEnabled = this.checkDebugMode();
@@ -267,7 +267,7 @@ export class StateManager {
             // GITHUB ISSUE #126 FIX: Process the beta wormhole discovery through DiscoveryManager
             // This ensures the beta wormhole appears in the logbook, not just the chunk manager
             if (this.discoveryManager) {
-                this.discoveryManager.processDiscovery(betaWormhole, camera, chunkManager);
+                this.discoveryManager.processObjectDiscovery(betaWormhole, camera);
             }
         }
         

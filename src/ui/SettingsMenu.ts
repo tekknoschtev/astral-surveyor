@@ -49,12 +49,28 @@ export class SettingsMenu {
     private settingsChangeHandler: (event: any) => void;
     private disposed: boolean = false;
 
-    constructor(settingsService: SettingsService) {
+    // Game action callbacks
+    private onSaveGame?: () => Promise<void>;
+    private onLoadGame?: () => Promise<void>;
+    private onNewGame?: () => void;
+
+    constructor(
+        settingsService: SettingsService,
+        gameActions?: {
+            onSaveGame?: () => Promise<void>;
+            onLoadGame?: () => Promise<void>;
+            onNewGame?: () => void;
+        }
+    ) {
         if (!settingsService) {
             throw new Error('SettingsService is required');
         }
         
         this.settingsService = settingsService;
+        this.onSaveGame = gameActions?.onSaveGame;
+        this.onLoadGame = gameActions?.onLoadGame;
+        this.onNewGame = gameActions?.onNewGame;
+
         this.errorBoundary = new UIErrorBoundary(getErrorService(), {
             showErrorDetails: true,
             enableRecovery: true,
@@ -716,19 +732,21 @@ export class SettingsMenu {
     }
 
     private handleSaveGameClick(): void {
-        // Emit save game event for the Game class to handle
-        this.emitGameEvent('save.game.requested', {});
+        if (this.onSaveGame) {
+            this.onSaveGame();
+        }
     }
 
     private handleLoadGameClick(): void {
-        // Emit load game event for the Game class to handle
-        this.emitGameEvent('load.game.requested', {});
+        if (this.onLoadGame) {
+            this.onLoadGame();
+        }
     }
 
     private handleNewGameClick(): void {
-        // Emit new game event for the Game class to handle
-        // This should prompt for confirmation due to data loss
-        this.emitGameEvent('new.game.requested', {});
+        if (this.onNewGame) {
+            this.onNewGame();
+        }
     }
 
     private handleExportClick(): void {
@@ -752,14 +770,6 @@ export class SettingsMenu {
         }
     }
 
-    /**
-     * Emit game events via global event system
-     */
-    private emitGameEvent(eventType: string, data: any): void {
-        if (typeof window !== 'undefined' && (window as any).gameEventSystem) {
-            (window as any).gameEventSystem.emit(eventType, data);
-        }
-    }
 
     private handleMouseDrag(mouseX: number, mouseY: number): void {
         if (this.currentTab === 'audio') {

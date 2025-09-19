@@ -68,6 +68,7 @@ export interface IAudioService {
     playStarDiscovery(starType: string): void;
     playPlanetDiscovery(planetType: string): void;
     playNebulaDiscovery(nebulaType: string): void;
+    playCrystalGardenDiscovery(variant: string): void;
     playDiscoverySound(objectType: string): void;
     
     // Ambient audio

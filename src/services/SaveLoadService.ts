@@ -7,7 +7,7 @@ import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
 import type { Camera } from '../camera/camera.js';
 import type { SettingsService } from './SettingsService.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
-import type { DiscoveryManager } from './DiscoveryManager.js';
+import type { SimplifiedDiscoveryService } from './SimplifiedDiscoveryService.js';
 import { getUniverseSeed, setUniverseSeed, getUniverseResetCount } from '../utils/random.js';
 
 // Serializable game state structure
@@ -82,14 +82,14 @@ export class SaveLoadService implements ISaveLoadService {
         private camera: Camera,
         private discoveryLogbook: DiscoveryLogbook,
         private chunkManager: ChunkManager,
-        private discoveryManager?: DiscoveryManager,
+        private discoveryManager?: SimplifiedDiscoveryService,
         private settingsService?: SettingsService
     ) {}
 
     /**
      * Set the discovery manager after initialization
      */
-    setDiscoveryManager(discoveryManager: DiscoveryManager): void {
+    setDiscoveryManager(discoveryManager: SimplifiedDiscoveryService): void {
         this.discoveryManager = discoveryManager;
     }
 
@@ -105,8 +105,6 @@ export class SaveLoadService implements ISaveLoadService {
             });
             
             if (result.success) {
-                // Emit save success event for UI feedback
-                this.emitSaveEvent('game-saved', { timestamp: saveData.timestamp });
             }
             
             return result;
@@ -135,11 +133,6 @@ export class SaveLoadService implements ISaveLoadService {
             // Apply loaded state to game systems
             await this.restoreGameState(result.data!);
             
-            // Emit load success event
-            this.emitSaveEvent('game-loaded', { 
-                timestamp: result.data!.timestamp,
-                version: result.version 
-            });
             
             return result;
         } catch (error) {
@@ -330,15 +323,6 @@ export class SaveLoadService implements ISaveLoadService {
         return true;
     }
 
-    /**
-     * Emit save/load events for UI feedback
-     */
-    private emitSaveEvent(eventType: string, data: any): void {
-        // Use global event system if available
-        if (typeof window !== 'undefined' && (window as any).gameEventSystem) {
-            (window as any).gameEventSystem.emit(eventType, data);
-        }
-    }
 
     // Helper methods for accessing game state
     // These will need to be implemented based on actual game architecture
