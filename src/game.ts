@@ -21,6 +21,7 @@ import { createDiscoveryService } from './services/DiscoveryServiceFactory.js';
 import { StateManager } from './services/StateManager.js';
 import { DebugSpawner } from './debug/debug-spawner.js';
 import { DeveloperConsole } from './debug/DeveloperConsole.js';
+import { createGameComponents, GameComponents } from './services/GameFactory.js';
 import { CommandRegistry } from './debug/CommandRegistry.js';
 import { AudioService } from './services/AudioService.js';
 import { SettingsService } from './services/SettingsService.js';
@@ -162,124 +163,13 @@ export class Game {
     set previousBrakeState(value: boolean) { this.stateManager.previousBrakeState = value; }
 
     constructor(canvas: HTMLCanvasElement) {
-        this.renderer = new Renderer(canvas);
-        this.input = new Input();
-        this.camera = new Camera();
-        this.chunkManager = new ChunkManager();
-        this.starField = new InfiniteStarField(this.chunkManager);
-        this.ship = new Ship();
-        this.thrusterParticles = new ThrusterParticles();
-        this.starParticles = new StarParticles();
-        this.discoveryDisplay = new DiscoveryDisplay(this.chunkManager);
-        this.discoveryLogbook = new DiscoveryLogbook();
-        this.stellarMap = new StellarMap();
-        this.discoveryService = new DiscoveryService();
-        this.localMinimap = new LocalMinimap(this.chunkManager, this.discoveryService);
-        this.namingService = new NamingService();
-        this.stellarMap.setNamingService(this.namingService);
-        this.stellarMap.setChunkManager(this.chunkManager);
-        this.touchUI = new TouchUI();
-        this.soundManager = new SoundManager();
-        
-        // Initialize audio service wrapper and settings
-        this.audioService = this.createAudioServiceWrapper();
-        this.settingsService = new SettingsService(this.audioService);
-        this.settingsMenu = new SettingsMenu(this.settingsService, {
-            onSaveGame: () => this.saveGame(),
-            onLoadGame: () => this.loadGame(),
-            onNewGame: () => this.requestNewGame()
-        });
-        
-        // Initialize save/load services
-        this.storageService = new StorageService();
-        this.saveLoadService = new SaveLoadService(
-            this.storageService,
-            this.stateManager,
-            this.camera,
-            this.discoveryLogbook,
-            this.chunkManager,
-            undefined, // SimplifiedDiscoveryService - will be set after initialization
-            this.settingsService
-        );
-        this.confirmationDialog = new ConfirmationDialog();
-        
-        // Skip audio sync for now to avoid initialization issues
-        
-        // Set up callbacks for data management features
-        this.settingsService.onDistanceReset = () => {
-            this.camera.resetLifetimeDistance();
-            this.discoveryDisplay.addNotification('Distance traveled has been reset');
-        };
-        
-        this.settingsService.onDiscoveryHistoryClear = () => {
-            this.discoveryLogbook.clearHistory();
-            this.chunkManager.clearDiscoveryHistory();
-            this.discoveryDisplay.addNotification('Discovery history has been cleared');
-        };
-        
-        // Space drone will be started on first user interaction due to browser autoplay policies
-        
-        this.discoveryManager = createDiscoveryService(
-            this.namingService,
-            this.soundManager,
-            this.discoveryDisplay,
-            this.discoveryLogbook
-        );
+        // Use factory to create all components with proper initialization
+        const components = createGameComponents(canvas);
 
-        // Connect SimplifiedDiscoveryService to SaveLoadService for persistence
-        this.saveLoadService.setDiscoveryManager(this.discoveryManager);
+        // Assign components to instance properties
+        Object.assign(this, components);
 
-        // Connect SimplifiedDiscoveryService to DiscoveryLogbook for enhanced UI
-        this.discoveryLogbook.setDiscoveryManager(this.discoveryManager);
-        
-        // Connect DiscoveryDisplay to DiscoveryLogbook for notifications
-        this.discoveryLogbook.setDiscoveryDisplay(this.discoveryDisplay);
-        
-        // Initialize developer console
-        this.commandRegistry = new CommandRegistry();
-        this.developerConsole = new DeveloperConsole(
-            this.commandRegistry,
-            this.camera,
-            this.chunkManager,
-            this.stellarMap
-        );
-        
-        // Connect naming service to stellar map
-        this.stellarMap.setNamingService(this.namingService);
-        
         this.setupCanvas();
-        
-        // Set camera position from URL parameters if provided
-        const startingCoords = getStartingCoordinates();
-        if (startingCoords) {
-            this.camera.x = startingCoords.x;
-            this.camera.y = startingCoords.y;
-        }
-        
-        // Create starting position object for stellar map reference
-        const startingPosition = {
-            x: this.camera.x,
-            y: this.camera.y
-        };
-        
-        // Initialize state manager with starting position and discovery manager
-        this.stateManager = new StateManager(startingPosition, this.discoveryManager);
-        
-        // Initialize seed inspector service for developer tools
-        this.seedInspectorService = new SeedInspectorService(this.chunkManager);
-        this.stellarMap.initInspectorMode(this.seedInspectorService);
-        
-        
-        // Enable auto-save (5-minute intervals)
-        this.saveLoadService.enableAutoSave(5);
-        
-        // Log lifetime distance traveled
-        const lifetimeDistance = this.camera.getFormattedLifetimeDistance();
-        if (lifetimeDistance !== '0 km') {
-        }
-        
-        // Initialize chunks around starting position
-        this.chunkManager.updateActiveChunks(this.camera.x, this.camera.y);
     }
 
     setupCanvas(): void {
@@ -1523,53 +1413,7 @@ export class Game {
         }
     }
 
-    private createAudioServiceWrapper(): any {
-        // Real audio wrapper that uses SoundManager's granular controls
-        return {
-            setMasterVolume: (volume: number) => {
-                // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                this.soundManager.setMasterVolume(volume);
-            },
-            setAmbientVolume: (volume: number) => {
-                // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                this.soundManager.setAmbientVolume(volume);
-            },
-            setDiscoveryVolume: (volume: number) => {
-                // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                this.soundManager.setDiscoveryVolume(volume);
-            },
-            setEffectsVolume: (volume: number) => {
-                // SettingsService already converts from 0-100 to 0-1 range, so use directly
-                this.soundManager.setDiscoveryVolume(volume);
-            },
-            setMuted: (muted: boolean) => {
-                // Use the existing working toggle method
-                const currentlyMuted = this.soundManager.isMuted();
-                if (muted !== currentlyMuted) {
-                    this.soundManager.toggleMute();
-                }
-            },
-            setMasterMuted: (muted: boolean) => {
-                this.soundManager.setMasterMuted(muted);
-            },
-            setAmbientMuted: (muted: boolean) => {
-                this.soundManager.setAmbientMuted(muted);
-            },
-            setDiscoveryMuted: (muted: boolean) => {
-                this.soundManager.setDiscoveryMuted(muted);
-            },
-            // Return actual values from SoundManager (converted back to 0-100 range)
-            getMasterVolume: () => Math.round(this.soundManager.getMasterVolume() * 100),
-            getAmbientVolume: () => Math.round(this.soundManager.getAmbientVolume() * 100),
-            getDiscoveryVolume: () => Math.round(this.soundManager.getDiscoveryVolume() * 100),
-            getEffectsVolume: () => Math.round(this.soundManager.getDiscoveryVolume() * 100),
-            isMuted: () => this.soundManager.isMuted(),
-            // Individual mute state getters
-            isMasterMuted: () => this.soundManager.isMasterMuted(),
-            isAmbientMuted: () => this.soundManager.isAmbientMuted(),
-            isDiscoveryMuted: () => this.soundManager.isDiscoveryMuted()
-        };
-    }
+    // Removed createAudioServiceWrapper - now handled by GameFactory
 
     // Performance optimization helpers
     

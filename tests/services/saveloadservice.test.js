@@ -407,14 +407,25 @@ describe('SaveLoadService', () => {
             expect(result.success).toBe(true);
         });
 
+        it('should handle null save data correctly', async () => {
+            mockStorageService.getItem.mockReturnValue({
+                success: true,
+                data: null
+            });
+
+            const result = await saveLoadService.loadGame();
+            expect(result.success).toBe(true); // Returns early without validation
+            expect(result.data).toBe(null);
+        });
+
         it('should reject invalid save data structures', async () => {
             const invalidCases = [
-                null,
-                { },
+                { }, // Empty object
                 { version: '1.0.0' }, // Missing required fields
-                { version: '1.0.0', player: { x: 'invalid' } }, // Wrong type
-                { version: '1.0.0', player: { x: 100, y: 200 }, world: { } }, // Missing seed
-                { version: '1.0.0', player: { x: 100, y: 200 }, world: { currentSeed: 'test' }, discoveries: 'not-array' }
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 'invalid' } }, // Wrong player type
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 100, y: 200 }, world: { } }, // Missing seed
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 100, y: 200 }, world: { currentSeed: 'test' }, discoveries: 'not-array', discoveredObjects: [] }, // discoveries wrong type
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 100, y: 200 }, world: { currentSeed: 'test' }, discoveries: [], discoveredObjects: 'not-array' } // discoveredObjects wrong type
             ];
 
             for (const invalidData of invalidCases) {

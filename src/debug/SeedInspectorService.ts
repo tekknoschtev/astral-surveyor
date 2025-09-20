@@ -285,7 +285,10 @@ export class SeedInspectorService {
      */
     private getCosmicRegionInfo(chunkX: number, chunkY: number): { regionType: string; regionName: string; influence: number } | null {
         try {
-            const regionInfo = this.chunkManager.getChunkRegion(chunkX, chunkY);
+            // Convert chunk coordinates to world coordinates for region lookup
+            const worldX = chunkX * 2000; // Using actual chunk size of 2000
+            const worldY = chunkY * 2000;
+            const regionInfo = this.chunkManager.getRegionAt(worldX, worldY);
             if (regionInfo && regionInfo.definition) {
                 return {
                     regionType: regionInfo.regionType,

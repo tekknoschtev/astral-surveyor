@@ -1,7 +1,7 @@
 // SettingsService - User preference management and persistence
 // Handles all user settings with localStorage persistence and event system
 
-import type { IAudioService } from './AudioService.js';
+import type { AudioService } from './AudioService.js';
 
 // Settings data structure
 interface UserSettings {
@@ -31,7 +31,7 @@ interface SettingsChangeEvent {
 }
 
 export class SettingsService {
-    private readonly audioService: IAudioService;
+    private readonly audioService: AudioService;
     private settings: UserSettings;
     private readonly instanceId: string = `SettingsService-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     private previousVolumes: { ambient: number; discovery: number; master: number } = {
@@ -45,7 +45,7 @@ export class SettingsService {
     onDistanceReset?: () => void;
     onDiscoveryHistoryClear?: () => void;
 
-    constructor(audioService: IAudioService) {
+    constructor(audioService: AudioService) {
         if (!audioService) {
             throw new Error('AudioService is required');
         }

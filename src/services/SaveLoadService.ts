@@ -1,126 +1,65 @@
-// SaveLoadService - Game state persistence orchestration
-// Manages complete game state serialization and restoration
+// SaveLoadService - Simple game state persistence
+// Manages localStorage save/load with minimal complexity
 
 import type { IStorageService, StorageResult } from './StorageService.js';
 import type { StateManager } from './StateManager.js';
 import type { DiscoveryLogbook } from '../ui/discoverylogbook.js';
 import type { Camera } from '../camera/camera.js';
-import type { SettingsService } from './SettingsService.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
 import type { SimplifiedDiscoveryService } from './SimplifiedDiscoveryService.js';
 import { getUniverseSeed, setUniverseSeed, getUniverseResetCount } from '../utils/random.js';
 
-// Serializable game state structure
+// Simple save data structure
 export interface SaveGameData {
     version: string;
     timestamp: number;
-    
-    // Core game state
-    player: {
-        x: number;
-        y: number;
-        velocityX: number;
-        velocityY: number;
-        distanceTraveled: number;
-    };
-    
-    // World state
-    world: {
-        currentSeed: string;
-        universeResetCount: number;
-    };
-    
-    // Discovery progress (enhanced)
-    discoveries: Array<{
-        name: string;
-        type: string;
-        timestamp: number;
-    }>;
-    
-    // Enhanced discovery manager data
-    discoveryManager?: {
-        discoveries: any[]; // DiscoveryEntry[]
-        idCounter: number;
-    };
-    
-    // ChunkManager discovery state
-    discoveredObjects: Array<{
-        objectId: string;
-        discoveryData: any;
-    }>;
-    
-    // Game statistics
-    stats: {
-        sessionStartTime: number;
-        totalPlayTime: number;
-        firstDiscoveryTime?: number;
-        lastDiscoveryTime?: number;
-    };
+    player: { x: number; y: number; velocityX: number; velocityY: number; distanceTraveled: number };
+    world: { currentSeed: string; universeResetCount: number };
+    discoveries: Array<{ name: string; type: string; timestamp: number }>;
+    discoveredObjects: Array<{ objectId: string; discoveryData: any }>;
+    discoveryManager?: any;
+    stats: { sessionStartTime: number; totalPlayTime: number };
 }
 
-export interface ISaveLoadService {
-    saveGame(slotName?: string): Promise<StorageResult<void>>;
-    loadGame(slotName?: string): Promise<StorageResult<SaveGameData>>;
-    hasSavedGame(slotName?: string): boolean;
-    deleteSavedGame(slotName?: string): StorageResult<void>;
-    getSaveGameInfo(slotName?: string): Promise<{ exists: boolean; timestamp?: number; version?: string }>;
-    getAvailableSaveSlots(): string[];
-    enableAutoSave(intervalMinutes?: number): void;
-    disableAutoSave(): void;
-    saveOnDiscovery(): Promise<void>;
-}
-
-export class SaveLoadService implements ISaveLoadService {
+export class SaveLoadService {
     private readonly defaultSlot = 'gameState';
     private readonly currentVersion = '1.0.0';
     private autoSaveTimer?: number;
-    private autoSaveInterval: number = 5 * 60 * 1000; // 5 minutes default
-    
+    private discoveryManager?: SimplifiedDiscoveryService;
+
     constructor(
         private storageService: IStorageService,
         private stateManager: StateManager,
         private camera: Camera,
         private discoveryLogbook: DiscoveryLogbook,
         private chunkManager: ChunkManager,
-        private discoveryManager?: SimplifiedDiscoveryService,
-        private settingsService?: SettingsService
-    ) {}
+        discoveryManager?: SimplifiedDiscoveryService,
+        settingsService?: any // Optional for backward compatibility
+    ) {
+        if (discoveryManager) {
+            this.discoveryManager = discoveryManager;
+        }
+    }
 
-    /**
-     * Set the discovery manager after initialization
-     */
     setDiscoveryManager(discoveryManager: SimplifiedDiscoveryService): void {
         this.discoveryManager = discoveryManager;
     }
 
-    /**
-     * Save complete game state to localStorage
-     */
+    // Save game state
     async saveGame(slotName: string = this.defaultSlot): Promise<StorageResult<void>> {
         try {
             const saveData = this.collectGameState();
-            
-            const result = this.storageService.setItem(slotName, saveData, {
-                version: this.currentVersion
-            });
-            
-            if (result.success) {
-            }
-            
-            return result;
+            return this.storageService.setItem(slotName, saveData, { version: this.currentVersion });
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown save error';
-            return { success: false, error: `Failed to save game: ${errorMessage}` };
+            return { success: false, error: `Save failed: ${error}` };
         }
     }
 
-    /**
-     * Load game state from localStorage
-     */
+    // Load game state
     async loadGame(slotName: string = this.defaultSlot): Promise<StorageResult<SaveGameData>> {
         const result = this.storageService.getItem<SaveGameData>(slotName);
-        
-        if (!result.success) {
+
+        if (!result.success || !result.data) {
             return result;
         }
 
@@ -130,267 +69,32 @@ export class SaveLoadService implements ISaveLoadService {
                 return { success: false, error: 'Save data validation failed' };
             }
 
-            // Apply loaded state to game systems
-            await this.restoreGameState(result.data!);
-            
-            
+            await this.restoreGameState(result.data);
             return result;
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown load error';
-            return { success: false, error: `Failed to load game: ${errorMessage}` };
+            return { success: false, error: `Load failed: ${error}` };
         }
     }
 
-    /**
-     * Check if a saved game exists
-     */
+    // Check if save exists
     hasSavedGame(slotName: string = this.defaultSlot): boolean {
-        const result = this.storageService.getItem(slotName);
-        return result.success;
+        return this.storageService.getItem(slotName).success;
     }
 
-    /**
-     * Delete saved game data
-     */
+    // Delete saved game
     deleteSavedGame(slotName: string = this.defaultSlot): StorageResult<void> {
         return this.storageService.removeItem(slotName);
     }
 
-    /**
-     * Get information about existing save game
-     */
-    async getSaveGameInfo(slotName: string = this.defaultSlot): Promise<{ exists: boolean; timestamp?: number; version?: string }> {
-        const result = this.storageService.getItem<SaveGameData>(slotName);
-        
-        if (!result.success) {
-            return { exists: false };
-        }
-
-        return {
-            exists: true,
-            timestamp: result.data?.timestamp,
-            version: result.version
-        };
-    }
-
-    /**
-     * Get list of available save slots
-     */
-    getAvailableSaveSlots(): string[] {
-        // For single slot implementation, return array with default slot if it exists
-        const slots: string[] = [];
-        
-        if (this.hasSavedGame(this.defaultSlot)) {
-            slots.push(this.defaultSlot);
-        }
-        
-        return slots;
-    }
-
-    /**
-     * Collect current game state for serialization
-     */
-    private collectGameState(): SaveGameData {
-        // Get current discoveries from logbook
-        const discoveries = this.discoveryLogbook.getDiscoveries().map(d => ({
-            name: d.name,
-            type: d.type,
-            timestamp: d.timestamp
-        }));
-        
-        // Get discovered objects from ChunkManager
-        const discoveredObjects: Array<{ objectId: string; discoveryData: any }> = [];
-        for (const [objectId, discoveryData] of (this.chunkManager as any).discoveredObjects) {
-            discoveredObjects.push({ objectId, discoveryData });
-        }
-
-        // Calculate total play time (basic implementation)
-        const sessionStart = this.getSessionStartTime();
-        const currentTime = Date.now();
-        const sessionDuration = currentTime - sessionStart;
-
-        return {
-            version: this.currentVersion,
-            timestamp: Date.now(),
-            
-            player: {
-                x: this.camera.x,
-                y: this.camera.y,
-                velocityX: this.camera.velocityX || 0,
-                velocityY: this.camera.velocityY || 0,
-                distanceTraveled: this.getDistanceTraveled()
-            },
-            
-            world: {
-                currentSeed: this.getCurrentSeed(),
-                universeResetCount: this.getUniverseResetCount()
-            },
-            
-            discoveries: discoveries,
-            discoveredObjects: discoveredObjects,
-            
-            // Enhanced discovery manager data
-            discoveryManager: this.discoveryManager ? this.discoveryManager.exportDiscoveryData() : undefined,
-            
-            stats: {
-                sessionStartTime: sessionStart,
-                totalPlayTime: this.getTotalPlayTime() + sessionDuration,
-                firstDiscoveryTime: this.getFirstDiscoveryTime(discoveries),
-                lastDiscoveryTime: this.getLastDiscoveryTime(discoveries)
-            }
-        };
-    }
-
-    /**
-     * Restore game state from loaded data
-     */
-    private async restoreGameState(saveData: SaveGameData): Promise<void> {
-        // Restore player position and velocity
-        this.camera.x = saveData.player.x;
-        this.camera.y = saveData.player.y;
-        
-        if (this.camera.velocityX !== undefined) {
-            this.camera.velocityX = saveData.player.velocityX;
-        }
-        if (this.camera.velocityY !== undefined) {
-            this.camera.velocityY = saveData.player.velocityY;
-        }
-
-        // Restore distance traveled
-        if (this.camera.sessionDistanceTraveled !== undefined) {
-            this.camera.sessionDistanceTraveled = saveData.player.distanceTraveled;
-        }
-
-        // Restore world state
-        if (saveData.world.currentSeed) {
-            this.setCurrentSeed(saveData.world.currentSeed);
-        }
-
-        // Restore discoveries in logbook
-        this.discoveryLogbook.clearHistory();
-        saveData.discoveries.forEach(discovery => {
-            this.discoveryLogbook.addDiscovery(discovery.name, discovery.type, discovery.timestamp);
-        });
-        
-        // Restore ChunkManager discovered objects map
-        (this.chunkManager as any).discoveredObjects.clear();
-        saveData.discoveredObjects.forEach(({ objectId, discoveryData }) => {
-            (this.chunkManager as any).discoveredObjects.set(objectId, discoveryData);
-        });
-
-        // Restore enhanced discovery manager data
-        if (this.discoveryManager && saveData.discoveryManager) {
-            this.discoveryManager.importDiscoveryData(saveData.discoveryManager);
-        }
-
-        // Update session tracking
-        this.setSessionStartTime(Date.now() - (saveData.stats.totalPlayTime || 0));
-    }
-
-    /**
-     * Validate save data structure
-     */
-    private validateSaveData(data: any): data is SaveGameData {
-        if (!data || typeof data !== 'object') return false;
-        
-        // Check required top-level properties
-        if (!data.version || !data.timestamp || !data.player || !data.world || !data.discoveries || !data.discoveredObjects) {
-            return false;
-        }
-        
-        // Validate discoveredObjects array
-        if (!Array.isArray(data.discoveredObjects)) {
-            return false;
-        }
-
-        // Validate player data
-        const player = data.player;
-        if (typeof player.x !== 'number' || typeof player.y !== 'number') {
-            return false;
-        }
-
-        // Validate world data
-        const world = data.world;
-        if (!world.currentSeed || typeof world.currentSeed !== 'string') {
-            return false;
-        }
-
-        // Validate discoveries array
-        if (!Array.isArray(data.discoveries)) {
-            return false;
-        }
-
-        return true;
-    }
-
-
-    // Helper methods for accessing game state
-    // These will need to be implemented based on actual game architecture
-
-    private getDistanceTraveled(): number {
-        // Access distance from camera or separate tracking
-        return this.camera.getSessionDistance();
-    }
-
-    private getCurrentSeed(): string {
-        return getUniverseSeed().toString();
-    }
-
-    private getUniverseResetCount(): number {
-        return getUniverseResetCount();
-    }
-
-    private setCurrentSeed(seed: string): void {
-        const numericSeed = parseInt(seed, 10);
-        if (!isNaN(numericSeed)) {
-            setUniverseSeed(numericSeed);
-        }
-    }
-
-    private getSessionStartTime(): number {
-        return (globalThis as any).sessionStartTime || Date.now();
-    }
-
-    private setSessionStartTime(time: number): void {
-        (globalThis as any).sessionStartTime = time;
-    }
-
-    private getTotalPlayTime(): number {
-        return (globalThis as any).totalPlayTime || 0;
-    }
-
-    private getFirstDiscoveryTime(discoveries: any[]): number | undefined {
-        if (discoveries.length === 0) return undefined;
-        return Math.min(...discoveries.map(d => d.timestamp));
-    }
-
-    private getLastDiscoveryTime(discoveries: any[]): number | undefined {
-        if (discoveries.length === 0) return undefined;
-        return Math.max(...discoveries.map(d => d.timestamp));
-    }
-
-    /**
-     * Enable periodic auto-save functionality
-     */
+    // Enable auto-save
     enableAutoSave(intervalMinutes: number = 5): void {
-        this.disableAutoSave(); // Clear any existing timer
-        
-        this.autoSaveInterval = intervalMinutes * 60 * 1000;
-        this.autoSaveTimer = window.setInterval(async () => {
-            try {
-                const result = await this.saveGame();
-                if (result.success) {
-                } else {
-                }
-            } catch (error) {
-            }
-        }, this.autoSaveInterval);
-        
+        this.disableAutoSave();
+        this.autoSaveTimer = window.setInterval(() => {
+            this.saveGame().catch(() => {}); // Silent fail for auto-save
+        }, intervalMinutes * 60 * 1000);
     }
 
-    /**
-     * Disable auto-save functionality
-     */
+    // Disable auto-save
     disableAutoSave(): void {
         if (this.autoSaveTimer) {
             window.clearInterval(this.autoSaveTimer);
@@ -398,16 +102,163 @@ export class SaveLoadService implements ISaveLoadService {
         }
     }
 
-    /**
-     * Save game when discovery is made (non-blocking)
-     */
+    // Save on discovery
     async saveOnDiscovery(): Promise<void> {
-        try {
-            const result = await this.saveGame();
-            if (result.success) {
-            } else {
-            }
-        } catch (error) {
+        await this.saveGame();
+    }
+
+    // Get information about existing save game
+    async getSaveGameInfo(slotName: string = this.defaultSlot): Promise<{ exists: boolean; timestamp?: number; version?: string }> {
+        const result = this.storageService.getItem<SaveGameData>(slotName);
+
+        if (!result.success) {
+            return { exists: false };
         }
+
+        return {
+            exists: true,
+            timestamp: result.data?.timestamp,
+            version: this.currentVersion
+        };
+    }
+
+    // Get list of available save slots
+    getAvailableSaveSlots(): string[] {
+        const slots: string[] = [];
+
+        if (this.hasSavedGame(this.defaultSlot)) {
+            slots.push(this.defaultSlot);
+        }
+
+        return slots;
+    }
+
+    // Collect current game state
+    private collectGameState(): SaveGameData {
+        const discoveries = this.discoveryLogbook.getDiscoveries().map(d => ({
+            name: d.name,
+            type: d.type,
+            timestamp: d.timestamp
+        }));
+
+        const discoveredObjects: Array<{ objectId: string; discoveryData: any }> = [];
+        for (const [objectId, discoveryData] of (this.chunkManager as any).discoveredObjects) {
+            discoveredObjects.push({ objectId, discoveryData });
+        }
+
+        const sessionStart = (globalThis as any).sessionStartTime || Date.now();
+        const sessionDuration = Date.now() - sessionStart;
+
+        return {
+            version: this.currentVersion,
+            timestamp: Date.now(),
+
+            player: {
+                x: this.camera.x,
+                y: this.camera.y,
+                velocityX: this.camera.velocityX || 0,
+                velocityY: this.camera.velocityY || 0,
+                distanceTraveled: this.camera.getSessionDistance()
+            },
+
+            world: {
+                currentSeed: getUniverseSeed().toString(),
+                universeResetCount: getUniverseResetCount()
+            },
+
+            discoveries,
+            discoveredObjects,
+            discoveryManager: this.discoveryManager?.exportDiscoveryData(),
+
+            stats: {
+                sessionStartTime: sessionStart,
+                totalPlayTime: ((globalThis as any).totalPlayTime || 0) + sessionDuration
+            }
+        };
+    }
+
+    // Restore game state from save data
+    private async restoreGameState(saveData: SaveGameData): Promise<void> {
+        // Restore player position
+        this.camera.x = saveData.player.x;
+        this.camera.y = saveData.player.y;
+
+        if (this.camera.velocityX !== undefined) {
+            this.camera.velocityX = saveData.player.velocityX;
+        }
+        if (this.camera.velocityY !== undefined) {
+            this.camera.velocityY = saveData.player.velocityY;
+        }
+
+        // Restore distance
+        if (this.camera.sessionDistanceTraveled !== undefined) {
+            this.camera.sessionDistanceTraveled = saveData.player.distanceTraveled;
+        }
+
+        // Restore world seed
+        if (saveData.world.currentSeed) {
+            const seed = parseInt(saveData.world.currentSeed, 10);
+            if (!isNaN(seed)) {
+                setUniverseSeed(seed);
+            }
+        }
+
+        // Restore discoveries
+        this.discoveryLogbook.clearHistory();
+        saveData.discoveries.forEach(discovery => {
+            this.discoveryLogbook.addDiscovery(discovery.name, discovery.type, discovery.timestamp);
+        });
+
+        // Restore discovered objects
+        (this.chunkManager as any).discoveredObjects.clear();
+        saveData.discoveredObjects.forEach(({ objectId, discoveryData }) => {
+            (this.chunkManager as any).discoveredObjects.set(objectId, discoveryData);
+        });
+
+        // Restore discovery manager
+        if (this.discoveryManager && saveData.discoveryManager) {
+            this.discoveryManager.importDiscoveryData(saveData.discoveryManager);
+        }
+
+        // Update session tracking
+        (globalThis as any).sessionStartTime = Date.now() - (saveData.stats.totalPlayTime || 0);
+    }
+
+    // Validate save data structure
+    private validateSaveData(data: any): data is SaveGameData {
+        if (!data || typeof data !== 'object') {
+            console.log('Validation failed: not object or null/undefined');
+            return false;
+        }
+
+        // Check required top-level properties - all must exist
+        if (!data.version || !data.timestamp || !data.player || !data.world ||
+            !data.hasOwnProperty('discoveries') || !data.hasOwnProperty('discoveredObjects')) {
+            console.log('Validation failed: missing required properties', JSON.stringify(data));
+            return false;
+        }
+
+        // Validate arrays
+        if (!Array.isArray(data.discoveries) || !Array.isArray(data.discoveredObjects)) {
+            console.log('Validation failed: invalid arrays', typeof data.discoveries, typeof data.discoveredObjects);
+            return false;
+        }
+
+        // Validate player data
+        const player = data.player;
+        if (!player || typeof player.x !== 'number' || typeof player.y !== 'number') {
+            console.log('Validation failed: invalid player data', player);
+            return false;
+        }
+
+        // Validate world data
+        const world = data.world;
+        if (!world || !world.currentSeed || typeof world.currentSeed !== 'string') {
+            console.log('Validation failed: invalid world data', world);
+            return false;
+        }
+
+        console.log('Validation passed for:', JSON.stringify(data));
+        return true;
     }
 }
