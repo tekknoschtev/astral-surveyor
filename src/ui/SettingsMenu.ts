@@ -85,6 +85,19 @@ export class SettingsMenu {
         this.settingsService.addEventListener('settingsChanged', this.settingsChangeHandler);
     }
 
+    /**
+     * Update game action callbacks after game initialization
+     */
+    updateGameActions(gameActions: {
+        onSaveGame?: () => Promise<void>;
+        onLoadGame?: () => Promise<void>;
+        onNewGame?: () => void;
+    }): void {
+        this.onSaveGame = gameActions.onSaveGame;
+        this.onLoadGame = gameActions.onLoadGame;
+        this.onNewGame = gameActions.onNewGame;
+    }
+
     private calculateDimensions(canvas: { width: number; height: number }): MenuDimensions {
         const baseWidth = this.touchMode ? 500 : 600;
         const baseHeight = this.touchMode ? 450 : 500;

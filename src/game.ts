@@ -169,6 +169,13 @@ export class Game {
         // Assign components to instance properties
         Object.assign(this, components);
 
+        // Update settings menu with proper game callbacks now that the game instance exists
+        this.settingsMenu.updateGameActions({
+            onSaveGame: () => this.saveGame(),
+            onLoadGame: () => this.loadGame(),
+            onNewGame: () => this.requestNewGame()
+        });
+
         this.setupCanvas();
     }
 
