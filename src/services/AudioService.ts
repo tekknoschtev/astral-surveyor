@@ -26,6 +26,7 @@ export class AudioService {
     constructor(configService: ConfigService, soundManager: ISoundManager) {
         this.soundManager = soundManager;
         this.loadSettings();
+        this.syncMuteState();
     }
 
     // Volume management
@@ -135,6 +136,15 @@ export class AudioService {
             localStorage.setItem('astralSurveyor_audioSettings', JSON.stringify(settings));
         } catch (error) {
             // Ignore save errors
+        }
+    }
+
+    /**
+     * Synchronize the mute state with the sound manager after loading settings
+     */
+    private syncMuteState(): void {
+        if (this.muted !== this.soundManager.isMuted()) {
+            this.soundManager.toggleMute();
         }
     }
 }

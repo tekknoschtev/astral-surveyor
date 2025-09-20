@@ -62,6 +62,42 @@ describe('AudioService', () => {
             expect(audioService.getVolume()).toBe(0.8);
             expect(audioService.isMuted()).toBe(false);
         });
+
+        it('should synchronize mute state with sound manager on initialization', () => {
+            // Mock localStorage with muted = true
+            const savedSettings = JSON.stringify({
+                volume: 0.7,
+                muted: true
+            });
+            localStorage.getItem.mockReturnValue(savedSettings);
+
+            // Mock sound manager starting unmuted
+            mockSoundManager.isMuted.mockReturnValue(false);
+
+            const newService = new AudioService(mockConfigService, mockSoundManager);
+
+            // Should have called toggleMute to sync the state
+            expect(mockSoundManager.toggleMute).toHaveBeenCalled();
+            expect(newService.isMuted()).toBe(true);
+        });
+
+        it('should not toggle mute if already synchronized', () => {
+            // Mock localStorage with muted = false
+            const savedSettings = JSON.stringify({
+                volume: 0.7,
+                muted: false
+            });
+            localStorage.getItem.mockReturnValue(savedSettings);
+
+            // Mock sound manager already unmuted
+            mockSoundManager.isMuted.mockReturnValue(false);
+
+            const newService = new AudioService(mockConfigService, mockSoundManager);
+
+            // Should NOT have called toggleMute since they're already in sync
+            expect(mockSoundManager.toggleMute).not.toHaveBeenCalled();
+            expect(newService.isMuted()).toBe(false);
+        });
     });
 
     describe('Volume Management', () => {
