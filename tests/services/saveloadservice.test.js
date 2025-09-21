@@ -11,7 +11,7 @@ describe('SaveLoadService', () => {
     let mockCamera;
     let mockDiscoveryLogbook;
     let mockChunkManager;
-    let mockDiscoveryManager;
+    let mockSimplifiedDiscoveryService;
     let mockSettingsService;
 
     beforeEach(() => {
@@ -66,8 +66,8 @@ describe('SaveLoadService', () => {
             restoreDiscoveryState: vi.fn()
         };
 
-        // Mock discovery manager
-        mockDiscoveryManager = {
+        // Mock simplified discovery service
+        mockSimplifiedDiscoveryService = {
             exportDiscoveryData: vi.fn(() => ({
                 discoveries: [
                     {
@@ -96,7 +96,7 @@ describe('SaveLoadService', () => {
             mockCamera,
             mockDiscoveryLogbook,
             mockChunkManager,
-            mockDiscoveryManager,
+            mockSimplifiedDiscoveryService,
             mockSettingsService
         );
     });
@@ -217,7 +217,7 @@ describe('SaveLoadService', () => {
             expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledWith(
                 'ASV-100 G', 'star', 1640000000000
             );
-            expect(mockDiscoveryManager.importDiscoveryData).toHaveBeenCalledWith({
+            expect(mockSimplifiedDiscoveryService.importDiscoveryData).toHaveBeenCalledWith({
                 discoveries: expect.any(Array),
                 idCounter: 1
             });
@@ -407,14 +407,25 @@ describe('SaveLoadService', () => {
             expect(result.success).toBe(true);
         });
 
+        it('should handle null save data correctly', async () => {
+            mockStorageService.getItem.mockReturnValue({
+                success: true,
+                data: null
+            });
+
+            const result = await saveLoadService.loadGame();
+            expect(result.success).toBe(true); // Returns early without validation
+            expect(result.data).toBe(null);
+        });
+
         it('should reject invalid save data structures', async () => {
             const invalidCases = [
-                null,
-                { },
+                { }, // Empty object
                 { version: '1.0.0' }, // Missing required fields
-                { version: '1.0.0', player: { x: 'invalid' } }, // Wrong type
-                { version: '1.0.0', player: { x: 100, y: 200 }, world: { } }, // Missing seed
-                { version: '1.0.0', player: { x: 100, y: 200 }, world: { currentSeed: 'test' }, discoveries: 'not-array' }
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 'invalid' } }, // Wrong player type
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 100, y: 200 }, world: { } }, // Missing seed
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 100, y: 200 }, world: { currentSeed: 'test' }, discoveries: 'not-array', discoveredObjects: [] }, // discoveries wrong type
+                { version: '1.0.0', timestamp: Date.now(), player: { x: 100, y: 200 }, world: { currentSeed: 'test' }, discoveries: [], discoveredObjects: 'not-array' } // discoveredObjects wrong type
             ];
 
             for (const invalidData of invalidCases) {

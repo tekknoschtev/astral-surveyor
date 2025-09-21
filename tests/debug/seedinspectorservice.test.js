@@ -16,7 +16,8 @@ describe('SeedInspectorService', () => {
         // Create mock ChunkManager
         mockChunkManager = {
             generateChunk: vi.fn(),
-            _generateChunk: vi.fn()
+            _generateChunk: vi.fn(),
+            getRegionAt: vi.fn().mockReturnValue(null) // Mock region method
         };
 
         // Create service instance

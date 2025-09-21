@@ -1,5 +1,5 @@
-// AudioService Tests - Test-driven development for audio management
-// Following Phase 4 clean architecture patterns
+// AudioService Tests - Updated for simplified interface
+// Following complexity elimination and clean architecture patterns
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AudioService } from '../../dist/services/AudioService.js';
@@ -9,37 +9,10 @@ describe('AudioService', () => {
     let mockConfigService;
     let mockSoundManager;
 
-    // Mock AudioContext for testing
-    const mockAudioContext = {
-        createGain: vi.fn(() => ({
-            gain: { value: 1 },
-            connect: vi.fn(),
-            disconnect: vi.fn()
-        })),
-        createOscillator: vi.fn(() => ({
-            frequency: { value: 440 },
-            type: 'sine',
-            connect: vi.fn(),
-            start: vi.fn(),
-            stop: vi.fn()
-        })),
-        createBiquadFilter: vi.fn(() => ({
-            frequency: { value: 350 },
-            Q: { value: 1 },
-            type: 'lowpass',
-            connect: vi.fn()
-        })),
-        destination: {},
-        currentTime: 0,
-        state: 'running',
-        resume: vi.fn(),
-        close: vi.fn()
-    };
-
     beforeEach(() => {
         // Reset mocks
         vi.clearAllMocks();
-        
+
         // Mock localStorage
         const localStorageMock = {
             getItem: vi.fn(() => null),
@@ -51,33 +24,14 @@ describe('AudioService', () => {
             value: localStorageMock,
             writable: true
         });
-        
-        // Mock global AudioContext
-        global.AudioContext = vi.fn(() => mockAudioContext);
-        global.webkitAudioContext = vi.fn(() => mockAudioContext);
 
-        // Mock dependencies
+        // Mock ConfigService - simplified
         mockConfigService = {
-            get: (key, defaultValue) => {
-                const configMap = {
-                    'audio.enabled': true,
-                    'audio.volume.master': 0.8,
-                    'audio.volume.effects': 0.6,
-                    'audio.volume.ambient': 0.4,
-                    'audio.quality': 'high'
-                };
-                return configMap[key] || defaultValue;
-            },
-            getAudioConfig: () => ({
-                enabled: true,
-                volume: {
-                    master: 0.8,
-                    effects: 0.6,
-                    ambient: 0.4
-                }
-            })
+            get: vi.fn((key, defaultValue) => defaultValue),
+            getAudioConfig: vi.fn(() => null)
         };
 
+        // Mock SoundManager - simplified interface
         mockSoundManager = {
             isInitialized: vi.fn(() => true),
             isMuted: vi.fn(() => false),
@@ -85,339 +39,223 @@ describe('AudioService', () => {
             playStarDiscovery: vi.fn(),
             playPlanetDiscovery: vi.fn(),
             playNebulaDiscovery: vi.fn(),
+            playCrystalGardenDiscovery: vi.fn(),
             setVolume: vi.fn(),
-            stopAmbient: vi.fn()
+            startSpaceDrone: vi.fn(),
+            stopSpaceDrone: vi.fn(),
+            isSpaceDronePlaying: vi.fn(() => false)
         };
 
         audioService = new AudioService(mockConfigService, mockSoundManager);
     });
 
     afterEach(() => {
-        if (audioService && typeof audioService.dispose === 'function') {
-            audioService.dispose();
-        }
         vi.restoreAllMocks();
     });
 
-    describe('Initialization', () => {
+    describe('Basic Initialization', () => {
         it('should initialize with proper dependencies', () => {
             expect(audioService).toBeDefined();
-            expect(audioService.configService).toBe(mockConfigService);
-            expect(audioService.soundManager).toBe(mockSoundManager);
         });
 
-        it('should handle missing dependencies gracefully', () => {
-            expect(() => {
-                new AudioService(null, mockSoundManager);
-            }).toThrow('ConfigService is required');
-
-            expect(() => {
-                new AudioService(mockConfigService, null);
-            }).toThrow('SoundManager is required');
+        it('should load default settings', () => {
+            expect(audioService.getVolume()).toBe(0.8);
+            expect(audioService.isMuted()).toBe(false);
         });
 
-        it('should initialize audio settings from configuration', () => {
-            expect(audioService.getMasterVolume()).toBe(0.8);
-            expect(audioService.getEffectsVolume()).toBe(0.6);
-            expect(audioService.getAmbientVolume()).toBe(0.4);
+        it('should synchronize mute state with sound manager on initialization', () => {
+            // Mock localStorage with muted = true
+            const savedSettings = JSON.stringify({
+                volume: 0.7,
+                muted: true
+            });
+            localStorage.getItem.mockReturnValue(savedSettings);
+
+            // Mock sound manager starting unmuted
+            mockSoundManager.isMuted.mockReturnValue(false);
+
+            const newService = new AudioService(mockConfigService, mockSoundManager);
+
+            // Should have called toggleMute to sync the state
+            expect(mockSoundManager.toggleMute).toHaveBeenCalled();
+            expect(newService.isMuted()).toBe(true);
         });
 
-        it('should detect audio capability', () => {
-            expect(audioService.isAudioSupported()).toBe(true);
+        it('should not toggle mute if already synchronized', () => {
+            // Mock localStorage with muted = false
+            const savedSettings = JSON.stringify({
+                volume: 0.7,
+                muted: false
+            });
+            localStorage.getItem.mockReturnValue(savedSettings);
+
+            // Mock sound manager already unmuted
+            mockSoundManager.isMuted.mockReturnValue(false);
+
+            const newService = new AudioService(mockConfigService, mockSoundManager);
+
+            // Should NOT have called toggleMute since they're already in sync
+            expect(mockSoundManager.toggleMute).not.toHaveBeenCalled();
+            expect(newService.isMuted()).toBe(false);
         });
     });
 
     describe('Volume Management', () => {
-        it('should manage master volume', () => {
-            audioService.setMasterVolume(0.5);
-            expect(audioService.getMasterVolume()).toBe(0.5);
+        it('should manage volume', () => {
+            audioService.setVolume(0.5);
+            expect(audioService.getVolume()).toBe(0.5);
         });
 
-        it('should manage effects volume', () => {
-            audioService.setEffectsVolume(0.7);
-            expect(audioService.getEffectsVolume()).toBe(0.7);
+        it('should manage master volume through compatibility methods', () => {
+            audioService.setMasterVolume(0.7);
+            expect(audioService.getVolume()).toBe(0.7);
         });
 
-        it('should manage ambient volume', () => {
+        it('should manage effects volume through compatibility methods', () => {
+            audioService.setEffectsVolume(0.6);
+            expect(audioService.getVolume()).toBe(0.6);
+        });
+
+        it('should manage ambient volume through compatibility methods', () => {
             audioService.setAmbientVolume(0.3);
-            expect(audioService.getAmbientVolume()).toBe(0.3);
+            expect(audioService.getVolume()).toBe(0.3);
         });
 
         it('should validate volume ranges', () => {
-            expect(() => {
-                audioService.setMasterVolume(1.5);
-            }).toThrow('Volume must be between 0 and 1');
+            // Valid range should work
+            audioService.setVolume(0.5);
+            expect(audioService.getVolume()).toBe(0.5);
 
-            expect(() => {
-                audioService.setMasterVolume(-0.1);
-            }).toThrow('Volume must be between 0 and 1');
-        });
+            // Invalid ranges should be ignored (simplified behavior)
+            audioService.setVolume(1.5);
+            expect(audioService.getVolume()).toBe(0.5); // Should remain unchanged
 
-        it('should apply volume changes immediately', () => {
-            audioService.setMasterVolume(0.5);
-            expect(mockSoundManager.setVolume).toHaveBeenCalledWith('master', 0.5);
+            audioService.setVolume(-0.1);
+            expect(audioService.getVolume()).toBe(0.5); // Should remain unchanged
         });
     });
 
     describe('Mute Management', () => {
-        it('should toggle mute state', () => {
+        it('should manage mute state', () => {
+            audioService.setMuted(true);
+            expect(audioService.isMuted()).toBe(true);
+
+            audioService.setMuted(false);
+            expect(audioService.isMuted()).toBe(false);
+        });
+
+        it('should toggle mute', () => {
             mockSoundManager.toggleMute.mockReturnValue(true);
-            
-            const isMuted = audioService.toggleMute();
-            expect(isMuted).toBe(true);
+            const result = audioService.toggleMute();
+            expect(result).toBe(true);
             expect(mockSoundManager.toggleMute).toHaveBeenCalled();
         });
 
-        it('should get mute state', () => {
-            // Set mute state first
-            audioService.setMuted(true);
-            
-            const isMuted = audioService.isMuted();
-            expect(isMuted).toBe(true);
-        });
-
-        it('should set mute state explicitly', () => {
-            audioService.setMuted(true);
+        it('should provide compatibility mute methods', () => {
+            audioService.setMasterMuted(true);
             expect(audioService.isMuted()).toBe(true);
-            
-            audioService.setMuted(false);
+
+            audioService.setAmbientMuted(false);
             expect(audioService.isMuted()).toBe(false);
+
+            audioService.setDiscoveryMuted(true);
+            expect(audioService.isMuted()).toBe(true);
         });
     });
 
     describe('Discovery Sound Effects', () => {
-        it('should play star discovery sounds', () => {
-            audioService.playStarDiscovery('G-Type Star');
+        it('should play discovery sounds through generic method', () => {
+            audioService.playDiscoverySound('G-Type Star');
             expect(mockSoundManager.playStarDiscovery).toHaveBeenCalledWith('G-Type Star');
-        });
 
-        it('should play planet discovery sounds', () => {
-            audioService.playPlanetDiscovery('Gas Giant');
-            expect(mockSoundManager.playPlanetDiscovery).toHaveBeenCalledWith('Gas Giant');
-        });
+            audioService.playDiscoverySound('Gas Giant Planet');
+            expect(mockSoundManager.playPlanetDiscovery).toHaveBeenCalledWith('Gas Giant Planet');
 
-        it('should play nebula discovery sounds', () => {
-            audioService.playNebulaDiscovery('emission');
-            expect(mockSoundManager.playNebulaDiscovery).toHaveBeenCalledWith('emission');
-        });
+            audioService.playDiscoverySound('emission nebula');
+            expect(mockSoundManager.playNebulaDiscovery).toHaveBeenCalledWith('emission nebula');
 
-        it('should play generic discovery sound', () => {
-            audioService.playDiscoverySound('wormhole');
-            // Should call appropriate discovery method based on type
-            expect(mockSoundManager.playStarDiscovery).not.toHaveBeenCalled();
+            audioService.playDiscoverySound('crystal-garden');
+            expect(mockSoundManager.playCrystalGardenDiscovery).toHaveBeenCalledWith('pure');
         });
 
         it('should not play sounds when muted', () => {
             audioService.setMuted(true);
-            
-            audioService.playStarDiscovery('M-Type Star');
+            audioService.playDiscoverySound('M-Type Star');
             expect(mockSoundManager.playStarDiscovery).not.toHaveBeenCalled();
         });
 
-        it('should not play sounds when audio is disabled', () => {
-            mockConfigService.get = (key, defaultValue) => {
-                if (key === 'audio.enabled') return false;
-                return defaultValue;
-            };
-
-            const disabledAudioService = new AudioService(mockConfigService, mockSoundManager);
-            disabledAudioService.playStarDiscovery('G-Type Star');
-            
+        it('should not play sounds when sound manager not initialized', () => {
+            mockSoundManager.isInitialized.mockReturnValue(false);
+            audioService.playDiscoverySound('G-Type Star');
             expect(mockSoundManager.playStarDiscovery).not.toHaveBeenCalled();
-            
-            disabledAudioService.dispose();
         });
     });
 
-    describe('Ambient Audio Management', () => {
-        it('should start ambient audio', () => {
-            audioService.startAmbient('space');
-            // Should trigger ambient audio setup
-            expect(audioService.isAmbientPlaying()).toBe(true);
+    describe('Space Drone Audio Management', () => {
+        it('should start space drone', () => {
+            audioService.startSpaceDrone('deep-space');
+            expect(mockSoundManager.startSpaceDrone).toHaveBeenCalledWith('deep-space');
         });
 
-        it('should stop ambient audio', () => {
-            audioService.startAmbient('space');
-            audioService.stopAmbient();
-            
-            expect(mockSoundManager.stopAmbient).toHaveBeenCalled();
-            expect(audioService.isAmbientPlaying()).toBe(false);
+        it('should stop space drone', () => {
+            audioService.stopSpaceDrone();
+            expect(mockSoundManager.stopSpaceDrone).toHaveBeenCalled();
         });
 
-        it('should change ambient tracks smoothly', () => {
-            audioService.startAmbient('space');
-            audioService.startAmbient('nebula');
-            
-            // Should stop previous and start new
-            expect(mockSoundManager.stopAmbient).toHaveBeenCalled();
+        it('should check if space drone is playing', () => {
+            mockSoundManager.isSpaceDronePlaying.mockReturnValue(true);
+            expect(audioService.isSpaceDronePlaying()).toBe(true);
+
+            mockSoundManager.isSpaceDronePlaying.mockReturnValue(false);
+            expect(audioService.isSpaceDronePlaying()).toBe(false);
         });
 
-        it('should adjust ambient volume independently', () => {
-            audioService.startAmbient('space');
-            audioService.setAmbientVolume(0.2);
-            
-            expect(audioService.getAmbientVolume()).toBe(0.2);
-        });
-    });
+        it('should handle missing space drone methods gracefully', () => {
+            // Remove optional methods
+            delete mockSoundManager.startSpaceDrone;
+            delete mockSoundManager.stopSpaceDrone;
+            delete mockSoundManager.isSpaceDronePlaying;
 
-    describe('Configuration Integration', () => {
-        it('should load settings from configuration on startup', () => {
-            const audioService2 = new AudioService(mockConfigService, mockSoundManager);
-            
-            expect(audioService2.getMasterVolume()).toBe(0.8);
-            expect(audioService2.getEffectsVolume()).toBe(0.6);
-            expect(audioService2.getAmbientVolume()).toBe(0.4);
-            
-            audioService2.dispose();
-        });
-
-        it('should respond to configuration changes', () => {
-            mockConfigService.get = (key, defaultValue) => {
-                if (key === 'audio.volume.master') return 0.3;
-                return defaultValue;
-            };
-
-            audioService.reloadConfiguration();
-            expect(audioService.getMasterVolume()).toBe(0.3);
-        });
-
-        it('should validate configuration values', () => {
-            mockConfigService.get = (key, defaultValue) => {
-                if (key === 'audio.volume.master') return 2.0; // Invalid
-                return defaultValue;
-            };
-
+            // Should not throw errors
             expect(() => {
-                audioService.reloadConfiguration();
-            }).toThrow('Invalid master volume');
-        });
+                audioService.startSpaceDrone('space');
+                audioService.stopSpaceDrone();
+                audioService.isSpaceDronePlaying();
+            }).not.toThrow();
 
+            expect(audioService.isSpaceDronePlaying()).toBe(false);
+        });
+    });
+
+    describe('Settings Persistence', () => {
         it('should save settings to localStorage', () => {
-            audioService.setMasterVolume(0.9);
-            audioService.saveSettings();
-            
-            expect(global.localStorage.setItem).toHaveBeenCalledWith(
-                'astralSurveyor_audioSettings', 
-                expect.stringContaining('0.9')
+            audioService.setVolume(0.6);
+            audioService.setMuted(true);
+
+            expect(localStorage.setItem).toHaveBeenCalledWith(
+                'astralSurveyor_audioSettings',
+                expect.stringContaining('0.6')
             );
         });
-    });
 
-    describe('Audio Context Management', () => {
-        it('should handle audio context initialization', () => {
-            expect(audioService.isAudioContextActive()).toBe(true);
-        });
-
-        it('should resume audio context when needed', async () => {
-            mockAudioContext.state = 'suspended';
-            
-            await audioService.resumeAudioContext();
-            expect(mockAudioContext.resume).toHaveBeenCalled();
-        });
-
-        it('should handle audio context errors gracefully', async () => {
-            mockAudioContext.resume.mockRejectedValue(new Error('Resume failed'));
-            
-            await expect(audioService.resumeAudioContext()).rejects.toThrow('Resume failed');
-        });
-
-        it('should detect when audio context is not available', () => {
-            global.AudioContext = undefined;
-            global.webkitAudioContext = undefined;
-
-            const serviceWithoutAudio = new AudioService(mockConfigService, mockSoundManager);
-            expect(serviceWithoutAudio.isAudioSupported()).toBe(false);
-            
-            serviceWithoutAudio.dispose();
-        });
-    });
-
-    describe('Performance and Memory Management', () => {
-        it('should handle rapid sound effect calls efficiently', () => {
-            const start = performance.now();
-            
-            // Simulate rapid discovery sounds
-            for (let i = 0; i < 50; i++) {
-                audioService.playStarDiscovery('G-Type Star');
-            }
-            
-            const end = performance.now();
-            const duration = end - start;
-            
-            // Should handle calls quickly
-            expect(duration).toBeLessThan(100);
-        });
-
-        it('should properly dispose of resources', () => {
-            audioService.startAmbient('space');
-            expect(audioService.isAmbientPlaying()).toBe(true);
-            
-            audioService.dispose();
-            
-            // Should not be able to play sounds after disposal
-            expect(() => {
-                audioService.playStarDiscovery('G-Type Star');
-            }).toThrow('AudioService has been disposed');
-        });
-
-        it('should clean up ambient audio on disposal', () => {
-            audioService.startAmbient('space');
-            audioService.dispose();
-            
-            expect(mockSoundManager.stopAmbient).toHaveBeenCalled();
-        });
-    });
-
-    describe('Sound Effect Categories', () => {
-        it('should categorize discovery sounds correctly', () => {
-            const starTypes = ['G-Type Star', 'M-Type Star', 'Blue Giant'];
-            
-            starTypes.forEach(type => {
-                audioService.playStarDiscovery(type);
-                expect(mockSoundManager.playStarDiscovery).toHaveBeenCalledWith(type);
+        it('should load settings from localStorage on initialization', () => {
+            const savedSettings = JSON.stringify({
+                volume: 0.3,
+                muted: true
             });
+            localStorage.getItem.mockReturnValue(savedSettings);
+
+            const newService = new AudioService(mockConfigService, mockSoundManager);
+            expect(newService.getVolume()).toBe(0.3);
+            expect(newService.isMuted()).toBe(true);
         });
 
-        it('should handle unknown sound types gracefully', () => {
+        it('should handle corrupted localStorage gracefully', () => {
+            localStorage.getItem.mockReturnValue('invalid json');
+
             expect(() => {
-                audioService.playDiscoverySound('unknown-type');
+                new AudioService(mockConfigService, mockSoundManager);
             }).not.toThrow();
-        });
-
-        it('should provide available sound categories', () => {
-            const categories = audioService.getAvailableSoundCategories();
-            
-            expect(categories).toContain('discovery');
-            expect(categories).toContain('ambient');
-            expect(categories).toContain('effects');
-        });
-    });
-
-    describe('Audio Quality Management', () => {
-        it('should adjust quality based on configuration', () => {
-            mockConfigService.get = (key, defaultValue) => {
-                if (key === 'audio.quality') return 'low';
-                return defaultValue;
-            };
-
-            const lowQualityService = new AudioService(mockConfigService, mockSoundManager);
-            expect(lowQualityService.getAudioQuality()).toBe('low');
-            
-            lowQualityService.dispose();
-        });
-
-        it('should handle quality changes at runtime', () => {
-            audioService.setAudioQuality('high');
-            expect(audioService.getAudioQuality()).toBe('high');
-            
-            audioService.setAudioQuality('low');
-            expect(audioService.getAudioQuality()).toBe('low');
-        });
-
-        it('should validate quality settings', () => {
-            expect(() => {
-                audioService.setAudioQuality('invalid');
-            }).toThrow('Invalid audio quality');
         });
     });
 
@@ -428,28 +266,47 @@ describe('AudioService', () => {
             });
 
             expect(() => {
-                audioService.playStarDiscovery('G-Type Star');
+                audioService.playDiscoverySound('G-Type Star');
             }).not.toThrow();
         });
 
-        it('should continue working when some audio features fail', () => {
-            mockSoundManager.playStarDiscovery.mockImplementation(() => {
-                throw new Error('Star sound failed');
-            });
-
-            // Other sounds should still work
-            audioService.playPlanetDiscovery('Rocky Planet');
-            expect(mockSoundManager.playPlanetDiscovery).toHaveBeenCalled();
-        });
-
-        it('should handle volume setting errors', () => {
+        it('should handle volume setting errors gracefully', () => {
             mockSoundManager.setVolume.mockImplementation(() => {
                 throw new Error('Volume failed');
             });
 
             expect(() => {
-                audioService.setMasterVolume(0.5);
+                audioService.setVolume(0.5);
             }).not.toThrow();
+        });
+
+        it('should handle localStorage errors gracefully', () => {
+            localStorage.setItem.mockImplementation(() => {
+                throw new Error('Storage full');
+            });
+
+            expect(() => {
+                audioService.setVolume(0.5);
+            }).not.toThrow();
+        });
+    });
+
+    describe('Sound Manager Integration', () => {
+        it('should sync mute state with sound manager', () => {
+            mockSoundManager.isMuted.mockReturnValue(true);
+            audioService.setMuted(false);
+            expect(mockSoundManager.toggleMute).toHaveBeenCalled();
+        });
+
+        it('should not toggle when already in sync', () => {
+            mockSoundManager.isMuted.mockReturnValue(false);
+            audioService.setMuted(false);
+            expect(mockSoundManager.toggleMute).not.toHaveBeenCalled();
+        });
+
+        it('should set volume on sound manager when available', () => {
+            audioService.setVolume(0.7);
+            expect(mockSoundManager.setVolume).toHaveBeenCalledWith('master', 0.7);
         });
     });
 });

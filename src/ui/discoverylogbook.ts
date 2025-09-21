@@ -5,7 +5,9 @@
 import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 import type { Input } from '../input/input.js';
-import type { DiscoveryManager, DiscoveryEntry, DiscoveryFilter, DiscoveryCategory, DiscoveryStatistics } from '../services/DiscoveryManager.js';
+import type { SimplifiedDiscoveryService } from '../services/SimplifiedDiscoveryService.js';
+import type { DiscoveryEntry } from '../services/ObjectDiscovery.js';
+import type { DiscoveryFilter, DiscoveryCategory, DiscoveryStatistics } from '../services/DiscoveryStats.js';
 import type { DiscoveryDisplay } from './ui.js';
 
 // Legacy interface for backward compatibility
@@ -40,7 +42,7 @@ export class DiscoveryLogbook {
     private savedScrollOffset: number; // Remember scroll position when entering detail view
     
     // Enhanced functionality
-    private discoveryManager?: DiscoveryManager;
+    private discoveryManager?: SimplifiedDiscoveryService;
     private discoveryDisplay?: DiscoveryDisplay;
     private uiState: UIState;
     
@@ -97,7 +99,7 @@ export class DiscoveryLogbook {
     /**
      * Connect the enhanced DiscoveryManager for advanced features
      */
-    setDiscoveryManager(discoveryManager: DiscoveryManager): void {
+    setDiscoveryManager(discoveryManager: SimplifiedDiscoveryService): void {
         this.discoveryManager = discoveryManager;
     }
 
