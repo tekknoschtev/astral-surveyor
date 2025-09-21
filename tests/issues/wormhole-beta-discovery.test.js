@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Wormhole, generateWormholePair } from '../../dist/celestial/wormholes.js';
-import { DiscoveryManager } from '../../dist/services/DiscoveryManager.js';
+import { createDiscoveryService } from '../../dist/services/DiscoveryServiceFactory.js';
 import { DiscoveryLogbook } from '../../dist/ui/discoverylogbook.js';
 
 describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
@@ -73,12 +73,12 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       choice: vi.fn((array) => array[0])
     };
 
-    // Create discovery manager
-    discoveryManager = new DiscoveryManager(
+    // Create discovery manager using the factory
+    discoveryManager = createDiscoveryService(
+      mockNamingService,
       mockSoundManager,
       mockDiscoveryDisplay,
-      mockDiscoveryLogbook,
-      mockNamingService
+      mockDiscoveryLogbook
     );
   });
 
@@ -102,7 +102,7 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       expect(alphaWormhole.discovered).toBe(true);
       
       // Process the alpha discovery
-      discoveryManager.processDiscovery(alphaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(alphaWormhole, mockCamera);
       
       // Verify alpha was logged
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledWith(
@@ -124,7 +124,7 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       expect(betaWormhole.discovered).toBe(true);
 
       // Process the beta discovery - THIS IS WHERE THE BUG OCCURS
-      discoveryManager.processDiscovery(betaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(betaWormhole, mockCamera);
 
       // Beta wormhole should also be logged in the logbook
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledWith(
@@ -145,13 +145,13 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       mockCamera.x = 100;
       mockCamera.y = 200;
       alphaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(alphaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(alphaWormhole, mockCamera);
 
       // Discover beta wormhole
       mockCamera.x = 5000;
       mockCamera.y = 6000;
       betaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(betaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(betaWormhole, mockCamera);
 
       // Both wormholes should be logged in the UI logbook
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(2);
@@ -177,12 +177,12 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       mockCamera.x = 1000;
       mockCamera.y = 1000;
       alphaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(alphaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(alphaWormhole, mockCamera);
 
       mockCamera.x = 3000;
       mockCamera.y = 3000;
       betaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(betaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(betaWormhole, mockCamera);
 
       // Both wormholes should be logged in the UI logbook
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(2);
@@ -209,7 +209,7 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       mockCamera.x = 0;
       mockCamera.y = 0;
       alphaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(alphaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(alphaWormhole, mockCamera);
 
       // Verify alpha discovery was logged
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(1);
@@ -244,7 +244,7 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       expect(betaDiscovered).toBe(true);
       
       // Process beta discovery
-      discoveryManager.processDiscovery(betaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(betaWormhole, mockCamera);
 
       // Step 4: Verify both wormholes are logged in the UI logbook
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(2);
@@ -264,7 +264,7 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       mockCamera.x = 500;
       mockCamera.y = 500;
       alphaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(alphaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(alphaWormhole, mockCamera);
       
       // Verify alpha is logged
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(1);
@@ -285,7 +285,7 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       
       // Step 3: StateManager should call processDiscovery for the beta wormhole
       // This is the fix - the beta wormhole gets processed through DiscoveryManager
-      discoveryManager.processDiscovery(betaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(betaWormhole, mockCamera);
       
       // Step 4: Verify both alpha and beta are now logged in the UI logbook
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(2);
@@ -329,12 +329,12 @@ describe('GitHub Issue #126: Beta wormhole discovery logging', () => {
       mockCamera.x = 100;
       mockCamera.y = 100;
       alphaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(alphaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(alphaWormhole, mockCamera);
 
       mockCamera.x = 900;
       mockCamera.y = 900;
       betaWormhole.checkDiscovery(mockCamera, 800, 600);
-      discoveryManager.processDiscovery(betaWormhole, mockCamera, mockChunkManager);
+      discoveryManager.processObjectDiscovery(betaWormhole, mockCamera);
 
       // Both wormholes should be logged in the logbook
       expect(mockDiscoveryLogbook.addDiscovery).toHaveBeenCalledTimes(2);
