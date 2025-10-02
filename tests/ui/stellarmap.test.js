@@ -1175,59 +1175,8 @@ describe('StellarMap System', () => {
     });
   });
 
-  describe('Star Size Calculation Edge Cases', () => {
-    it('should calculate sizes correctly for galactic view', () => {
-      stellarMap.zoomLevel = 0.1; // Galactic view
-      const mockStar = {
-        starType: { sizeMultiplier: 1.5 },
-        starTypeName: 'Blue Giant'
-      };
-      
-      const size = stellarMap.calculateStarSize(mockStar, false);
-      
-      expect(size).toBeGreaterThan(0);
-      expect(size).toBeLessThan(5); // Should be small for galactic view
-    });
-
-    it('should use minimal size for extreme zoom out', () => {
-      const mockStar = {
-        starType: { sizeMultiplier: 2.0 },
-        starTypeName: 'Red Giant'
-      };
-      
-      const size = stellarMap.calculateStarSize(mockStar, true); // isExtremeZoomOut = true
-      
-      expect(size).toBe(1); // Should be minimal fixed size
-    });
-
-    it('should handle stars without starType gracefully', () => {
-      stellarMap.zoomLevel = 2.0;
-      const mockStar = {
-        starType: null,
-        starTypeName: 'Unknown Star'
-      };
-      
-      const size = stellarMap.calculateStarSize(mockStar, false);
-      
-      expect(size).toBeGreaterThan(0);
-      expect(typeof size).toBe('number');
-    });
-
-    it('should scale sizes correctly across zoom levels', () => {
-      const mockStar = {
-        starType: { sizeMultiplier: 1.0 },
-        starTypeName: 'G-Type Star'
-      };
-      
-      stellarMap.zoomLevel = 0.5; // Regional view
-      const regionalSize = stellarMap.calculateStarSize(mockStar, false);
-      
-      stellarMap.zoomLevel = 5.0; // Detail view
-      const detailSize = stellarMap.calculateStarSize(mockStar, false);
-      
-      expect(detailSize).toBeGreaterThan(regionalSize);
-    });
-  });
+  // Star size calculation tests removed - now internal to StarRenderer
+  // Star rendering behavior is tested through integration tests in "Star Rendering" section
 
   describe('Planet Rendering and Calculations', () => {
     let mockPlanet;

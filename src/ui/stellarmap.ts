@@ -9,6 +9,7 @@ import { NamingService } from '../naming/naming.js';
 import type { SeedInspectorService, CelestialObjectData } from '../debug/SeedInspectorService.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
 import { GameConstants } from '../config/GameConstants.js';
+import { StarRenderer } from './stellarmap/renderers/StarRenderer.js';
 
 // Interface definitions
 interface StarLike {
@@ -289,11 +290,14 @@ export class StellarMap {
     
     // Centralized hover system
     private hoverSystem: StellarMapHoverSystem;
-    
+
+    // Renderers
+    private starRenderer: StarRenderer;
+
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
     revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
-    
+
     // Chunk Manager for region information
     chunkManager: ChunkManager | null;
 
@@ -384,9 +388,12 @@ export class StellarMap {
         // Initialize persistent revealed areas system
         this.revealedChunks = new Map();
         this.revealedChunksMetadata = new Map();
-        
+
         // Initialize chunk manager
         this.chunkManager = null;
+
+        // Initialize renderers
+        this.starRenderer = new StarRenderer();
     }
 
     private getLabelFont(): string {
@@ -1168,6 +1175,7 @@ export class StellarMap {
 
     setNamingService(namingService: NamingService): void {
         this.namingService = namingService;
+        this.starRenderer.setNamingService(namingService);
     }
     
     setChunkManager(chunkManager: ChunkManager): void {
@@ -1809,92 +1817,26 @@ export class StellarMap {
     }
 
     renderDiscoveredStars(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredStars: StarLike[]): void {
-        if (!discoveredStars) return;
+        // Delegate to StarRenderer
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        // Performance optimization: reduce star detail at extreme zoom out
-        const isExtremeZoomOut = this.zoomLevel < 0.1;
-        const renderLabels = this.zoomLevel > 2.0 || (!isExtremeZoomOut && this.selectedStar);
-
-        for (const star of discoveredStars) {
-            // Convert world coordinates to map coordinates
-            const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * scale;
-            const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * scale;
-            
-            // Calculate proportional star size based on zoom level and star type
-            const starSize = this.calculateStarSize(star, isExtremeZoomOut);
-            
-            // Expanded bounds check for better culling at extreme zoom
-            const margin = isExtremeZoomOut ? 0 : 10; // No margin needed at extreme zoom
-            if (starMapX >= mapX - margin && starMapX <= mapX + mapWidth + margin && 
-                starMapY >= mapY - margin && starMapY <= mapY + mapHeight + margin) {
-                
-                // Get star color based on type
-                const starColor = this.starColors[star.starTypeName || ''] || '#ffffff';
-                
-                // Draw star as circle with proportional sizing
-                ctx.fillStyle = starColor;
-                ctx.beginPath();
-                ctx.arc(starMapX, starMapY, starSize, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add hover highlight if this star is hovered (but not selected)
-                if (this.hoveredStar === star && this.selectedStar !== star) {
-                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    // Scale hover highlight to be proportional to star size
-                    const hoverRadius = Math.max(5, starSize + 1);
-                    ctx.arc(starMapX, starMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add selection highlight if this star is selected (takes precedence over hover)
-                if (this.selectedStar === star) {
-                    ctx.strokeStyle = this.currentPositionColor;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    // Scale selection highlight to be proportional to star size
-                    const highlightRadius = Math.max(6, starSize + 2);
-                    ctx.arc(starMapX, starMapY, highlightRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Draw star name at higher zoom levels or when selected (optimized)
-                if (renderLabels && (this.zoomLevel > 2.0 || this.selectedStar === star)) {
-                    this.renderStarLabel(ctx, star, starMapX, starMapY);
-                }
-            }
-        }
-    }
-
-    calculateStarSize(star: StarLike, isExtremeZoomOut: boolean): number {
-        // At extreme zoom out, use minimal fixed size for performance
-        if (isExtremeZoomOut) {
-            return 1;
-        }
-        
-        // Get the star's size multiplier from its star type (default 1.0 if not available)
-        const sizeMultiplier = star.starType?.sizeMultiplier || 1.0;
-        
-        // Base size varies by zoom level to show more detail at higher zooms
-        let baseSize: number;
-        if (this.zoomLevel <= 0.2) {
-            // Galactic/Sector View: minimal differences, focus on visibility
-            baseSize = 2;
-            return Math.max(1, baseSize * (0.8 + sizeMultiplier * 0.4)); // Range: ~1.6-3.2
-        } else if (this.zoomLevel <= 1.0) {
-            // Regional View: moderate size differences become visible
-            baseSize = 3;
-            return Math.max(2, baseSize * (0.6 + sizeMultiplier * 0.8)); // Range: ~1.8-5.4
-        } else if (this.zoomLevel <= 3.0) {
-            // Local View: significant size differences
-            baseSize = 4;
-            return Math.max(2, baseSize * (0.4 + sizeMultiplier * 1.2)); // Range: ~2.6-8.6
-        } else {
-            // Detail View: full proportional sizing - dramatic differences
-            baseSize = 5;
-            return Math.max(2, baseSize * (0.2 + sizeMultiplier * 1.6)); // Range: ~2.6-15.4
-        }
+        this.starRenderer.renderDiscoveredStars(
+            context,
+            discoveredStars,
+            this.zoomLevel,
+            this.selectedStar,
+            this.hoveredStar,
+            this.currentPositionColor
+        );
     }
 
     calculateCometSize(): number {
@@ -3302,48 +3244,6 @@ export class StellarMap {
             'Exotic World': '#DA70D6'
         };
         return colorMap[planet.planetTypeName] || '#888888';
-    }
-
-    renderStarLabel(ctx: CanvasRenderingContext2D, star: StarLike, starMapX: number, starMapY: number): void {
-        if (!this.namingService) return;
-        
-        // Generate star name
-        const starName = this.namingService.generateDisplayName(star);
-        
-        // Calculate star size for positioning
-        const starSize = this.calculateStarSize(star, false);
-        
-        // Calculate offset position for scientific diagram style
-        const offsetDistance = 35; // Distance from star center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = starMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = starMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from star edge to text
-        ctx.strokeStyle = '#aaaaaa'; // Lighter gray for visibility
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of star
-        const lineStartX = starMapX + Math.cos(offsetAngle) * (starSize + 2);
-        const lineStartY = starMapY + Math.sin(offsetAngle) * (starSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        // Draw star name at offset position
-        ctx.fillStyle = '#b0c4d4';
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(starName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
     }
 
     renderStartingPositionMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, startingPosition: GameStartingPosition): void {
