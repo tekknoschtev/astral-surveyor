@@ -11,6 +11,7 @@ import type { ChunkManager } from '../world/ChunkManager.js';
 import { GameConstants } from '../config/GameConstants.js';
 import { StarRenderer } from './stellarmap/renderers/StarRenderer.js';
 import { PlanetRenderer } from './stellarmap/renderers/PlanetRenderer.js';
+import { NebulaRenderer } from './stellarmap/renderers/NebulaRenderer.js';
 
 // Interface definitions
 interface StarLike {
@@ -45,6 +46,7 @@ interface NebulaLike {
     nebulaTypeData?: {
         name: string;
         colors?: string[];
+        size?: number;
     };
     objectName?: string;
     timestamp?: number;
@@ -295,6 +297,7 @@ export class StellarMap {
     // Renderers
     private starRenderer: StarRenderer;
     private planetRenderer: PlanetRenderer;
+    private nebulaRenderer: NebulaRenderer;
 
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
@@ -397,6 +400,7 @@ export class StellarMap {
         // Initialize renderers
         this.starRenderer = new StarRenderer();
         this.planetRenderer = new PlanetRenderer();
+        this.nebulaRenderer = new NebulaRenderer();
     }
 
     private getLabelFont(): string {
@@ -1179,6 +1183,7 @@ export class StellarMap {
     setNamingService(namingService: NamingService): void {
         this.namingService = namingService;
         this.starRenderer.setNamingService(namingService);
+        this.nebulaRenderer.setNamingService(namingService);
     }
     
     setChunkManager(chunkManager: ChunkManager): void {
@@ -1882,154 +1887,24 @@ export class StellarMap {
     }
 
     renderDiscoveredNebulae(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredNebulae: NebulaLike[]): void {
-        if (!discoveredNebulae) return;
-
-        for (const nebula of discoveredNebulae) {
-            // Convert world coordinates to map coordinates
-            const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * scale;
-            const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * scale;
-            
-            // Calculate nebula size (nebulae are large objects, so scale appropriately)
-            const baseSize = 8; // Larger than planets but smaller than stars on the map
-            const nebulaSize = Math.max(4, baseSize * this.zoomLevel * 0.5);
-            
-            // Check if nebula is within map bounds (with margin for large size)
-            const margin = nebulaSize + 10;
-            if (nebulaMapX >= mapX - margin && nebulaMapX <= mapX + mapWidth + margin && 
-                nebulaMapY >= mapY - margin && nebulaMapY <= mapY + mapHeight + margin) {
-                
-                // Get nebula colors based on type
-                const nebulaColors = this.getNebulaColors(nebula);
-                
-                // Draw nebula as a soft, glowing cloud
-                ctx.save();
-                
-                // Create radial gradient for nebula effect
-                const gradient = ctx.createRadialGradient(
-                    nebulaMapX, nebulaMapY, 0,
-                    nebulaMapX, nebulaMapY, nebulaSize * 2
-                );
-                gradient.addColorStop(0, nebulaColors.core + '60'); // Semi-transparent core
-                gradient.addColorStop(0.5, nebulaColors.mid + '30'); // Fainter middle
-                gradient.addColorStop(1, nebulaColors.edge + '10');  // Very faint edge
-                
-                // Draw the nebula glow
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(nebulaMapX, nebulaMapY, nebulaSize * 2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw the solid center 
-                ctx.fillStyle = nebulaColors.core + '80';
-                ctx.beginPath();
-                ctx.arc(nebulaMapX, nebulaMapY, nebulaSize * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add selection highlight if this nebula is selected
-                if (this.selectedNebula === nebula) {
-                    ctx.strokeStyle = this.currentPositionColor;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    const highlightRadius = nebulaSize + 2;
-                    ctx.arc(nebulaMapX, nebulaMapY, highlightRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add hover highlight if this nebula is hovered
-                if (this.hoveredNebula === nebula) {
-                    ctx.strokeStyle = this.currentPositionColor + '60'; // Semi-transparent hover
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    const hoverRadius = nebulaSize + 1;
-                    ctx.arc(nebulaMapX, nebulaMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                ctx.restore();
-                
-                // Render nebula label if zoomed in enough
-                if (this.zoomLevel > 2.0 || this.selectedNebula === nebula) {
-                    this.renderNebulaLabel(ctx, nebula, nebulaMapX, nebulaMapY);
-                }
-            }
-        }
-    }
-
-    getNebulaColors(nebula: NebulaLike): { core: string; mid: string; edge: string } {
-        // Color schemes based on nebula type
-        const colorSchemes: Record<string, { core: string; mid: string; edge: string }> = {
-            'emission': { 
-                core: '#ff6b6b',    // Red-orange core
-                mid: '#ff8e53',     // Orange middle  
-                edge: '#ff6b9d'     // Pink edge
-            },
-            'reflection': {
-                core: '#4ecdc4',    // Teal core
-                mid: '#45b7d1',     // Blue middle
-                edge: '#96ceb4'     // Green edge
-            },
-            'planetary': {
-                core: '#a8e6cf',    // Light green core
-                mid: '#7fcdcd',     // Cyan middle
-                edge: '#81ecec'     // Light cyan edge
-            },
-            'dark': {
-                core: '#2c3e50',    // Dark blue-gray core
-                mid: '#34495e',     // Lighter gray middle
-                edge: '#4a6741'     // Dark green edge
-            }
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
         };
-        
-        return colorSchemes[nebula.nebulaType] || colorSchemes['emission'];
-    }
 
-    renderNebulaLabel(ctx: CanvasRenderingContext2D, nebula: NebulaLike, nebulaMapX: number, nebulaMapY: number): void {
-        if (!this.namingService) return;
-        
-        const nebulaName = nebula.objectName || this.namingService.generateDisplayName(nebula);
-        
-        // Calculate offset position for scientific diagram style
-        const offsetDistance = 25; // Distance from nebula center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = nebulaMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = nebulaMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from nebula edge to text
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of nebula (approximate size)
-        const nebulaSize = 8; // Approximate nebula visual size
-        const lineStartX = nebulaMapX + Math.cos(offsetAngle) * (nebulaSize + 2);
-        const lineStartY = nebulaMapY + Math.sin(offsetAngle) * (nebulaSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        ctx.save();
-        ctx.fillStyle = '#e8f4fd';
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text background for readability
-        const textWidth = ctx.measureText(nebulaName).width;
-        const bgPadding = 3;
-        ctx.fillStyle = '#000000B0';
-        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
-        
-        // Draw label text
-        ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(nebulaName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-        ctx.restore();
+        this.nebulaRenderer.renderDiscoveredNebulae(
+            context,
+            discoveredNebulae,
+            this.selectedNebula,
+            this.hoveredNebula,
+            this.currentPositionColor
+        );
     }
 
     renderDiscoveredWormholes(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredWormholes: WormholeLike[]): void {

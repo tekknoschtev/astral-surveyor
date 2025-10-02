@@ -34,6 +34,7 @@ export interface NebulaLike {
     nebulaTypeData?: {
         name: string;
         colors?: string[];
+        size?: number;
     };
     objectName?: string;
     timestamp?: number;
