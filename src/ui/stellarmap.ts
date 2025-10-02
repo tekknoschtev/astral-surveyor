@@ -10,6 +10,7 @@ import type { SeedInspectorService, CelestialObjectData } from '../debug/SeedIns
 import type { ChunkManager } from '../world/ChunkManager.js';
 import { GameConstants } from '../config/GameConstants.js';
 import { StarRenderer } from './stellarmap/renderers/StarRenderer.js';
+import { PlanetRenderer } from './stellarmap/renderers/PlanetRenderer.js';
 
 // Interface definitions
 interface StarLike {
@@ -293,6 +294,7 @@ export class StellarMap {
 
     // Renderers
     private starRenderer: StarRenderer;
+    private planetRenderer: PlanetRenderer;
 
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
@@ -394,6 +396,7 @@ export class StellarMap {
 
         // Initialize renderers
         this.starRenderer = new StarRenderer();
+        this.planetRenderer = new PlanetRenderer();
     }
 
     private getLabelFont(): string {
@@ -1857,80 +1860,25 @@ export class StellarMap {
     }
 
     renderDiscoveredPlanets(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredPlanets: PlanetLike[]): void {
-        if (!discoveredPlanets) return;
+        // Delegate to PlanetRenderer
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        // Group planets by their parent star for orbital rendering
-        const planetsByStarId = new Map<string, PlanetLike[]>();
-        
-        for (const planet of discoveredPlanets) {
-            // Only process planets that have current position data (are in active chunks)
-            if (planet.x === null || planet.y === null) continue;
-            
-            const starId = `${planet.parentStarX}_${planet.parentStarY}`;
-            if (!planetsByStarId.has(starId)) {
-                planetsByStarId.set(starId, []);
-            }
-            planetsByStarId.get(starId)!.push(planet);
-        }
-        
-        // Render orbital systems
-        for (const [starId, planets] of planetsByStarId) {
-            const [starX, starY] = starId.split('_').map(parseFloat);
-            const starMapX = mapX + mapWidth/2 + (starX - this.centerX) * scale;
-            const starMapY = mapY + mapHeight/2 + (starY - this.centerY) * scale;
-            
-            // Check if star system is within extended map bounds
-            const systemMargin = 200 * scale; // Allow for large orbital systems
-            if (starMapX >= mapX - systemMargin && starMapX <= mapX + mapWidth + systemMargin && 
-                starMapY >= mapY - systemMargin && starMapY <= mapY + mapHeight + systemMargin) {
-                
-                // Draw orbital circles for each planet
-                this.renderOrbitalCircles(ctx, starMapX, starMapY, planets, scale, mapX, mapY, mapWidth, mapHeight);
-                
-                // Draw planets on their orbits
-                for (const planet of planets) {
-                    const planetMapX = mapX + mapWidth/2 + (planet.x! - this.centerX) * scale;
-                    const planetMapY = mapY + mapHeight/2 + (planet.y! - this.centerY) * scale;
-                    
-                    // Calculate proportional planet size (smaller than stars)
-                    const planetSize = this.calculatePlanetSize(planet);
-                    
-                    // Get planet color based on type
-                    const planetColor = this.getPlanetColor(planet);
-                    
-                    // Draw planet as circle
-                    ctx.fillStyle = planetColor;
-                    ctx.beginPath();
-                    ctx.arc(planetMapX, planetMapY, planetSize, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Add subtle outline to differentiate from stars
-                    ctx.strokeStyle = planetColor;
-                    ctx.lineWidth = 0.5;
-                    ctx.stroke();
-                    
-                    // Add hover highlight if this planet is hovered (but not selected)
-                    if (this.hoveredPlanet === planet && this.selectedPlanet !== planet) {
-                        ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
-                        ctx.lineWidth = 0.8;
-                        ctx.beginPath();
-                        const hoverRadius = Math.max(3, planetSize + 0.5);
-                        ctx.arc(planetMapX, planetMapY, hoverRadius, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                    
-                    // Add selection highlight if this planet is selected (takes precedence over hover)
-                    if (this.selectedPlanet === planet) {
-                        ctx.strokeStyle = this.currentPositionColor;
-                        ctx.lineWidth = 1.5;
-                        ctx.beginPath();
-                        const highlightRadius = Math.max(4, planetSize + 1);
-                        ctx.arc(planetMapX, planetMapY, highlightRadius, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
+        this.planetRenderer.renderDiscoveredPlanets(
+            context,
+            discoveredPlanets,
+            this.selectedPlanet,
+            this.hoveredPlanet,
+            this.currentPositionColor
+        );
     }
 
     renderDiscoveredNebulae(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredNebulae: NebulaLike[]): void {
@@ -2356,41 +2304,6 @@ export class StellarMap {
         // Reset text alignment and baseline
         ctx.textBaseline = 'alphabetic';
         ctx.restore();
-    }
-
-    renderOrbitalCircles(ctx: CanvasRenderingContext2D, starMapX: number, starMapY: number, planets: PlanetLike[], scale: number, mapX: number, mapY: number, mapWidth: number, mapHeight: number): void {
-        // Calculate unique orbital radii for this star system based on actual map positions
-        const orbitalRadii = new Set<number>();
-        
-        for (const planet of planets) {
-            // Calculate the planet's actual position on the map
-            const planetMapX = mapX + mapWidth/2 + (planet.x! - this.centerX) * scale;
-            const planetMapY = mapY + mapHeight/2 + (planet.y! - this.centerY) * scale;
-            
-            // Calculate orbital radius directly from map coordinates
-            const mapOrbitalRadius = Math.sqrt(
-                Math.pow(planetMapX - starMapX, 2) + 
-                Math.pow(planetMapY - starMapY, 2)
-            );
-            orbitalRadii.add(Math.round(mapOrbitalRadius)); // Round to avoid duplicate very close orbits
-        }
-        
-        // Draw orbital circles
-        ctx.strokeStyle = '#444444'; // Subtle dark gray
-        ctx.lineWidth = 0.5;
-        ctx.setLineDash([2, 3]); // Dashed line for subtle effect
-        
-        for (const radius of orbitalRadii) {
-            // Only draw orbits that are reasonably visible and not too large
-            if (radius > 2 && radius < 500) {
-                ctx.beginPath();
-                ctx.arc(starMapX, starMapY, radius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        }
-        
-        // Reset line dash for other rendering
-        ctx.setLineDash([]);
     }
 
     renderDiscoveredAsteroidGardens(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredAsteroidGardens: AsteroidGardenLike[]): void {
@@ -3217,36 +3130,7 @@ export class StellarMap {
         ctx.restore();
     }
 
-    calculatePlanetSize(planet: PlanetLike): number {
-        // Get the planet's size multiplier from its planet type (default 1.0 if not available)
-        const sizeMultiplier = planet.planetType?.sizeMultiplier || 1.0;
-        
-        // Base size for planets (smaller than stars)
-        const baseSize = 1.5;
-        
-        // Scale planet size based on type, but keep them smaller than stars
-        return Math.max(1, baseSize * (0.8 + sizeMultiplier * 0.4)); // Range: ~1.2-2.6
-    }
-
-    getPlanetColor(planet: PlanetLike): string {
-        // Use planet type colors if available, otherwise default
-        if (planet.planetType && planet.planetType.colors) {
-            return planet.planetType.colors[0]; // Use first color from palette
-        }
-        // Fallback colors based on planet type name
-        const colorMap: Record<string, string> = {
-            'Rocky Planet': '#8B4513',
-            'Ocean World': '#4169E1', 
-            'Gas Giant': '#DAA520',
-            'Desert World': '#FFE4B5',
-            'Frozen World': '#87CEEB',
-            'Volcanic World': '#DC143C',
-            'Exotic World': '#DA70D6'
-        };
-        return colorMap[planet.planetTypeName] || '#888888';
-    }
-
-    renderStartingPositionMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, startingPosition: GameStartingPosition): void {
+    renderStartingPositionMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, startingPosition: GameStartingPosition): void{
         // Edge case: Don't render starting position marker if it's the same as origin (0,0)
         if (startingPosition.x === 0 && startingPosition.y === 0) {
             return;
