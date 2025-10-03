@@ -9,6 +9,14 @@ import { NamingService } from '../naming/naming.js';
 import type { SeedInspectorService, CelestialObjectData } from '../debug/SeedInspectorService.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
 import { GameConstants } from '../config/GameConstants.js';
+import { StarRenderer } from './stellarmap/renderers/StarRenderer.js';
+import { PlanetRenderer } from './stellarmap/renderers/PlanetRenderer.js';
+import { NebulaRenderer } from './stellarmap/renderers/NebulaRenderer.js';
+import { WormholeRenderer } from './stellarmap/renderers/WormholeRenderer.js';
+import { BlackHoleRenderer } from './stellarmap/renderers/BlackHoleRenderer.js';
+import { CometRenderer } from './stellarmap/renderers/CometRenderer.js';
+import { AsteroidRenderer } from './stellarmap/renderers/AsteroidRenderer.js';
+import { RegionObjectRenderer } from './stellarmap/renderers/RegionObjectRenderer.js';
 
 // Interface definitions
 interface StarLike {
@@ -43,6 +51,7 @@ interface NebulaLike {
     nebulaTypeData?: {
         name: string;
         colors?: string[];
+        size?: number;
     };
     objectName?: string;
     timestamp?: number;
@@ -289,11 +298,21 @@ export class StellarMap {
     
     // Centralized hover system
     private hoverSystem: StellarMapHoverSystem;
-    
+
+    // Renderers
+    private starRenderer: StarRenderer;
+    private planetRenderer: PlanetRenderer;
+    private nebulaRenderer: NebulaRenderer;
+    private wormholeRenderer: WormholeRenderer;
+    private blackHoleRenderer: BlackHoleRenderer;
+    private cometRenderer: CometRenderer;
+    private asteroidRenderer: AsteroidRenderer;
+    private regionObjectRenderer: RegionObjectRenderer;
+
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
     revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
-    
+
     // Chunk Manager for region information
     chunkManager: ChunkManager | null;
 
@@ -384,9 +403,19 @@ export class StellarMap {
         // Initialize persistent revealed areas system
         this.revealedChunks = new Map();
         this.revealedChunksMetadata = new Map();
-        
+
         // Initialize chunk manager
         this.chunkManager = null;
+
+        // Initialize renderers
+        this.starRenderer = new StarRenderer();
+        this.planetRenderer = new PlanetRenderer();
+        this.nebulaRenderer = new NebulaRenderer();
+        this.wormholeRenderer = new WormholeRenderer();
+        this.blackHoleRenderer = new BlackHoleRenderer();
+        this.cometRenderer = new CometRenderer();
+        this.asteroidRenderer = new AsteroidRenderer();
+        this.regionObjectRenderer = new RegionObjectRenderer();
     }
 
     private getLabelFont(): string {
@@ -1168,6 +1197,11 @@ export class StellarMap {
 
     setNamingService(namingService: NamingService): void {
         this.namingService = namingService;
+        this.starRenderer.setNamingService(namingService);
+        this.nebulaRenderer.setNamingService(namingService);
+        this.wormholeRenderer.setNamingService(namingService);
+        this.asteroidRenderer.setNamingService(namingService);
+        this.regionObjectRenderer.setNamingService(namingService);
     }
     
     setChunkManager(chunkManager: ChunkManager): void {
@@ -1809,92 +1843,26 @@ export class StellarMap {
     }
 
     renderDiscoveredStars(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredStars: StarLike[]): void {
-        if (!discoveredStars) return;
+        // Delegate to StarRenderer
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        // Performance optimization: reduce star detail at extreme zoom out
-        const isExtremeZoomOut = this.zoomLevel < 0.1;
-        const renderLabels = this.zoomLevel > 2.0 || (!isExtremeZoomOut && this.selectedStar);
-
-        for (const star of discoveredStars) {
-            // Convert world coordinates to map coordinates
-            const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * scale;
-            const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * scale;
-            
-            // Calculate proportional star size based on zoom level and star type
-            const starSize = this.calculateStarSize(star, isExtremeZoomOut);
-            
-            // Expanded bounds check for better culling at extreme zoom
-            const margin = isExtremeZoomOut ? 0 : 10; // No margin needed at extreme zoom
-            if (starMapX >= mapX - margin && starMapX <= mapX + mapWidth + margin && 
-                starMapY >= mapY - margin && starMapY <= mapY + mapHeight + margin) {
-                
-                // Get star color based on type
-                const starColor = this.starColors[star.starTypeName || ''] || '#ffffff';
-                
-                // Draw star as circle with proportional sizing
-                ctx.fillStyle = starColor;
-                ctx.beginPath();
-                ctx.arc(starMapX, starMapY, starSize, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add hover highlight if this star is hovered (but not selected)
-                if (this.hoveredStar === star && this.selectedStar !== star) {
-                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    // Scale hover highlight to be proportional to star size
-                    const hoverRadius = Math.max(5, starSize + 1);
-                    ctx.arc(starMapX, starMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add selection highlight if this star is selected (takes precedence over hover)
-                if (this.selectedStar === star) {
-                    ctx.strokeStyle = this.currentPositionColor;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    // Scale selection highlight to be proportional to star size
-                    const highlightRadius = Math.max(6, starSize + 2);
-                    ctx.arc(starMapX, starMapY, highlightRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Draw star name at higher zoom levels or when selected (optimized)
-                if (renderLabels && (this.zoomLevel > 2.0 || this.selectedStar === star)) {
-                    this.renderStarLabel(ctx, star, starMapX, starMapY);
-                }
-            }
-        }
-    }
-
-    calculateStarSize(star: StarLike, isExtremeZoomOut: boolean): number {
-        // At extreme zoom out, use minimal fixed size for performance
-        if (isExtremeZoomOut) {
-            return 1;
-        }
-        
-        // Get the star's size multiplier from its star type (default 1.0 if not available)
-        const sizeMultiplier = star.starType?.sizeMultiplier || 1.0;
-        
-        // Base size varies by zoom level to show more detail at higher zooms
-        let baseSize: number;
-        if (this.zoomLevel <= 0.2) {
-            // Galactic/Sector View: minimal differences, focus on visibility
-            baseSize = 2;
-            return Math.max(1, baseSize * (0.8 + sizeMultiplier * 0.4)); // Range: ~1.6-3.2
-        } else if (this.zoomLevel <= 1.0) {
-            // Regional View: moderate size differences become visible
-            baseSize = 3;
-            return Math.max(2, baseSize * (0.6 + sizeMultiplier * 0.8)); // Range: ~1.8-5.4
-        } else if (this.zoomLevel <= 3.0) {
-            // Local View: significant size differences
-            baseSize = 4;
-            return Math.max(2, baseSize * (0.4 + sizeMultiplier * 1.2)); // Range: ~2.6-8.6
-        } else {
-            // Detail View: full proportional sizing - dramatic differences
-            baseSize = 5;
-            return Math.max(2, baseSize * (0.2 + sizeMultiplier * 1.6)); // Range: ~2.6-15.4
-        }
+        this.starRenderer.renderDiscoveredStars(
+            context,
+            discoveredStars,
+            this.zoomLevel,
+            this.selectedStar,
+            this.hoveredStar,
+            this.currentPositionColor
+        );
     }
 
     calculateCometSize(): number {
@@ -1915,737 +1883,101 @@ export class StellarMap {
     }
 
     renderDiscoveredPlanets(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredPlanets: PlanetLike[]): void {
-        if (!discoveredPlanets) return;
+        // Delegate to PlanetRenderer
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        // Group planets by their parent star for orbital rendering
-        const planetsByStarId = new Map<string, PlanetLike[]>();
-        
-        for (const planet of discoveredPlanets) {
-            // Only process planets that have current position data (are in active chunks)
-            if (planet.x === null || planet.y === null) continue;
-            
-            const starId = `${planet.parentStarX}_${planet.parentStarY}`;
-            if (!planetsByStarId.has(starId)) {
-                planetsByStarId.set(starId, []);
-            }
-            planetsByStarId.get(starId)!.push(planet);
-        }
-        
-        // Render orbital systems
-        for (const [starId, planets] of planetsByStarId) {
-            const [starX, starY] = starId.split('_').map(parseFloat);
-            const starMapX = mapX + mapWidth/2 + (starX - this.centerX) * scale;
-            const starMapY = mapY + mapHeight/2 + (starY - this.centerY) * scale;
-            
-            // Check if star system is within extended map bounds
-            const systemMargin = 200 * scale; // Allow for large orbital systems
-            if (starMapX >= mapX - systemMargin && starMapX <= mapX + mapWidth + systemMargin && 
-                starMapY >= mapY - systemMargin && starMapY <= mapY + mapHeight + systemMargin) {
-                
-                // Draw orbital circles for each planet
-                this.renderOrbitalCircles(ctx, starMapX, starMapY, planets, scale, mapX, mapY, mapWidth, mapHeight);
-                
-                // Draw planets on their orbits
-                for (const planet of planets) {
-                    const planetMapX = mapX + mapWidth/2 + (planet.x! - this.centerX) * scale;
-                    const planetMapY = mapY + mapHeight/2 + (planet.y! - this.centerY) * scale;
-                    
-                    // Calculate proportional planet size (smaller than stars)
-                    const planetSize = this.calculatePlanetSize(planet);
-                    
-                    // Get planet color based on type
-                    const planetColor = this.getPlanetColor(planet);
-                    
-                    // Draw planet as circle
-                    ctx.fillStyle = planetColor;
-                    ctx.beginPath();
-                    ctx.arc(planetMapX, planetMapY, planetSize, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Add subtle outline to differentiate from stars
-                    ctx.strokeStyle = planetColor;
-                    ctx.lineWidth = 0.5;
-                    ctx.stroke();
-                    
-                    // Add hover highlight if this planet is hovered (but not selected)
-                    if (this.hoveredPlanet === planet && this.selectedPlanet !== planet) {
-                        ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
-                        ctx.lineWidth = 0.8;
-                        ctx.beginPath();
-                        const hoverRadius = Math.max(3, planetSize + 0.5);
-                        ctx.arc(planetMapX, planetMapY, hoverRadius, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                    
-                    // Add selection highlight if this planet is selected (takes precedence over hover)
-                    if (this.selectedPlanet === planet) {
-                        ctx.strokeStyle = this.currentPositionColor;
-                        ctx.lineWidth = 1.5;
-                        ctx.beginPath();
-                        const highlightRadius = Math.max(4, planetSize + 1);
-                        ctx.arc(planetMapX, planetMapY, highlightRadius, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
+        this.planetRenderer.renderDiscoveredPlanets(
+            context,
+            discoveredPlanets,
+            this.selectedPlanet,
+            this.hoveredPlanet,
+            this.currentPositionColor
+        );
     }
 
     renderDiscoveredNebulae(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredNebulae: NebulaLike[]): void {
-        if (!discoveredNebulae) return;
-
-        for (const nebula of discoveredNebulae) {
-            // Convert world coordinates to map coordinates
-            const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * scale;
-            const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * scale;
-            
-            // Calculate nebula size (nebulae are large objects, so scale appropriately)
-            const baseSize = 8; // Larger than planets but smaller than stars on the map
-            const nebulaSize = Math.max(4, baseSize * this.zoomLevel * 0.5);
-            
-            // Check if nebula is within map bounds (with margin for large size)
-            const margin = nebulaSize + 10;
-            if (nebulaMapX >= mapX - margin && nebulaMapX <= mapX + mapWidth + margin && 
-                nebulaMapY >= mapY - margin && nebulaMapY <= mapY + mapHeight + margin) {
-                
-                // Get nebula colors based on type
-                const nebulaColors = this.getNebulaColors(nebula);
-                
-                // Draw nebula as a soft, glowing cloud
-                ctx.save();
-                
-                // Create radial gradient for nebula effect
-                const gradient = ctx.createRadialGradient(
-                    nebulaMapX, nebulaMapY, 0,
-                    nebulaMapX, nebulaMapY, nebulaSize * 2
-                );
-                gradient.addColorStop(0, nebulaColors.core + '60'); // Semi-transparent core
-                gradient.addColorStop(0.5, nebulaColors.mid + '30'); // Fainter middle
-                gradient.addColorStop(1, nebulaColors.edge + '10');  // Very faint edge
-                
-                // Draw the nebula glow
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(nebulaMapX, nebulaMapY, nebulaSize * 2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw the solid center 
-                ctx.fillStyle = nebulaColors.core + '80';
-                ctx.beginPath();
-                ctx.arc(nebulaMapX, nebulaMapY, nebulaSize * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add selection highlight if this nebula is selected
-                if (this.selectedNebula === nebula) {
-                    ctx.strokeStyle = this.currentPositionColor;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    const highlightRadius = nebulaSize + 2;
-                    ctx.arc(nebulaMapX, nebulaMapY, highlightRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add hover highlight if this nebula is hovered
-                if (this.hoveredNebula === nebula) {
-                    ctx.strokeStyle = this.currentPositionColor + '60'; // Semi-transparent hover
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    const hoverRadius = nebulaSize + 1;
-                    ctx.arc(nebulaMapX, nebulaMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                ctx.restore();
-                
-                // Render nebula label if zoomed in enough
-                if (this.zoomLevel > 2.0 || this.selectedNebula === nebula) {
-                    this.renderNebulaLabel(ctx, nebula, nebulaMapX, nebulaMapY);
-                }
-            }
-        }
-    }
-
-    getNebulaColors(nebula: NebulaLike): { core: string; mid: string; edge: string } {
-        // Color schemes based on nebula type
-        const colorSchemes: Record<string, { core: string; mid: string; edge: string }> = {
-            'emission': { 
-                core: '#ff6b6b',    // Red-orange core
-                mid: '#ff8e53',     // Orange middle  
-                edge: '#ff6b9d'     // Pink edge
-            },
-            'reflection': {
-                core: '#4ecdc4',    // Teal core
-                mid: '#45b7d1',     // Blue middle
-                edge: '#96ceb4'     // Green edge
-            },
-            'planetary': {
-                core: '#a8e6cf',    // Light green core
-                mid: '#7fcdcd',     // Cyan middle
-                edge: '#81ecec'     // Light cyan edge
-            },
-            'dark': {
-                core: '#2c3e50',    // Dark blue-gray core
-                mid: '#34495e',     // Lighter gray middle
-                edge: '#4a6741'     // Dark green edge
-            }
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
         };
-        
-        return colorSchemes[nebula.nebulaType] || colorSchemes['emission'];
-    }
 
-    renderNebulaLabel(ctx: CanvasRenderingContext2D, nebula: NebulaLike, nebulaMapX: number, nebulaMapY: number): void {
-        if (!this.namingService) return;
-        
-        const nebulaName = nebula.objectName || this.namingService.generateDisplayName(nebula);
-        
-        // Calculate offset position for scientific diagram style
-        const offsetDistance = 25; // Distance from nebula center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = nebulaMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = nebulaMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from nebula edge to text
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of nebula (approximate size)
-        const nebulaSize = 8; // Approximate nebula visual size
-        const lineStartX = nebulaMapX + Math.cos(offsetAngle) * (nebulaSize + 2);
-        const lineStartY = nebulaMapY + Math.sin(offsetAngle) * (nebulaSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        ctx.save();
-        ctx.fillStyle = '#e8f4fd';
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text background for readability
-        const textWidth = ctx.measureText(nebulaName).width;
-        const bgPadding = 3;
-        ctx.fillStyle = '#000000B0';
-        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
-        
-        // Draw label text
-        ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(nebulaName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-        ctx.restore();
+        this.nebulaRenderer.renderDiscoveredNebulae(
+            context,
+            discoveredNebulae,
+            this.selectedNebula,
+            this.hoveredNebula,
+            this.currentPositionColor,
+            this.zoomLevel
+        );
     }
 
     renderDiscoveredWormholes(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredWormholes: WormholeLike[]): void {
-        if (!discoveredWormholes) return;
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        // Group wormholes by their wormhole ID to render pairs and connections
-        const wormholePairs = new Map<string, WormholeLike[]>();
-        
-        for (const wormhole of discoveredWormholes) {
-            if (!wormholePairs.has(wormhole.wormholeId)) {
-                wormholePairs.set(wormhole.wormholeId, []);
-            }
-            wormholePairs.get(wormhole.wormholeId)!.push(wormhole);
-        }
-
-        // First pass: Draw connection lines between paired wormholes
-        this.renderWormholeConnections(ctx, mapX, mapY, mapWidth, mapHeight, scale, wormholePairs);
-
-        // Second pass: Draw individual wormholes on top of connection lines
-        for (const wormhole of discoveredWormholes) {
-            // Convert world coordinates to map coordinates
-            const wormholeMapX = mapX + mapWidth/2 + (wormhole.x - this.centerX) * scale;
-            const wormholeMapY = mapY + mapHeight/2 + (wormhole.y - this.centerY) * scale;
-            
-            // Calculate wormhole size (prominent objects, larger than planets but smaller than big stars)
-            const baseSize = 6; // Larger than planets (1.5-2.6) to show their significance
-            const wormholeSize = Math.max(4, baseSize * Math.min(1.0, this.zoomLevel * 0.7));
-            
-            // Check if wormhole is within map bounds (with margin for size)
-            const margin = wormholeSize + 10;
-            if (wormholeMapX >= mapX - margin && wormholeMapX <= mapX + mapWidth + margin && 
-                wormholeMapY >= mapY - margin && wormholeMapY <= mapY + mapHeight + margin) {
-                
-                // Get wormhole colors (unique to differentiate from other objects)
-                const wormholeColors = this.getWormholeColors(wormhole);
-                
-                ctx.save();
-                
-                // Draw wormhole as a distinctive swirling vortex symbol
-                this.renderWormholeVortex(ctx, wormholeMapX, wormholeMapY, wormholeSize, wormholeColors);
-                
-                // Add selection highlight if this wormhole is selected
-                if (this.selectedWormhole === wormhole) {
-                    ctx.strokeStyle = this.currentPositionColor;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    const highlightRadius = wormholeSize + 3;
-                    ctx.arc(wormholeMapX, wormholeMapY, highlightRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add hover highlight if this wormhole is hovered
-                if (this.hoveredWormhole === wormhole) {
-                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath();
-                    const hoverRadius = wormholeSize + 2;
-                    ctx.arc(wormholeMapX, wormholeMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Draw designation symbol (α or β)
-                this.renderWormholeDesignation(ctx, wormholeMapX, wormholeMapY, wormholeSize, wormhole);
-                
-                ctx.restore();
-                
-                // Render wormhole label if zoomed in enough or selected
-                if (this.zoomLevel > 1.5 || this.selectedWormhole === wormhole) {
-                    this.renderWormholeLabel(ctx, wormhole, wormholeMapX, wormholeMapY);
-                }
-            }
-        }
-    }
-
-    renderWormholeConnections(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, wormholePairs: Map<string, WormholeLike[]>): void {
-        ctx.save();
-        ctx.strokeStyle = '#6a5acd40'; // Semi-transparent purple for connections
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 4]); // Distinctive dashed pattern
-        
-        for (const [/* wormholeId */, wormholes] of wormholePairs) {
-            // Only draw connection if we have both wormholes discovered
-            if (wormholes.length === 2) {
-                const alpha = wormholes.find(w => w.designation === 'alpha');
-                const beta = wormholes.find(w => w.designation === 'beta');
-                
-                if (alpha && beta) {
-                    const alphaMapX = mapX + mapWidth/2 + (alpha.x - this.centerX) * scale;
-                    const alphaMapY = mapY + mapHeight/2 + (alpha.y - this.centerY) * scale;
-                    const betaMapX = mapX + mapWidth/2 + (beta.x - this.centerX) * scale;
-                    const betaMapY = mapY + mapHeight/2 + (beta.y - this.centerY) * scale;
-                    
-                    // Draw connection line between the pair
-                    ctx.beginPath();
-                    ctx.moveTo(alphaMapX, alphaMapY);
-                    ctx.lineTo(betaMapX, betaMapY);
-                    ctx.stroke();
-                    
-                    // Draw directional indicators (small arrows) along the line
-                    if (this.zoomLevel > 0.5) {
-                        this.renderDirectionalIndicators(ctx, alphaMapX, alphaMapY, betaMapX, betaMapY);
-                    }
-                }
-            }
-        }
-        
-        ctx.setLineDash([]); // Reset line dash
-        ctx.restore();
-    }
-
-    renderWormholeVortex(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, colors: {core: string, spiral: string, outer: string}): void {
-        // Draw the swirling vortex effect
-        const spiralRadius = size;
-        const coreRadius = size * 0.4;
-        
-        // Draw outer ring
-        ctx.strokeStyle = colors.outer;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(x, y, spiralRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Draw spiral pattern
-        ctx.strokeStyle = colors.spiral;
-        ctx.lineWidth = 1;
-        const spiralTurns = 2;
-        const spiralPoints = 16;
-        ctx.beginPath();
-        
-        for (let i = 0; i <= spiralPoints; i++) {
-            const angle = (i / spiralPoints) * Math.PI * 2 * spiralTurns;
-            const radius = (spiralRadius * 0.8) * (1 - i / spiralPoints);
-            const spiralX = x + Math.cos(angle) * radius;
-            const spiralY = y + Math.sin(angle) * radius;
-            
-            if (i === 0) {
-                ctx.moveTo(spiralX, spiralY);
-            } else {
-                ctx.lineTo(spiralX, spiralY);
-            }
-        }
-        ctx.stroke();
-        
-        // Draw bright core
-        ctx.fillStyle = colors.core;
-        ctx.beginPath();
-        ctx.arc(x, y, coreRadius, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    renderWormholeDesignation(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, wormhole: WormholeLike): void {
-        const symbol = wormhole.designation === 'alpha' ? 'α' : 'β';
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `${Math.max(8, Math.min(12, size * 1.2))}px "Courier New", monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text background for readability
-        const textMetrics = ctx.measureText(symbol);
-        const bgSize = Math.max(textMetrics.width, size * 0.6);
-        
-        ctx.fillStyle = '#00000080';
-        ctx.beginPath();
-        ctx.arc(x + size + 8, y - size - 8, bgSize / 2 + 2, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw the designation symbol
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(symbol, x + size + 8, y - size - 8);
-        
-        ctx.textBaseline = 'alphabetic'; // Reset baseline
-    }
-
-    renderDirectionalIndicators(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
-        const arrowCount = 3;
-        const arrowSize = 4;
-        
-        for (let i = 1; i <= arrowCount; i++) {
-            const t = i / (arrowCount + 1);
-            const arrowX = x1 + (x2 - x1) * t;
-            const arrowY = y1 + (y2 - y1) * t;
-            
-            // Calculate arrow direction
-            const angle = Math.atan2(y2 - y1, x2 - x1);
-            
-            // Draw small arrow
-            ctx.beginPath();
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(arrowX - arrowSize * Math.cos(angle - Math.PI/6), arrowY - arrowSize * Math.sin(angle - Math.PI/6));
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(arrowX - arrowSize * Math.cos(angle + Math.PI/6), arrowY - arrowSize * Math.sin(angle + Math.PI/6));
-            ctx.stroke();
-        }
-    }
-
-    getWormholeColors(wormhole: WormholeLike): {core: string, spiral: string, outer: string} {
-        // Color scheme based on designation with spacetime theme
-        if (wormhole.designation === 'alpha') {
-            return {
-                core: '#9370db',    // Medium slate blue core
-                spiral: '#ba55d3',  // Medium orchid spiral
-                outer: '#dda0dd60'  // Plum outer ring (semi-transparent)
-            };
-        } else {
-            return {
-                core: '#4169e1',    // Royal blue core
-                spiral: '#1e90ff',  // Dodger blue spiral  
-                outer: '#87ceeb60'  // Sky blue outer ring (semi-transparent)
-            };
-        }
-    }
-
-    renderWormholeLabel(ctx: CanvasRenderingContext2D, wormhole: WormholeLike, wormholeMapX: number, wormholeMapY: number): void {
-        if (!this.namingService) return;
-        
-        const wormholeName = wormhole.objectName || this.namingService.generateDisplayName(wormhole);
-        
-        // Calculate offset position for scientific diagram style
-        const offsetDistance = 30; // Distance from wormhole center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = wormholeMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = wormholeMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from wormhole edge to text
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of wormhole (approximate size)
-        const wormholeSize = 6; // Approximate wormhole visual size
-        const lineStartX = wormholeMapX + Math.cos(offsetAngle) * (wormholeSize + 2);
-        const lineStartY = wormholeMapY + Math.sin(offsetAngle) * (wormholeSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        ctx.save();
-        ctx.fillStyle = '#e8f4fd';
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text background for readability
-        const textWidth = ctx.measureText(wormholeName).width;
-        const bgPadding = 4;
-        ctx.fillStyle = '#000000C0';
-        ctx.fillRect(labelX - bgPadding, labelY - 7, textWidth + bgPadding*2, 14);
-        
-        // Draw label text
-        ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(wormholeName, labelX, labelY);
-        
-        // Draw twin coordinates if zoomed in enough
-        if (this.zoomLevel > 2.0) {
-            const twinText = `→ (${Math.round(wormhole.twinX)}, ${Math.round(wormhole.twinY)})`;
-            ctx.font = '9px "Courier New", monospace';
-            const twinTextWidth = ctx.measureText(twinText).width;
-            
-            const twinLabelY = labelY + 15;
-            ctx.fillStyle = '#000000A0';
-            ctx.fillRect(labelX - 2, twinLabelY - 6, twinTextWidth + 4, 12);
-            
-            ctx.fillStyle = '#aaaaaa';
-            ctx.fillText(twinText, labelX, twinLabelY);
-        }
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-        ctx.restore();
-    }
-
-    renderOrbitalCircles(ctx: CanvasRenderingContext2D, starMapX: number, starMapY: number, planets: PlanetLike[], scale: number, mapX: number, mapY: number, mapWidth: number, mapHeight: number): void {
-        // Calculate unique orbital radii for this star system based on actual map positions
-        const orbitalRadii = new Set<number>();
-        
-        for (const planet of planets) {
-            // Calculate the planet's actual position on the map
-            const planetMapX = mapX + mapWidth/2 + (planet.x! - this.centerX) * scale;
-            const planetMapY = mapY + mapHeight/2 + (planet.y! - this.centerY) * scale;
-            
-            // Calculate orbital radius directly from map coordinates
-            const mapOrbitalRadius = Math.sqrt(
-                Math.pow(planetMapX - starMapX, 2) + 
-                Math.pow(planetMapY - starMapY, 2)
-            );
-            orbitalRadii.add(Math.round(mapOrbitalRadius)); // Round to avoid duplicate very close orbits
-        }
-        
-        // Draw orbital circles
-        ctx.strokeStyle = '#444444'; // Subtle dark gray
-        ctx.lineWidth = 0.5;
-        ctx.setLineDash([2, 3]); // Dashed line for subtle effect
-        
-        for (const radius of orbitalRadii) {
-            // Only draw orbits that are reasonably visible and not too large
-            if (radius > 2 && radius < 500) {
-                ctx.beginPath();
-                ctx.arc(starMapX, starMapY, radius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        }
-        
-        // Reset line dash for other rendering
-        ctx.setLineDash([]);
+        this.wormholeRenderer.renderDiscoveredWormholes(
+            context,
+            discoveredWormholes,
+            this.selectedWormhole,
+            this.hoveredWormhole,
+            this.currentPositionColor,
+            this.zoomLevel
+        );
     }
 
     renderDiscoveredAsteroidGardens(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredAsteroidGardens: AsteroidGardenLike[]): void {
-        if (!discoveredAsteroidGardens) return;
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        for (const asteroidGarden of discoveredAsteroidGardens) {
-            // Convert world coordinates to map coordinates
-            const gardenMapX = mapX + mapWidth/2 + (asteroidGarden.x - this.centerX) * scale;
-            const gardenMapY = mapY + mapHeight/2 + (asteroidGarden.y - this.centerY) * scale;
-            
-            // Calculate asteroid garden size (smaller than nebulae, larger than planets)
-            const baseSize = 4; // Smaller than nebulae (8), larger than planets (1.5-2.6)
-            const gardenSize = Math.max(2, baseSize * Math.min(1.0, this.zoomLevel * 0.8));
-            
-            // Check if asteroid garden is within map bounds (with margin for size)
-            const margin = gardenSize + 5;
-            if (gardenMapX >= mapX - margin && gardenMapX <= mapX + mapWidth + margin && 
-                gardenMapY >= mapY - margin && gardenMapY <= mapY + mapHeight + margin) {
-                
-                // Get asteroid garden colors
-                const gardenColors = this.getAsteroidGardenColors(asteroidGarden);
-                
-                ctx.save();
-                
-                // Draw asteroid garden as scattered dots with glitter effect
-                this.renderAsteroidField(ctx, gardenMapX, gardenMapY, gardenSize, gardenColors, asteroidGarden.x, asteroidGarden.y);
-                
-                // Add selection highlight if this asteroid garden is selected
-                if (this.selectedAsteroidGarden === asteroidGarden) {
-                    ctx.strokeStyle = this.currentPositionColor;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    const highlightRadius = gardenSize + 2;
-                    ctx.arc(gardenMapX, gardenMapY, highlightRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add hover highlight if this asteroid garden is hovered
-                if (this.hoveredAsteroidGarden === asteroidGarden) {
-                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    const hoverRadius = gardenSize + 1;
-                    ctx.arc(gardenMapX, gardenMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                ctx.restore();
-                
-                // Render asteroid garden label if zoomed in enough or selected
-                if (this.zoomLevel > 2.0 || this.selectedAsteroidGarden === asteroidGarden) {
-                    this.renderAsteroidGardenLabel(ctx, asteroidGarden, gardenMapX, gardenMapY);
-                }
-            }
-        }
+        this.asteroidRenderer.renderDiscoveredAsteroidGardens(
+            context,
+            discoveredAsteroidGardens,
+            this.selectedAsteroidGarden,
+            this.hoveredAsteroidGarden,
+            this.currentPositionColor,
+            this.zoomLevel
+        );
     }
 
     renderDiscoveredRoguePlanets(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredRoguePlanets: any[]): void {
-        if (!discoveredRoguePlanets) return;
-
-        for (const roguePlanet of discoveredRoguePlanets) {
-            // Convert world coordinates to map coordinates
-            const planetMapX = mapX + mapWidth/2 + (roguePlanet.x - this.centerX) * scale;
-            const planetMapY = mapY + mapHeight/2 + (roguePlanet.y - this.centerY) * scale;
-            
-            // Calculate rogue planet size (similar to regular planets but slightly larger)
-            const baseSize = 2.5; // Slightly larger than regular planets
-            const planetSize = Math.max(1.5, baseSize * Math.min(1.0, this.zoomLevel * 0.9));
-            
-            // Check if rogue planet is within map bounds (with margin for size)
-            const margin = planetSize + 3;
-            if (planetMapX >= mapX - margin && planetMapX <= mapX + mapWidth + margin && 
-                planetMapY >= mapY - margin && planetMapY <= mapY + mapHeight + margin) {
-                
-                ctx.save();
-                
-                // Get rogue planet color based on variant
-                const planetColor = this.getRoguePlanetColor(roguePlanet.variant);
-                
-                // Draw glow effect for ice and volcanic variants
-                if (roguePlanet.variant === 'ice' || roguePlanet.variant === 'volcanic') {
-                    const glowColor = roguePlanet.variant === 'ice' ? '#E0FFFF' : '#FF4500';
-                    const gradient = ctx.createRadialGradient(
-                        planetMapX, planetMapY, planetSize,
-                        planetMapX, planetMapY, planetSize * 1.8
-                    );
-                    gradient.addColorStop(0, glowColor + '40'); // 40 = ~25% opacity
-                    gradient.addColorStop(1, glowColor + '00'); // Fully transparent
-                    
-                    ctx.fillStyle = gradient;
-                    ctx.beginPath();
-                    ctx.arc(planetMapX, planetMapY, planetSize * 1.8, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                // Draw main rogue planet body
-                ctx.fillStyle = planetColor;
-                ctx.beginPath();
-                ctx.arc(planetMapX, planetMapY, planetSize, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add subtle outline to differentiate from regular planets
-                ctx.strokeStyle = planetColor;
-                ctx.lineWidth = 0.5;
-                ctx.stroke();
-                
-                ctx.restore();
-            }
-        }
-    }
-
-    private getRoguePlanetColor(variant: 'ice' | 'rock' | 'volcanic'): string {
-        switch (variant) {
-            case 'ice':
-                return '#B0E0E6'; // Light steel blue
-            case 'volcanic':
-                return '#8B0000'; // Dark red
-            case 'rock':
-            default:
-                return '#696969'; // Dim gray
-        }
+        const context = { ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale: scale, centerX: this.centerX, centerY: this.centerY };
+        this.regionObjectRenderer.renderDiscoveredRoguePlanets(context, discoveredRoguePlanets, this.zoomLevel);
     }
 
     renderDiscoveredDarkNebulae(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredDarkNebulae: any[]): void {
-        if (!discoveredDarkNebulae) return;
-
-        for (const darkNebula of discoveredDarkNebulae) {
-            // Convert world coordinates to map coordinates
-            const nebulaMapX = mapX + mapWidth/2 + (darkNebula.x - this.centerX) * scale;
-            const nebulaMapY = mapY + mapHeight/2 + (darkNebula.y - this.centerY) * scale;
-            
-            // Calculate dark nebula size based on radius and zoom level
-            const baseSize = Math.max(8, darkNebula.radius * scale * 0.3); // Larger than planets
-            const nebulaSize = Math.max(4, baseSize * Math.min(1.2, this.zoomLevel * 0.8));
-            
-            // Check if dark nebula is within map bounds (with margin for size)
-            const margin = nebulaSize + 5;
-            if (nebulaMapX >= mapX - margin && nebulaMapX <= mapX + mapWidth + margin && 
-                nebulaMapY >= mapY - margin && nebulaMapY <= mapY + mapHeight + margin) {
-                
-                ctx.save();
-                
-                // Get dark nebula color and opacity based on variant
-                const nebulaColor = this.getDarkNebulaColor(darkNebula.variant);
-                const occlusionStrength = darkNebula.occlusionStrength || 0.8;
-                
-                // Create gradient for dark nebula representation
-                const gradient = ctx.createRadialGradient(
-                    nebulaMapX, nebulaMapY, 0,
-                    nebulaMapX, nebulaMapY, nebulaSize
-                );
-                
-                // Dark core fading to transparent edges
-                gradient.addColorStop(0, nebulaColor + Math.floor(occlusionStrength * 255).toString(16).padStart(2, '0'));
-                gradient.addColorStop(0.7, nebulaColor + Math.floor(occlusionStrength * 128).toString(16).padStart(2, '0'));
-                gradient.addColorStop(1, nebulaColor + '00'); // Fully transparent
-                
-                // Draw dark nebula with irregular shape approximation
-                ctx.fillStyle = gradient;
-                if (darkNebula.shape === 'irregular') {
-                    // Draw irregular shape with multiple overlapping circles
-                    for (let i = 0; i < 3; i++) {
-                        const offsetX = (Math.random() - 0.5) * nebulaSize * 0.4;
-                        const offsetY = (Math.random() - 0.5) * nebulaSize * 0.4;
-                        const circleSize = nebulaSize * (0.6 + Math.random() * 0.4);
-                        
-                        ctx.beginPath();
-                        ctx.arc(nebulaMapX + offsetX, nebulaMapY + offsetY, circleSize, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                } else {
-                    // Draw circular shape
-                    ctx.beginPath();
-                    ctx.arc(nebulaMapX, nebulaMapY, nebulaSize, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                // Add subtle border to make it visible against dark backgrounds
-                ctx.strokeStyle = nebulaColor + '80'; // 50% opacity border
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                
-                ctx.restore();
-            }
-        }
-    }
-
-    private getDarkNebulaColor(variant: 'dense-core' | 'wispy' | 'globular'): string {
-        switch (variant) {
-            case 'dense-core':
-                return '#2C1810'; // Very dark brown
-            case 'wispy':
-                return '#1A1A2E'; // Dark purple-blue
-            case 'globular':
-            default:
-                return '#0F0F23'; // Very dark blue
-        }
+        const context = { ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale: scale, centerX: this.centerX, centerY: this.centerY };
+        this.regionObjectRenderer.renderDiscoveredDarkNebulae(context, discoveredDarkNebulae, this.zoomLevel);
     }
 
     renderDarkNebulaInfoPanel(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
@@ -2834,519 +2166,24 @@ export class StellarMap {
     }
 
     renderDiscoveredCrystalGardens(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredCrystalGardens: any[]): void {
-        if (!discoveredCrystalGardens) return;
-
-        for (const crystalGarden of discoveredCrystalGardens) {
-            // Convert world coordinates to map coordinates
-            const gardenMapX = mapX + mapWidth/2 + (crystalGarden.x - this.centerX) * scale;
-            const gardenMapY = mapY + mapHeight/2 + (crystalGarden.y - this.centerY) * scale;
-            
-            // Calculate crystal garden size based on radius and zoom level
-            const baseSize = Math.max(8, crystalGarden.radius * scale * 0.4);
-            const gardenSize = Math.max(4, baseSize * Math.min(1.2, this.zoomLevel * 0.8));
-            
-            // Check if crystal garden is within map bounds (with margin for size)
-            const margin = gardenSize + 5;
-            if (gardenMapX >= mapX - margin && gardenMapX <= mapX + mapWidth + margin && 
-                gardenMapY >= mapY - margin && gardenMapY <= mapY + mapHeight + margin) {
-                
-                ctx.save();
-                
-                // Get crystal garden colors based on variant
-                const gardenColors = this.getCrystalGardenColors(crystalGarden.variant);
-                
-                // Create gradient for crystal garden representation
-                const gradient = ctx.createRadialGradient(
-                    gardenMapX, gardenMapY, 0,
-                    gardenMapX, gardenMapY, gardenSize
-                );
-                
-                // Bright center fading to transparent edges
-                gradient.addColorStop(0, gardenColors.primary + 'FF');
-                gradient.addColorStop(0.3, gardenColors.primary + 'DD');
-                gradient.addColorStop(0.7, gardenColors.secondary + '88');
-                gradient.addColorStop(1, gardenColors.secondary + '00');
-                
-                // Draw crystal garden base
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(gardenMapX, gardenMapY, gardenSize, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add crystalline sparkle effects
-                this.renderCrystalSparkles(ctx, gardenMapX, gardenMapY, gardenSize, gardenColors, crystalGarden);
-                
-                // Add border for visibility
-                ctx.strokeStyle = gardenColors.primary + '80';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(gardenMapX, gardenMapY, gardenSize, 0, Math.PI * 2);
-                ctx.stroke();
-                
-                // Check for selection and draw label if needed
-                if (this.zoomLevel > 1.5) {
-                    this.renderCrystalGardenLabel(ctx, crystalGarden, gardenMapX, gardenMapY);
-                }
-                
-                ctx.restore();
-            }
-        }
-    }
-
-    private getCrystalGardenColors(variant: 'pure' | 'mixed' | 'rare-earth'): {primary: string, secondary: string} {
-        switch (variant) {
-            case 'pure':
-                return { primary: '#E0F7FF', secondary: '#B3E5FC' };
-            case 'mixed':
-                return { primary: '#FFE0B3', secondary: '#FFCC80' };
-            case 'rare-earth':
-                return { primary: '#E1BEE7', secondary: '#CE93D8' };
-            default:
-                return { primary: '#E0F7FF', secondary: '#B3E5FC' };
-        }
-    }
-
-    private renderCrystalSparkles(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {primary: string, secondary: string}, crystalGarden: any): void {
-        // Use deterministic sparkles based on world position
-        const seed = Math.floor(crystalGarden.x + crystalGarden.y * 1000);
-        const sparkleCount = Math.max(3, Math.floor(size * 0.3));
-        
-        for (let i = 0; i < sparkleCount; i++) {
-            const pseudoRandom1 = Math.sin(seed + i * 1.618) * 0.5 + 0.5;
-            const pseudoRandom2 = Math.sin(seed + i * 2.414) * 0.5 + 0.5;
-            
-            const angle = pseudoRandom1 * Math.PI * 2;
-            const distance = pseudoRandom2 * size * 0.7;
-            const sparkleX = centerX + Math.cos(angle) * distance;
-            const sparkleY = centerY + Math.sin(angle) * distance;
-            const sparkleSize = Math.max(1, size * 0.15);
-            
-            ctx.fillStyle = colors.primary + 'CC';
-            ctx.beginPath();
-            ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    renderCrystalGardenLabel(ctx: CanvasRenderingContext2D, crystalGarden: any, gardenMapX: number, gardenMapY: number): void {
-        if (!this.namingService) return;
-        
-        const gardenName = this.namingService.generateDisplayName(crystalGarden);
-        const labelY = gardenMapY + 20; // Position label below the garden
-        
-        // Label background
-        const textMetrics = ctx.measureText(gardenName);
-        const labelWidth = textMetrics.width + 8;
-        const labelHeight = 16;
-        const labelX = gardenMapX - labelWidth / 2;
-        
-        ctx.fillStyle = '#000000CC';
-        ctx.fillRect(labelX, labelY - 12, labelWidth, labelHeight);
-        
-        // Label text
-        ctx.fillStyle = '#E0F7FF';
-        ctx.font = '10px "Courier New", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(gardenName, gardenMapX, labelY);
-        ctx.textAlign = 'left'; // Reset alignment
+        const context = { ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale: scale, centerX: this.centerX, centerY: this.centerY };
+        this.regionObjectRenderer.renderDiscoveredCrystalGardens(context, discoveredCrystalGardens, this.zoomLevel);
     }
 
     renderDiscoveredProtostars(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredProtostars: any[]): void {
-        if (!discoveredProtostars) return;
-
-        for (const protostar of discoveredProtostars) {
-            // Convert world coordinates to map coordinates
-            const protostarMapX = mapX + mapWidth/2 + (protostar.x - this.centerX) * scale;
-            const protostarMapY = mapY + mapHeight/2 + (protostar.y - this.centerY) * scale;
-            
-            // Calculate protostar size based on radius and zoom level
-            const baseSize = Math.max(10, protostar.radius * scale * 0.5);
-            const protostarSize = Math.max(6, baseSize * Math.min(1.3, this.zoomLevel * 0.9));
-            
-            // Check if protostar is within map bounds (with margin for jets)
-            const margin = protostarSize + 20; // Extra margin for polar jets
-            if (protostarMapX >= mapX - margin && protostarMapX <= mapX + mapWidth + margin &&
-                protostarMapY >= mapY - margin && protostarMapY <= mapY + mapHeight + margin) {
-                
-                ctx.save();
-                
-                // Get protostar colors based on variant
-                const protostarColors = this.getProtostarColors(protostar.variant);
-                
-                // Draw polar jets first (background layer)
-                if (protostar.variant === 'class-1' || protostar.variant === 'class-2') {
-                    this.renderProtostarJets(ctx, protostarMapX, protostarMapY, protostarSize, protostarColors, protostar);
-                }
-                
-                // Draw accretion disk
-                this.renderProtostarDisk(ctx, protostarMapX, protostarMapY, protostarSize, protostarColors);
-                
-                // Create core gradient
-                const coreGradient = ctx.createRadialGradient(
-                    protostarMapX, protostarMapY, 0,
-                    protostarMapX, protostarMapY, protostarSize * 0.6
-                );
-                coreGradient.addColorStop(0, protostarColors.core);
-                coreGradient.addColorStop(0.4, protostarColors.core + '80');
-                coreGradient.addColorStop(1, protostarColors.core + '20');
-                
-                // Draw core
-                ctx.fillStyle = coreGradient;
-                ctx.beginPath();
-                ctx.arc(protostarMapX, protostarMapY, protostarSize * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add glow effect
-                ctx.shadowColor = protostarColors.core;
-                ctx.shadowBlur = protostarSize * 0.8;
-                ctx.fillStyle = protostarColors.core + '40';
-                ctx.beginPath();
-                ctx.arc(protostarMapX, protostarMapY, protostarSize, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                
-                // Add hover highlight if this protostar is hovered (but not selected)
-                if (this.hoveredProtostar === protostar && this.selectedProtostar !== protostar) {
-                    ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent amber
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    const hoverRadius = Math.max(5, protostarSize + 1);
-                    ctx.arc(protostarMapX, protostarMapY, hoverRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Add selection highlight if this protostar is selected (takes precedence over hover)
-                if (this.selectedProtostar === protostar) {
-                    ctx.strokeStyle = this.currentPositionColor; // Full amber
-                    ctx.lineWidth = 2;
-                    const selectionRadius = protostarSize + 3;
-                    ctx.beginPath();
-                    ctx.arc(protostarMapX, protostarMapY, selectionRadius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                
-                // Check for selection and draw label if needed
-                if (this.zoomLevel > 1.5) {
-                    this.renderProtostarLabel(ctx, protostar, protostarMapX, protostarMapY);
-                }
-                
-                ctx.restore();
-            }
-        }
-    }
-
-    private getProtostarColors(variant: 'class-0' | 'class-1' | 'class-2'): {core: string, jet: string, disk: string} {
-        switch (variant) {
-            case 'class-0':
-                return { core: '#8B0000', jet: '#FF4500', disk: '#8B4513' };
-            case 'class-1':
-                return { core: '#FF4500', jet: '#FFD700', disk: '#CD853F' };
-            case 'class-2':
-                return { core: '#FFD700', jet: '#FFFF00', disk: '#F0E68C' };
-            default:
-                return { core: '#FF4500', jet: '#FFD700', disk: '#CD853F' };
-        }
-    }
-
-    private renderProtostarJets(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {core: string, jet: string, disk: string}, protostar: any): void {
-        // Use deterministic angle based on world position
-        const seed = Math.floor(protostar.x + protostar.y * 1000);
-        const jetAngle = (seed % 360) * (Math.PI / 180);
-        
-        const jetLength = size * 3;
-        const jetWidth = size * 0.3;
-        
-        // Draw two opposing jets
-        for (let i = 0; i < 2; i++) {
-            const angle = jetAngle + (i * Math.PI);
-            const jetEndX = centerX + Math.cos(angle) * jetLength;
-            const jetEndY = centerY + Math.sin(angle) * jetLength;
-            
-            // Create gradient for jet
-            const jetGradient = ctx.createLinearGradient(centerX, centerY, jetEndX, jetEndY);
-            jetGradient.addColorStop(0, colors.jet + '80');
-            jetGradient.addColorStop(0.5, colors.jet + '40');
-            jetGradient.addColorStop(1, colors.jet + '10');
-            
-            ctx.fillStyle = jetGradient;
-            ctx.beginPath();
-            ctx.ellipse(
-                centerX + Math.cos(angle) * jetLength * 0.5,
-                centerY + Math.sin(angle) * jetLength * 0.5,
-                jetLength * 0.5,
-                jetWidth,
-                angle,
-                0,
-                Math.PI * 2
-            );
-            ctx.fill();
-        }
-    }
-
-    private renderProtostarDisk(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {core: string, jet: string, disk: string}): void {
-        const diskSize = size * 1.8;
-        
-        // Create disk gradient
-        const diskGradient = ctx.createRadialGradient(
-            centerX, centerY, size * 0.6,
-            centerX, centerY, diskSize
+        const context = { ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale: scale, centerX: this.centerX, centerY: this.centerY };
+        this.regionObjectRenderer.renderDiscoveredProtostars(
+            context,
+            discoveredProtostars,
+            this.selectedProtostar,
+            this.hoveredProtostar,
+            this.currentPositionColor,
+            this.zoomLevel
         );
-        diskGradient.addColorStop(0, 'transparent');
-        diskGradient.addColorStop(0.3, colors.disk + '30');
-        diskGradient.addColorStop(0.7, colors.disk + '60');
-        diskGradient.addColorStop(1, colors.disk + '20');
-        
-        ctx.fillStyle = diskGradient;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, diskSize, 0, Math.PI * 2);
-        ctx.fill();
     }
 
-    renderProtostarLabel(ctx: CanvasRenderingContext2D, protostar: any, protostarMapX: number, protostarMapY: number): void {
-        if (!this.namingService) return;
-        
-        const protostarName = this.namingService.generateDisplayName(protostar);
-        
-        // Calculate offset position for scientific diagram style (same as other objects)
-        const offsetDistance = 35; // Distance from protostar center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = protostarMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = protostarMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from protostar edge to text
-        ctx.strokeStyle = '#aaaaaa'; // Gray line like other objects
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of protostar (approximate size)
-        const protostarSize = 10; // Approximate protostar visual size
-        const lineStartX = protostarMapX + Math.cos(offsetAngle) * (protostarSize + 2);
-        const lineStartY = protostarMapY + Math.sin(offsetAngle) * (protostarSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        // Set text properties like other objects
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text background for readability (same as nebulae/crystal gardens)
-        const textWidth = ctx.measureText(protostarName).width;
-        const bgPadding = 3;
-        ctx.fillStyle = '#000000B0';
-        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
-        
-        // Draw label text (same color as other objects)
-        ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(protostarName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-    }
 
-    renderAsteroidField(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, colors: {rocks: string[], accents: string[]}, worldX: number, worldY: number): void {
-        // Draw several small rocks scattered around the center point
-        const rockCount = Math.max(4, Math.floor(size * 0.8)); // More rocks, better distribution
-        const spreadRadius = size * 2.5; // Much wider spread
-        
-        // Use deterministic "randomness" based on WORLD position for consistent appearance across all map movements
-        const seed = Math.floor(worldX + worldY * 1000);
-        
-        for (let i = 0; i < rockCount; i++) {
-            // Create more spread out, less uniform distribution
-            const pseudoRandom1 = Math.sin(seed + i * 1.618) * 0.5 + 0.5; // Golden ratio for better distribution
-            const pseudoRandom2 = Math.sin(seed + i * 2.414) * 0.5 + 0.5; // Different multiplier for Y
-            const pseudoRandom3 = Math.sin(seed + i * 3.142) * 0.5 + 0.5; // For size variation
-            
-            // Distribute rocks with more variation and spread
-            const angle = (i / rockCount) * Math.PI * 2 + (pseudoRandom1 - 0.5) * Math.PI * 0.8; // More angular variation
-            const distance = pseudoRandom2 * spreadRadius * (0.3 + pseudoRandom1 * 0.7); // Variable distance, some closer to center
-            const rockX = centerX + Math.cos(angle) * distance;
-            const rockY = centerY + Math.sin(angle) * distance;
-            const rockSize = Math.max(1, size * (0.2 + pseudoRandom3 * 0.5)); // More size variation
-            
-            // Draw rock
-            ctx.fillStyle = colors.rocks[i % colors.rocks.length];
-            ctx.beginPath();
-            ctx.arc(rockX, rockY, rockSize, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Add occasional glitter effect (reduced frequency and more subtle)
-            const glitterChance = 0.3; // Reduced from 70% to 30%
-            const glitterRandom = Math.sin(seed + i * 5.678) * 0.5 + 0.5;
-            if (glitterRandom < glitterChance) {
-                const glitterX = rockX + (pseudoRandom1 - 0.5) * rockSize * 0.8;
-                const glitterY = rockY + (pseudoRandom2 - 0.5) * rockSize * 0.8;
-                const glitterSize = Math.max(0.3, rockSize * 0.2); // Smaller glitter
-                
-                // Use more subtle glitter colors (blend with rock color)
-                const accentColor = colors.accents[Math.floor(pseudoRandom3 * colors.accents.length)];
-                ctx.fillStyle = accentColor + '80'; // Add transparency for subtlety
-                ctx.beginPath();
-                ctx.arc(glitterX, glitterY, glitterSize, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-    }
-
-    getAsteroidGardenColors(asteroidGarden: AsteroidGardenLike): {rocks: string[], accents: string[]} {
-        // Use colors from the asteroid garden type data if available
-        if (asteroidGarden.gardenTypeData?.colors && asteroidGarden.gardenTypeData?.accentColors) {
-            return {
-                rocks: asteroidGarden.gardenTypeData.colors,
-                accents: asteroidGarden.gardenTypeData.accentColors
-            };
-        }
-        
-        // Fallback colors based on garden type
-        const colorSchemes: Record<string, {rocks: string[], accents: string[]}> = {
-            metallic: {
-                rocks: ['#8c8c8c', '#a0a0a0', '#7a7a7a'],
-                accents: ['#ffffff', '#e6e6e6', '#d4d4d4']
-            },
-            carbonaceous: {
-                rocks: ['#2d2d2d', '#404040', '#1a1a1a'],
-                accents: ['#4a90e2', '#7bb3f0', '#a8c8ec']
-            },
-            crystalline: {
-                rocks: ['#e6f3ff', '#d4e6f1', '#aed6f1'],
-                accents: ['#ffffff', '#85c1e9', '#5dade2']
-            },
-            volcanic: {
-                rocks: ['#8b4513', '#a0522d', '#d2691e'],
-                accents: ['#ff4500', '#ff6347', '#ffa500']
-            }
-        };
-        
-        return colorSchemes[asteroidGarden.gardenType] || colorSchemes.metallic;
-    }
-
-    renderAsteroidGardenLabel(ctx: CanvasRenderingContext2D, asteroidGarden: AsteroidGardenLike, gardenMapX: number, gardenMapY: number): void {
-        if (!this.namingService) return;
-        
-        const gardenName = asteroidGarden.objectName || this.namingService.generateDisplayName(asteroidGarden);
-        
-        // Calculate offset position for scientific diagram style
-        const offsetDistance = 30; // Distance from garden center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = gardenMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = gardenMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from garden edge to text
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of asteroid garden (approximate size)
-        const gardenSize = 10; // Approximate asteroid garden visual size
-        const lineStartX = gardenMapX + Math.cos(offsetAngle) * (gardenSize + 2);
-        const lineStartY = gardenMapY + Math.sin(offsetAngle) * (gardenSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        ctx.save();
-        ctx.fillStyle = '#e8f4fd';
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text background for readability
-        const textWidth = ctx.measureText(gardenName).width;
-        const bgPadding = 3;
-        ctx.fillStyle = '#000000B0';
-        ctx.fillRect(labelX - bgPadding, labelY - 6, textWidth + bgPadding*2, 12);
-        
-        // Draw label text
-        ctx.fillStyle = '#e8f4fd';
-        ctx.fillText(gardenName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-        ctx.restore();
-    }
-
-    calculatePlanetSize(planet: PlanetLike): number {
-        // Get the planet's size multiplier from its planet type (default 1.0 if not available)
-        const sizeMultiplier = planet.planetType?.sizeMultiplier || 1.0;
-        
-        // Base size for planets (smaller than stars)
-        const baseSize = 1.5;
-        
-        // Scale planet size based on type, but keep them smaller than stars
-        return Math.max(1, baseSize * (0.8 + sizeMultiplier * 0.4)); // Range: ~1.2-2.6
-    }
-
-    getPlanetColor(planet: PlanetLike): string {
-        // Use planet type colors if available, otherwise default
-        if (planet.planetType && planet.planetType.colors) {
-            return planet.planetType.colors[0]; // Use first color from palette
-        }
-        // Fallback colors based on planet type name
-        const colorMap: Record<string, string> = {
-            'Rocky Planet': '#8B4513',
-            'Ocean World': '#4169E1', 
-            'Gas Giant': '#DAA520',
-            'Desert World': '#FFE4B5',
-            'Frozen World': '#87CEEB',
-            'Volcanic World': '#DC143C',
-            'Exotic World': '#DA70D6'
-        };
-        return colorMap[planet.planetTypeName] || '#888888';
-    }
-
-    renderStarLabel(ctx: CanvasRenderingContext2D, star: StarLike, starMapX: number, starMapY: number): void {
-        if (!this.namingService) return;
-        
-        // Generate star name
-        const starName = this.namingService.generateDisplayName(star);
-        
-        // Calculate star size for positioning
-        const starSize = this.calculateStarSize(star, false);
-        
-        // Calculate offset position for scientific diagram style
-        const offsetDistance = 35; // Distance from star center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = starMapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = starMapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from star edge to text
-        ctx.strokeStyle = '#aaaaaa'; // Lighter gray for visibility
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of star
-        const lineStartX = starMapX + Math.cos(offsetAngle) * (starSize + 2);
-        const lineStartY = starMapY + Math.sin(offsetAngle) * (starSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        // Draw star name at offset position
-        ctx.fillStyle = '#b0c4d4';
-        ctx.font = this.getLabelFont();
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(starName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-    }
-
-    renderStartingPositionMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, startingPosition: GameStartingPosition): void {
+    renderStartingPositionMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, startingPosition: GameStartingPosition): void{
         // Edge case: Don't render starting position marker if it's the same as origin (0,0)
         if (startingPosition.x === 0 && startingPosition.y === 0) {
             return;
@@ -4029,382 +2866,47 @@ export class StellarMap {
     }
 
     renderDiscoveredBlackHoles(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredBlackHoles: BlackHoleLike[]): void {
-        if (!discoveredBlackHoles) return;
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        for (const blackHole of discoveredBlackHoles) {
-            // Calculate black hole position on map
-            const blackHoleMapX = mapX + ((blackHole.x - this.centerX) * scale) + mapWidth / 2;
-            const blackHoleMapY = mapY + ((blackHole.y - this.centerY) * scale) + mapHeight / 2;
-
-            // Check if black hole is visible on the map
-            if (blackHoleMapX < mapX - 20 || blackHoleMapX > mapX + mapWidth + 20 ||
-                blackHoleMapY < mapY - 20 || blackHoleMapY > mapY + mapHeight + 20) {
-                continue;
-            }
-
-            ctx.save();
-
-            // Calculate black hole size based on zoom level
-            const baseSize = 8;
-            const blackHoleSize = Math.max(2, baseSize * Math.sqrt(this.zoomLevel));
-            const accretionDiscSize = blackHoleSize * 2.5;
-
-            // Render accretion disc
-            ctx.globalAlpha = 0.6;
-            
-            // Create radial gradient for accretion disc
-            const gradient = ctx.createRadialGradient(blackHoleMapX, blackHoleMapY, blackHoleSize * 0.3, blackHoleMapX, blackHoleMapY, accretionDiscSize);
-            gradient.addColorStop(0, 'rgba(255, 100, 0, 0.8)'); // Hot orange center
-            gradient.addColorStop(0.3, 'rgba(255, 150, 50, 0.6)'); // Orange middle
-            gradient.addColorStop(0.7, 'rgba(200, 50, 100, 0.3)'); // Purple outer
-            gradient.addColorStop(1, 'rgba(100, 0, 150, 0.1)'); // Dark purple edge
-            
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(blackHoleMapX, blackHoleMapY, accretionDiscSize, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Render event horizon (black center)
-            ctx.globalAlpha = 1.0;
-            ctx.fillStyle = '#000000';
-            ctx.beginPath();
-            ctx.arc(blackHoleMapX, blackHoleMapY, blackHoleSize, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Add subtle gravitational distortion ring
-            ctx.strokeStyle = 'rgba(100, 100, 255, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(blackHoleMapX, blackHoleMapY, blackHoleSize * 1.2, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Add hover highlight if this black hole is hovered (but not selected)
-            if (this.hoveredBlackHole === blackHole && this.selectedBlackHole !== blackHole) {
-                ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent amber
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                const hoverRadius = accretionDiscSize + 2;
-                ctx.arc(blackHoleMapX, blackHoleMapY, hoverRadius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-            
-            // Add selection highlight if this black hole is selected (takes precedence over hover)
-            if (this.selectedBlackHole === blackHole) {
-                ctx.strokeStyle = this.currentPositionColor; // Full amber
-                ctx.lineWidth = 2;
-                const selectionRadius = accretionDiscSize + 3;
-                ctx.beginPath();
-                ctx.arc(blackHoleMapX, blackHoleMapY, selectionRadius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-
-            ctx.restore();
-
-            // Render black hole label if zoomed in enough or selected
-            if (this.zoomLevel > 2.0 || this.selectedBlackHole === blackHole) {
-                this.renderBlackHoleLabel(ctx, blackHole, blackHoleMapX, blackHoleMapY);
-            }
-        }
-    }
-
-    renderBlackHoleLabel(ctx: CanvasRenderingContext2D, blackHole: BlackHoleLike, mapX: number, mapY: number): void {
-        ctx.save();
-        
-        const displayName = this.generateBlackHoleDisplayName(blackHole);
-        
-        // Calculate offset position for scientific diagram style  
-        const offsetDistance = 25; // Distance from black hole center
-        const offsetAngle = -Math.PI / 6; // -30 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = mapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = mapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from black hole edge to text
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of black hole (approximate size)
-        const blackHoleSize = 8; // Approximate black hole visual size
-        const lineStartX = mapX + Math.cos(offsetAngle) * (blackHoleSize + 2);
-        const lineStartY = mapY + Math.sin(offsetAngle) * (blackHoleSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        ctx.font = this.getLabelFont();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 3;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text outline and fill
-        ctx.strokeText(displayName, labelX, labelY);
-        ctx.fillText(displayName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-        ctx.restore();
+        this.blackHoleRenderer.renderDiscoveredBlackHoles(
+            context,
+            discoveredBlackHoles,
+            this.selectedBlackHole,
+            this.hoveredBlackHole,
+            this.currentPositionColor,
+            this.zoomLevel
+        );
     }
 
     renderDiscoveredComets(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredComets: CometLike[]): void {
-        if (!discoveredComets) return;
+        const context = {
+            ctx,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale: scale,
+            centerX: this.centerX,
+            centerY: this.centerY
+        };
 
-        for (const comet of discoveredComets) {
-            // Calculate comet position on map
-            const cometMapX = mapX + ((comet.x - this.centerX) * scale) + mapWidth / 2;
-            const cometMapY = mapY + ((comet.y - this.centerY) * scale) + mapHeight / 2;
-
-            // Check if comet is visible on the map
-            if (cometMapX < mapX - 30 || cometMapX > mapX + mapWidth + 30 ||
-                cometMapY < mapY - 30 || cometMapY > mapY + mapHeight + 30) {
-                continue;
-            }
-
-            ctx.save();
-
-            // Calculate comet size based on zoom level (similar to star sizing)
-            const cometSize = this.calculateCometSize();
-            
-            // Render elliptical orbit if zoom level is high enough and we have orbit data
-            if (this.zoomLevel > 1.5 && comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
-                this.renderCometOrbit(ctx, mapX, mapY, mapWidth, mapHeight, scale, comet);
-            }
-
-            // Render comet nucleus
-            const nucleusColor = comet.cometType?.nucleusColor || '#E0FFFF';
-            ctx.fillStyle = nucleusColor;
-            ctx.beginPath();
-            ctx.arc(cometMapX, cometMapY, cometSize, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Add bright center
-            ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-            ctx.arc(cometMapX, cometMapY, cometSize * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Render stylized tail at medium zoom levels and above (like other detailed features)
-            if (this.zoomLevel > 0.5) {
-                this.renderCometTail(ctx, cometMapX, cometMapY, scale, comet);
-            }
-
-            // Add hover highlight if this comet is hovered (but not selected)
-            if (this.hoveredComet === comet && this.selectedComet !== comet) {
-                ctx.strokeStyle = this.currentPositionColor + '80'; // Semi-transparent amber
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                const hoverRadius = cometSize + 3;
-                ctx.arc(cometMapX, cometMapY, hoverRadius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-            
-            // Add selection highlight if this comet is selected (takes precedence over hover)
-            if (this.selectedComet === comet) {
-                ctx.strokeStyle = this.currentPositionColor; // Full amber
-                ctx.lineWidth = 2;
-                const selectionRadius = cometSize + 4;
-                ctx.beginPath();
-                ctx.arc(cometMapX, cometMapY, selectionRadius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-
-            ctx.restore();
-
-            // Render comet label if zoomed in enough or selected
-            if (this.zoomLevel > 2.0 || this.selectedComet === comet) {
-                this.renderCometLabel(ctx, comet, cometMapX, cometMapY);
-            }
-        }
-    }
-
-    renderCometOrbit(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, comet: CometLike): void {
-        if (!comet.parentStarX || !comet.parentStarY) return;
-
-        // Calculate parent star position on map
-        const starMapX = mapX + ((comet.parentStarX - this.centerX) * scale) + mapWidth / 2;
-        const starMapY = mapY + ((comet.parentStarY - this.centerY) * scale) + mapHeight / 2;
-
-        ctx.save();
-        ctx.strokeStyle = '#444444'; // Subtle dark gray (same as planet orbits)
-        ctx.lineWidth = 0.5; // Thin line (same as planet orbits)
-        ctx.setLineDash([2, 3]); // Dashed line for orbit
-
-        // If we have orbit data, render actual ellipse
-        if (comet.orbit) {
-            const orbit = comet.orbit;
-            
-            // Calculate ellipse parameters for map display
-            const semiMajorAxis = orbit.semiMajorAxis * scale;
-            const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - orbit.eccentricity * orbit.eccentricity);
-            
-            // Calculate ellipse center (offset from star due to eccentricity)
-            const focalDistance = orbit.eccentricity * semiMajorAxis;
-            const ellipseCenterX = starMapX - focalDistance * Math.cos(orbit.argumentOfPerihelion || 0);
-            const ellipseCenterY = starMapY - focalDistance * Math.sin(orbit.argumentOfPerihelion || 0);
-
-            // Draw elliptical orbit
-            ctx.beginPath();
-            ctx.ellipse(
-                ellipseCenterX, 
-                ellipseCenterY, 
-                semiMajorAxis, 
-                semiMinorAxis, 
-                orbit.argumentOfPerihelion || 0, 
-                0, 
-                Math.PI * 2
-            );
-            ctx.stroke();
-        } else {
-            // Fallback: draw circular orbit based on current distance
-            const currentDistance = Math.sqrt(
-                (comet.x - comet.parentStarX) ** 2 + 
-                (comet.y - comet.parentStarY) ** 2
-            );
-            const orbitRadius = currentDistance * scale;
-
-            ctx.beginPath();
-            ctx.arc(starMapX, starMapY, orbitRadius, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        ctx.restore();
-    }
-
-    renderCometTail(ctx: CanvasRenderingContext2D, cometMapX: number, cometMapY: number, scale: number, comet: CometLike): void {
-        // Calculate tail direction - if we have parent star data, use it, otherwise use a default direction
-        let tailDirection: { x: number, y: number };
-        if (comet.parentStarX !== undefined && comet.parentStarY !== undefined) {
-            // Calculate direction from parent star to comet (tail points away from star)
-            const dx = comet.x - comet.parentStarX;
-            const dy = comet.y - comet.parentStarY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance === 0) return;
-            tailDirection = { x: dx / distance, y: dy / distance };
-        } else {
-            // Default tail direction (pointing roughly away from galactic center)
-            tailDirection = { x: 0.7, y: 0.7 }; // Default northeast direction
-        }
-
-        const tailLength = Math.min(15 * Math.sqrt(this.zoomLevel), 25); // Scale with zoom, smaller than before
-        const tailColors = comet.cometType?.tailColors || ['#87CEEB', '#B0E0E6', '#E0FFFF'];
-
-        ctx.save();
-        
-        // Render particle streams instead of single line (similar to main game)
-        const streamCount = Math.max(2, Math.floor(this.zoomLevel * 2)); // 2-6 streams based on zoom
-        const maxSpreadAngle = 0.3; // Fixed maximum spread angle in radians (~17 degrees total)
-        
-        for (let stream = 0; stream < streamCount; stream++) {
-            // Distribute streams evenly within fixed angular spread
-            const spreadFraction = streamCount > 1 ? stream / (streamCount - 1) : 0.5; // 0 to 1
-            const spreadAngle = (spreadFraction - 0.5) * maxSpreadAngle; // Center around 0
-            const streamAngle = Math.atan2(tailDirection.y, tailDirection.x) + spreadAngle;
-            const streamDirX = Math.cos(streamAngle);
-            const streamDirY = Math.sin(streamAngle);
-            
-            // Vary length slightly per stream
-            const streamLength = tailLength * (0.8 + Math.random() * 0.4);
-            const streamEndX = cometMapX + streamDirX * streamLength;
-            const streamEndY = cometMapY + streamDirY * streamLength;
-            
-            // Create gradient for this stream
-            const gradient = ctx.createLinearGradient(cometMapX, cometMapY, streamEndX, streamEndY);
-            gradient.addColorStop(0, tailColors[0] + 'AA'); // 67% opacity at base
-            gradient.addColorStop(0.5, tailColors[1] + '66'); // 40% opacity at middle  
-            gradient.addColorStop(1, tailColors[2] + '22'); // 13% opacity at tip
-            
-            // Draw stream as tapered line
-            ctx.strokeStyle = gradient;
-            ctx.lineWidth = Math.max(1, 2 * Math.sqrt(this.zoomLevel) / streamCount); // Thinner per stream
-            ctx.lineCap = 'round';
-            
-            ctx.beginPath();
-            ctx.moveTo(cometMapX, cometMapY);
-            ctx.lineTo(streamEndX, streamEndY);
-            ctx.stroke();
-        }
-        
-        // Add subtle particle effects at higher zoom levels
-        if (this.zoomLevel > 2.0) {
-            this.renderCometParticles(ctx, cometMapX, cometMapY, tailDirection, tailLength, tailColors);
-        }
-
-        ctx.restore();
-    }
-
-    // Add particle effects for detailed comet tail rendering
-    renderCometParticles(ctx: CanvasRenderingContext2D, cometMapX: number, cometMapY: number, tailDirection: { x: number, y: number }, tailLength: number, tailColors: string[]): void {
-        const particleCount = Math.floor(tailLength / 3); // Fewer particles for map view
-        
-        for (let i = 0; i < particleCount; i++) {
-            const t = i / particleCount; // 0 to 1 along tail
-            const particleX = cometMapX + tailDirection.x * tailLength * t;
-            const particleY = cometMapY + tailDirection.y * tailLength * t;
-            
-            // Random offset for particle scatter
-            const scatter = 2;
-            const offsetX = particleX + (Math.random() - 0.5) * scatter;
-            const offsetY = particleY + (Math.random() - 0.5) * scatter;
-            
-            // Fade opacity along tail
-            const opacity = Math.floor((1 - t) * 100).toString(16).padStart(2, '0');
-            const colorIndex = Math.floor(t * (tailColors.length - 1));
-            
-            ctx.fillStyle = tailColors[colorIndex] + opacity;
-            ctx.beginPath();
-            ctx.arc(offsetX, offsetY, 0.5, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    renderCometLabel(ctx: CanvasRenderingContext2D, comet: CometLike, mapX: number, mapY: number): void {
-        ctx.save();
-        
-        const displayName = this.generateCometDisplayName(comet);
-        
-        // Calculate offset position for scientific diagram style  
-        const offsetDistance = 20; // Distance from comet center
-        const offsetAngle = Math.PI / 4; // 45 degrees (upper-right)
-        
-        // Calculate label position
-        const labelX = mapX + Math.cos(offsetAngle) * offsetDistance;
-        const labelY = mapY + Math.sin(offsetAngle) * offsetDistance;
-        
-        // Draw connecting line from comet edge to text
-        ctx.strokeStyle = '#aaaaaa';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Start line from edge of comet (approximate size)
-        const cometSize = 3; // Approximate comet visual size
-        const lineStartX = mapX + Math.cos(offsetAngle) * (cometSize + 2);
-        const lineStartY = mapY + Math.sin(offsetAngle) * (cometSize + 2);
-        // End line just before the text starts
-        const lineEndX = labelX - 5; // Small gap before text
-        const lineEndY = labelY;
-        ctx.moveTo(lineStartX, lineStartY);
-        ctx.lineTo(lineEndX, lineEndY);
-        ctx.stroke();
-        
-        ctx.font = this.getLabelFont();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 3;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Draw text outline and fill
-        ctx.strokeText(displayName, labelX, labelY);
-        ctx.fillText(displayName, labelX, labelY);
-        
-        // Reset text alignment and baseline
-        ctx.textBaseline = 'alphabetic';
-        ctx.restore();
+        this.cometRenderer.renderDiscoveredComets(
+            context,
+            discoveredComets,
+            this.selectedComet,
+            this.hoveredComet,
+            this.currentPositionColor,
+            this.zoomLevel
+        );
     }
 
     generateCometDisplayName(comet: CometLike): string {
