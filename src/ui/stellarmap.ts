@@ -1921,7 +1921,8 @@ export class StellarMap {
             discoveredNebulae,
             this.selectedNebula,
             this.hoveredNebula,
-            this.currentPositionColor
+            this.currentPositionColor,
+            this.zoomLevel
         );
     }
 

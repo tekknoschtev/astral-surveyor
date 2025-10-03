@@ -17,7 +17,8 @@ export class NebulaRenderer extends BaseRenderer {
         discoveredNebulae: NebulaLike[],
         selectedNebula: NebulaLike | null,
         hoveredNebula: NebulaLike | null,
-        currentPositionColor: string
+        currentPositionColor: string,
+        zoomLevel: number
     ): void {
         if (!discoveredNebulae) return;
 
@@ -75,8 +76,10 @@ export class NebulaRenderer extends BaseRenderer {
                     this.drawSelectionHighlight(ctx, nebulaMapPos.x, nebulaMapPos.y, nebulaRadius + 3, currentPositionColor);
                 }
 
-                // Render nebula label
-                this.renderNebulaLabel(ctx, nebula, nebulaMapPos.x, nebulaMapPos.y);
+                // Render nebula label if zoomed in enough or selected
+                if (zoomLevel > 1.5 || selectedNebula === nebula) {
+                    this.renderNebulaLabel(ctx, nebula, nebulaMapPos.x, nebulaMapPos.y);
+                }
             }
         }
     }
