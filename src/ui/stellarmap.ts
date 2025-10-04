@@ -20,6 +20,7 @@ import { RegionObjectRenderer } from './stellarmap/renderers/RegionObjectRendere
 import { InfoPanelRenderer } from './stellarmap/InfoPanelRenderer.js';
 import { DiscoveryOverlay } from './stellarmap/DiscoveryOverlay.js';
 import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
+import { InteractionController } from './stellarmap/InteractionController.js';
 
 // Interface definitions
 interface StarLike {
@@ -385,43 +386,106 @@ export class StellarMap {
     private static readonly LABEL_FONT_FAMILY = '"Courier New", monospace';
     
     visible: boolean;
-    zoomLevel: number;
-    centerX: number;
-    centerY: number;
     gridSize: number;
-    selectedStar: StarLike | null;
-    hoveredStar: StarLike | null;
-    selectedPlanet: PlanetLike | null;
-    hoveredPlanet: PlanetLike | null;
-    selectedNebula: NebulaLike | null;
-    hoveredNebula: NebulaLike | null;
-    selectedWormhole: WormholeLike | null;
-    hoveredWormhole: WormholeLike | null;
-    selectedAsteroidGarden: AsteroidGardenLike | null;
-    hoveredAsteroidGarden: AsteroidGardenLike | null;
-    selectedBlackHole: BlackHoleLike | null;
-    hoveredBlackHole: BlackHoleLike | null;
-    selectedComet: CometLike | null;
-    hoveredComet: CometLike | null;
-    selectedRoguePlanet: any | null;
-    hoveredRoguePlanet: any | null;
-    selectedDarkNebula: any | null;
-    hoveredDarkNebula: any | null;
-    selectedCrystalGarden: any | null;
-    selectedProtostar: any | null;
-    hoveredProtostar: any | null;
-    hoveredCrystalGarden: any | null;
     namingService: NamingService | null;
-    
-    // Interactive panning state
-    followPlayer: boolean;
-    isPanning: boolean;
-    panStartX: number;
-    panStartY: number;
+
+    // Delegated properties to InteractionController
+    get zoomLevel() { return this.interactionController.zoomLevel; }
+    set zoomLevel(value: number) { this.interactionController.zoomLevel = value; }
+
+    get centerX() { return this.interactionController.centerX; }
+    set centerX(value: number) { this.interactionController.centerX = value; }
+
+    get centerY() { return this.interactionController.centerY; }
+    set centerY(value: number) { this.interactionController.centerY = value; }
+
+    get selectedStar() { return this.interactionController.selectedStar; }
+    set selectedStar(value: StarLike | null) { this.interactionController.selectedStar = value; }
+
+    get hoveredStar() { return this.interactionController.hoveredStar; }
+    set hoveredStar(value: StarLike | null) { this.interactionController.hoveredStar = value; }
+
+    get selectedPlanet() { return this.interactionController.selectedPlanet; }
+    set selectedPlanet(value: PlanetLike | null) { this.interactionController.selectedPlanet = value; }
+
+    get hoveredPlanet() { return this.interactionController.hoveredPlanet; }
+    set hoveredPlanet(value: PlanetLike | null) { this.interactionController.hoveredPlanet = value; }
+
+    get selectedNebula() { return this.interactionController.selectedNebula; }
+    set selectedNebula(value: NebulaLike | null) { this.interactionController.selectedNebula = value; }
+
+    get hoveredNebula() { return this.interactionController.hoveredNebula; }
+    set hoveredNebula(value: NebulaLike | null) { this.interactionController.hoveredNebula = value; }
+
+    get selectedWormhole() { return this.interactionController.selectedWormhole; }
+    set selectedWormhole(value: WormholeLike | null) { this.interactionController.selectedWormhole = value; }
+
+    get hoveredWormhole() { return this.interactionController.hoveredWormhole; }
+    set hoveredWormhole(value: WormholeLike | null) { this.interactionController.hoveredWormhole = value; }
+
+    get selectedAsteroidGarden() { return this.interactionController.selectedAsteroidGarden; }
+    set selectedAsteroidGarden(value: AsteroidGardenLike | null) { this.interactionController.selectedAsteroidGarden = value; }
+
+    get hoveredAsteroidGarden() { return this.interactionController.hoveredAsteroidGarden; }
+    set hoveredAsteroidGarden(value: AsteroidGardenLike | null) { this.interactionController.hoveredAsteroidGarden = value; }
+
+    get selectedBlackHole() { return this.interactionController.selectedBlackHole; }
+    set selectedBlackHole(value: BlackHoleLike | null) { this.interactionController.selectedBlackHole = value; }
+
+    get hoveredBlackHole() { return this.interactionController.hoveredBlackHole; }
+    set hoveredBlackHole(value: BlackHoleLike | null) { this.interactionController.hoveredBlackHole = value; }
+
+    get selectedComet() { return this.interactionController.selectedComet; }
+    set selectedComet(value: CometLike | null) { this.interactionController.selectedComet = value; }
+
+    get hoveredComet() { return this.interactionController.hoveredComet; }
+    set hoveredComet(value: CometLike | null) { this.interactionController.hoveredComet = value; }
+
+    get selectedRoguePlanet() { return this.interactionController.selectedRoguePlanet; }
+    set selectedRoguePlanet(value: any | null) { this.interactionController.selectedRoguePlanet = value; }
+
+    get hoveredRoguePlanet() { return this.interactionController.hoveredRoguePlanet; }
+    set hoveredRoguePlanet(value: any | null) { this.interactionController.hoveredRoguePlanet = value; }
+
+    get selectedDarkNebula() { return this.interactionController.selectedDarkNebula; }
+    set selectedDarkNebula(value: any | null) { this.interactionController.selectedDarkNebula = value; }
+
+    get hoveredDarkNebula() { return this.interactionController.hoveredDarkNebula; }
+    set hoveredDarkNebula(value: any | null) { this.interactionController.hoveredDarkNebula = value; }
+
+    get selectedCrystalGarden() { return this.interactionController.selectedCrystalGarden; }
+    set selectedCrystalGarden(value: any | null) { this.interactionController.selectedCrystalGarden = value; }
+
+    get selectedProtostar() { return this.interactionController.selectedProtostar; }
+    set selectedProtostar(value: any | null) { this.interactionController.selectedProtostar = value; }
+
+    get hoveredProtostar() { return this.interactionController.hoveredProtostar; }
+    set hoveredProtostar(value: any | null) { this.interactionController.hoveredProtostar = value; }
+
+    get hoveredCrystalGarden() { return this.interactionController.hoveredCrystalGarden; }
+    set hoveredCrystalGarden(value: any | null) { this.interactionController.hoveredCrystalGarden = value; }
+
+    get followPlayer() { return this.interactionController.followPlayer; }
+    set followPlayer(value: boolean) { this.interactionController.followPlayer = value; }
+
+    get isPanning() { return this.interactionController.isPanning; }
+    set isPanning(value: boolean) { this.interactionController.isPanning = value; }
+
+    get panStartX() { return this.interactionController.panStartX; }
+    set panStartX(value: number) { this.interactionController.panStartX = value; }
+
+    get panStartY() { return this.interactionController.panStartY; }
+    set panStartY(value: number) { this.interactionController.panStartY = value; }
+
+    get lastMouseX() { return this.interactionController.lastMouseX; }
+    set lastMouseX(value: number) { this.interactionController.lastMouseX = value; }
+
+    get lastMouseY() { return this.interactionController.lastMouseY; }
+    set lastMouseY(value: number) { this.interactionController.lastMouseY = value; }
+
+    // Legacy properties (not in controller)
     panStartMapX: number;
     panStartMapY: number;
-    lastMouseX: number;
-    lastMouseY: number;
     
     // Visual settings for subtle space aesthetic
     backgroundColor: string;
@@ -447,9 +511,6 @@ export class StellarMap {
     objectTypeVisibility: Record<string, boolean>;
     hoveredObjectTypeIndex: number;
     showDiscoveredObjects: boolean;
-    
-    // Centralized hover system
-    private hoverSystem: StellarMapHoverSystem;
 
     // Renderers
     private starRenderer: StarRenderer;
@@ -464,6 +525,9 @@ export class StellarMap {
     private discoveryOverlay: DiscoveryOverlay;
     private discoveryVisualizationService: DiscoveryVisualizationService;
 
+    // Interaction controller
+    private interactionController: InteractionController;
+
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
     revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
@@ -472,47 +536,16 @@ export class StellarMap {
     chunkManager: ChunkManager | null;
 
     constructor() {
+        // Initialize interaction controller first (it holds zoom, center, selection, hover, pan state)
+        this.interactionController = new InteractionController();
+
         this.visible = false;
-        this.zoomLevel = 1.0; // 1.0 = normal view, >1.0 = zoomed in
-        this.centerX = 0; // Map center coordinates
-        this.centerY = 0;
         this.gridSize = 2000; // Grid spacing in world units
-        this.selectedStar = null;
-        this.hoveredStar = null;
-        this.selectedPlanet = null;
-        this.hoveredPlanet = null;
-        this.selectedNebula = null;
-        this.hoveredNebula = null;
-        this.selectedWormhole = null;
-        this.hoveredWormhole = null;
-        this.selectedAsteroidGarden = null;
-        this.hoveredAsteroidGarden = null;
-        this.selectedBlackHole = null;
-        this.hoveredBlackHole = null;
-        this.selectedComet = null;
-        this.hoveredComet = null;
-        this.selectedRoguePlanet = null;
-        this.hoveredRoguePlanet = null;
-        this.selectedDarkNebula = null;
-        this.hoveredDarkNebula = null;
-        this.selectedCrystalGarden = null;
-        this.selectedProtostar = null;
-        this.hoveredProtostar = null;
-        this.hoveredCrystalGarden = null;
         this.namingService = null; // Will be injected
-        
-        // Initialize centralized hover system
-        this.hoverSystem = new StellarMapHoverSystem();
-        
-        // Interactive panning state
-        this.followPlayer = true; // Whether map should follow player position
-        this.isPanning = false; // Currently dragging to pan
-        this.panStartX = 0; // Start position for pan gesture
-        this.panStartY = 0;
+
+        // Legacy pan properties
         this.panStartMapX = 0; // Map center when pan started
         this.panStartMapY = 0;
-        this.lastMouseX = 0; // For drag detection
-        this.lastMouseY = 0;
         
         // Visual settings for subtle space aesthetic
         this.backgroundColor = '#000000F0'; // More opaque for better contrast
@@ -607,9 +640,8 @@ export class StellarMap {
     }
 
     centerOnPosition(x: number, y: number): void {
-        this.centerX = x;
-        this.centerY = y;
-        
+        this.interactionController.centerOnPosition(x, y);
+
         // Note: Inspector mode now uses persistent revealed chunks
         // No need to refresh data on position changes
     }
@@ -653,73 +685,12 @@ export class StellarMap {
 
     handleMouseMove(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, input: Input): boolean {
         // Hover state is handled by detectHoverTarget() which is called from game.ts
-
-        if (!this.visible || !input.isMousePressed() || input.isRightPressed()) {
-            return false;
-        }
-        
-        // Initialize tracking if we haven't started
-        if (this.lastMouseX === 0 && this.lastMouseY === 0) {
-            const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
-            const inBounds = mouseX >= mapX && mouseX <= mapX + mapWidth && 
-                mouseY >= mapY && mouseY <= mapY + mapHeight;
-            
-            // Only start if mouse is in map bounds
-            if (inBounds) {
-                this.lastMouseX = mouseX;
-                this.lastMouseY = mouseY;
-                this.panStartX = mouseX;
-                this.panStartY = mouseY;
-            }
-            return false;
-        }
-        
-        // Calculate movement from last position
-        const deltaX = mouseX - this.lastMouseX;
-        const deltaY = mouseY - this.lastMouseY;
-        
-        // Always consume input when handling mouse movement over stellar map (like settings menu does)
-        input.consumeTouch();
-        
-        // If there's any movement at all, apply it
-        if (deltaX !== 0 || deltaY !== 0) {
-            // Check if we should start panning (moved enough from start)
-            if (!this.isPanning) {
-                const totalMove = Math.abs(mouseX - this.panStartX) + Math.abs(mouseY - this.panStartY);
-                if (totalMove > 3) {
-                    this.isPanning = true;
-                    this.followPlayer = false;
-                }
-            }
-            
-            // Apply linear panning if active (scales properly with zoom)
-            if (this.isPanning) {
-                const { mapWidth, mapHeight } = this.getMapBounds(canvas);
-                const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
-                
-                // Simple 1:1 conversion with zoom scaling - no multiplication factor
-                this.centerX -= deltaX / worldToMapScale;
-                this.centerY -= deltaY / worldToMapScale;
-            }
-            
-            // Always update last position
-            this.lastMouseX = mouseX;
-            this.lastMouseY = mouseY;
-        }
-        
-        return true; // Always consume input when handling stellar map mouse movement
-        
-        return false;
+        return this.interactionController.handleMouseMove(mouseX, mouseY, canvas, input, this.visible, this.gridSize);
     }
     
     // Reset panning state when mouse is released
     resetPanState(): void {
-        this.isPanning = false;
-        // Reset mouse positions so next drag starts fresh
-        this.lastMouseX = 0;
-        this.lastMouseY = 0;
-        this.panStartX = 0;
-        this.panStartY = 0;
+        this.interactionController.resetPanState();
     }
 
     /**
@@ -737,49 +708,28 @@ export class StellarMap {
         worldToMapScale: number,
         objects: any[] | null | undefined
     ): ClosestObjectResult | null {
-        // Return null if no objects of this type
-        if (!objects) {
+        const result = this.interactionController.findClosestObjectOfType(
+            config,
+            mouseX,
+            mouseY,
+            mapX,
+            mapY,
+            mapWidth,
+            mapHeight,
+            worldToMapScale,
+            this.centerX,
+            this.centerY,
+            objects
+        );
+
+        if (!result) {
             return null;
         }
 
-        let closestObject: any | null = null;
-        let closestDistance = Infinity;
-
-        // Iterate through all objects of this type
-        for (const obj of objects) {
-            // Skip objects with null coordinates if config requires null check
-            if (config.requiresNullCheck && (obj.x === null || obj.y === null)) {
-                continue;
-            }
-
-            // Calculate object position on map
-            const objMapX = mapX + mapWidth/2 + (obj.x - this.centerX) * worldToMapScale;
-            const objMapY = mapY + mapHeight/2 + (obj.y - this.centerY) * worldToMapScale;
-
-            // Check if object is within map bounds
-            if (objMapX >= mapX && objMapX <= mapX + mapWidth &&
-                objMapY >= mapY && objMapY <= mapY + mapHeight) {
-
-                // Calculate distance from click to object
-                const distance = Math.sqrt((mouseX - objMapX)**2 + (mouseY - objMapY)**2);
-
-                // Check if within click threshold and closer than previous closest
-                if (distance <= config.clickThreshold && distance < closestDistance) {
-                    closestObject = obj;
-                    closestDistance = distance;
-                }
-            }
-        }
-
-        // Return null if no object was found within threshold
-        if (!closestObject) {
-            return null;
-        }
-
-        // Return result object
+        // Return result object with additional metadata for selection priority
         return {
-            object: closestObject,
-            distance: closestDistance,
+            object: result.object,
+            distance: result.distance,
             type: config.type,
             priority: config.priority,
             config: config
@@ -791,9 +741,7 @@ export class StellarMap {
      * @private
      */
     private clearAllSelections(): void {
-        for (const config of CELESTIAL_SELECTION_CONFIG) {
-            (this as any)[config.selectedProperty] = null;
-        }
+        this.interactionController.clearAllSelections();
     }
 
     handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null, input?: Input): boolean {
@@ -882,115 +830,30 @@ export class StellarMap {
     
     detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
         if (!this.visible) return;
-        
-        // Calculate map bounds and scaling
-        const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
-        const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
-        
-        // Check if mouse is within map bounds
-        if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
-            this.hoverSystem.clearHover();
-            this.clearAllOldHoverStates();
-            this.updateCursor(canvas);
-            return;
-        }
 
-        // Simple centralized approach: prepare data and let hover system handle it
-        const objectCollections: Record<string, HoverableObject[]> = {
-            'celestialStar': (discoveredStars || []).map(obj => ({...obj, type: 'celestialStar'})),
-            'planet': this.zoomLevel > 3.0 ? (discoveredPlanets || []).map(obj => ({...obj, type: 'planet'})) : [],
-            'nebula': (discoveredNebulae || []).map(obj => ({...obj, type: 'nebula'})),
-            'wormhole': (discoveredWormholes || []).map(obj => ({...obj, type: 'wormhole'})),
-            'asteroidGarden': (discoveredAsteroidGardens || []).map(obj => ({...obj, type: 'asteroidGarden'})),
-            'blackhole': (discoveredBlackHoles || []).map(obj => ({...obj, type: 'blackhole'})),
-            'comet': (discoveredComets || []).map(obj => ({...obj, type: 'comet'})),
-            'rogue-planet': (discoveredRoguePlanets || []).map(obj => ({...obj, type: 'rogue-planet'})),
-            'dark-nebula': (discoveredDarkNebulae || []).map(obj => ({...obj, type: 'dark-nebula'})),
-            'crystal-garden': (discoveredCrystalGardens || []).map(obj => ({...obj, type: 'crystal-garden'})),
-            'protostar': (discoveredProtostars || []).map(obj => ({...obj, type: 'protostar'}))
-        };
-
-        // Use centralized hover detection
-        this.hoverSystem.detectHover(
-            mouseX, mouseY, mapX, mapY, mapWidth, mapHeight,
-            worldToMapScale, this.centerX, this.centerY, objectCollections
+        this.interactionController.detectHoverTarget(
+            mouseX,
+            mouseY,
+            canvas,
+            discoveredStars,
+            this.zoomLevel,
+            discoveredPlanets,
+            discoveredNebulae,
+            discoveredWormholes,
+            discoveredAsteroidGardens,
+            discoveredBlackHoles,
+            discoveredComets,
+            discoveredRoguePlanets,
+            discoveredDarkNebulae,
+            discoveredCrystalGardens,
+            discoveredProtostars
         );
-
-        // Sync back to old properties for compatibility
-        this.syncOldHoverStates();
         this.updateCursor(canvas);
     }
 
-    private clearAllOldHoverStates(): void {
-        this.hoveredStar = null;
-        this.hoveredPlanet = null;
-        this.hoveredNebula = null;
-        this.hoveredWormhole = null;
-        this.hoveredAsteroidGarden = null;
-        this.hoveredBlackHole = null;
-        this.hoveredComet = null;
-        this.hoveredRoguePlanet = null;
-        this.hoveredDarkNebula = null;
-        this.hoveredProtostar = null;
-        this.hoveredCrystalGarden = null;
-    }
-
-    private syncOldHoverStates(): void {
-        const { object: hoveredObject, type: hoveredType } = this.hoverSystem.getHoveredObject();
-        
-        // Clear all old hover states first
-        this.clearAllOldHoverStates();
-
-        // Set the appropriate old property based on what was hovered
-        if (hoveredObject && hoveredType) {
-            switch (hoveredType) {
-                case 'celestialStar':
-                    this.hoveredStar = hoveredObject as unknown as StarLike;
-                    break;
-                case 'planet':
-                    this.hoveredPlanet = hoveredObject as unknown as PlanetLike;
-                    break;
-                case 'nebula':
-                    this.hoveredNebula = hoveredObject as unknown as NebulaLike;
-                    break;
-                case 'wormhole':
-                    this.hoveredWormhole = hoveredObject as unknown as WormholeLike;
-                    break;
-                case 'asteroidGarden':
-                    this.hoveredAsteroidGarden = hoveredObject as unknown as AsteroidGardenLike;
-                    break;
-                case 'blackhole':
-                    this.hoveredBlackHole = hoveredObject as unknown as BlackHoleLike;
-                    break;
-                case 'comet':
-                    this.hoveredComet = hoveredObject as unknown as CometLike;
-                    break;
-                case 'rogue-planet':
-                    this.hoveredRoguePlanet = hoveredObject as unknown;
-                    break;
-                case 'dark-nebula':
-                    this.hoveredDarkNebula = hoveredObject as unknown;
-                    break;
-                case 'crystal-garden':
-                    this.hoveredCrystalGarden = hoveredObject as unknown;
-                    break;
-                case 'protostar':
-                    this.hoveredProtostar = hoveredObject as unknown;
-                    break;
-            }
-        }
-    }
 
     updateCursor(canvas: HTMLCanvasElement): void {
-        if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet || this.hoveredRoguePlanet || this.hoveredDarkNebula || this.hoveredCrystalGarden || this.hoveredProtostar) {
-            canvas.style.cursor = 'pointer';
-        } else if (this.visible) {
-            // Use crosshair for map navigation when visible
-            canvas.style.cursor = 'crosshair';
-        } else {
-            // Default cursor when map is not visible
-            canvas.style.cursor = 'default';
-        }
+        this.interactionController.updateCursor(canvas, this.visible);
     }
     
     getMapBounds(canvas: HTMLCanvasElement): { mapX: number; mapY: number; mapWidth: number; mapHeight: number; } {
@@ -1030,34 +893,25 @@ export class StellarMap {
     
     // Enable following player position
     enableFollowPlayer(camera: Camera): void {
-        this.followPlayer = true;
-        this.centerOnPosition(camera.x, camera.y);
+        this.interactionController.enableFollowPlayer(camera);
     }
-    
+
     // Check if currently following player
     isFollowingPlayer(): boolean {
-        return this.followPlayer;
+        return this.interactionController.isFollowingPlayer();
     }
-    
+
     // Check if currently panning
     isCurrentlyPanning(): boolean {
-        return this.isPanning;
+        return this.interactionController.isCurrentlyPanning();
     }
 
     zoomIn(): void {
-        const maxZoom = this.inspectorZoomExtended ? 50.0 : 10.0; // Extended zoom for inspector mode
-        this.zoomLevel = Math.min(this.zoomLevel * 1.5, maxZoom);
-        
-        // Note: Inspector mode now uses persistent revealed chunks
-        // No need to refresh data on zoom changes
+        this.interactionController.zoomIn(this.inspectorMode, this.inspectorZoomExtended);
     }
 
     zoomOut(): void {
-        const minZoom = this.inspectorZoomExtended ? 0.001 : 0.01; // Extended zoom out for wide patterns
-        this.zoomLevel = Math.max(this.zoomLevel / 1.5, minZoom);
-        
-        // Note: Inspector mode now uses persistent revealed chunks
-        // No need to refresh data on zoom changes
+        this.interactionController.zoomOut(this.inspectorMode, this.inspectorZoomExtended);
     }
 
     render(renderer: Renderer, camera: Camera, discoveredStars: StarLike[], gameStartingPosition?: GameStartingPosition | null, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
