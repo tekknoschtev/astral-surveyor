@@ -2,7 +2,7 @@
 // Manages all game state including traversal, universe reset, debug mode, and timing
 
 import { Camera } from '../camera/camera.js';
-import { StellarMap } from '../ui/stellarmap.js';
+import { StellarMap } from '../ui/StellarMap.js';
 import { DiscoveryDisplay } from '../ui/ui.js';
 import { GameConfig } from '../config/gameConfig.js';
 import { resetUniverse, generateSafeSpawnPosition } from '../utils/random.js';

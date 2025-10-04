@@ -18,6 +18,8 @@ import { CometRenderer } from './stellarmap/renderers/CometRenderer.js';
 import { AsteroidRenderer } from './stellarmap/renderers/AsteroidRenderer.js';
 import { RegionObjectRenderer } from './stellarmap/renderers/RegionObjectRenderer.js';
 import { InfoPanelRenderer } from './stellarmap/InfoPanelRenderer.js';
+import { DiscoveryOverlay } from './stellarmap/DiscoveryOverlay.js';
+import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 
 // Interface definitions
 interface StarLike {
@@ -459,6 +461,8 @@ export class StellarMap {
     private asteroidRenderer: AsteroidRenderer;
     private regionObjectRenderer: RegionObjectRenderer;
     private infoPanelRenderer: InfoPanelRenderer;
+    private discoveryOverlay: DiscoveryOverlay;
+    private discoveryVisualizationService: DiscoveryVisualizationService;
 
     // Persistent revealed areas system
     revealedChunks: Map<string, CelestialObjectData[]>;
@@ -568,6 +572,10 @@ export class StellarMap {
         this.asteroidRenderer = new AsteroidRenderer();
         this.regionObjectRenderer = new RegionObjectRenderer();
         this.infoPanelRenderer = new InfoPanelRenderer();
+
+        // Initialize discovery visualization
+        this.discoveryVisualizationService = new DiscoveryVisualizationService();
+        this.discoveryOverlay = new DiscoveryOverlay(this.discoveryVisualizationService);
     }
 
     private getLabelFont(): string {
@@ -580,6 +588,22 @@ export class StellarMap {
 
     isVisible(): boolean {
         return this.visible;
+    }
+
+    toggleDiscoveryTimestamps(): void {
+        this.discoveryOverlay.toggleTimestampDisplay();
+    }
+
+    toggleCoordinateSharing(): void {
+        this.discoveryOverlay.toggleCoordinateSharing();
+    }
+
+    isTimestampDisplayEnabled(): boolean {
+        return this.discoveryOverlay.showTimestamps;
+    }
+
+    isCoordinateSharingEnabled(): boolean {
+        return this.discoveryOverlay.coordinateShareEnabled;
     }
 
     centerOnPosition(x: number, y: number): void {
@@ -1144,7 +1168,83 @@ export class StellarMap {
         if (this.statisticsOverlayEnabled && this.inspectorMode) {
             this.renderStatisticsOverlay(ctx, mapX, mapY, mapWidth, mapHeight);
         }
-        
+
+        // Draw discovery overlay effects (pulses, timestamps)
+        if (!this.inspectorMode || this.showDiscoveredObjects) {
+            const renderContext = {
+                ctx,
+                mapX,
+                mapY,
+                mapWidth,
+                mapHeight,
+                worldToMapScale,
+                centerX: this.centerX,
+                centerY: this.centerY
+            };
+
+            // Render discovery pulses for all object types
+            if (discoveredStars) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredStars, 'celestialStar');
+            }
+            if (discoveredPlanets && this.zoomLevel > 3.0) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredPlanets, 'planet');
+            }
+            if (discoveredNebulae) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredNebulae, 'nebula');
+            }
+            if (discoveredWormholes) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredWormholes, 'wormhole');
+            }
+            if (discoveredAsteroidGardens) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredAsteroidGardens, 'asteroidGarden');
+            }
+            if (discoveredBlackHoles) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredBlackHoles, 'black-hole');
+            }
+            if (discoveredComets) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredComets, 'comet');
+            }
+            if (discoveredRoguePlanets) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredRoguePlanets, 'rogue-planet');
+            }
+            if (discoveredDarkNebulae) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredDarkNebulae, 'dark-nebula');
+            }
+            if (discoveredCrystalGardens) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredCrystalGardens, 'crystal-garden');
+            }
+            if (discoveredProtostars) {
+                this.discoveryOverlay.renderDiscoveryPulses(renderContext, discoveredProtostars, 'protostar');
+            }
+
+            // Render timestamps if enabled
+            if (this.discoveryOverlay.showTimestamps) {
+                const allObjects = [
+                    ...(discoveredStars || []),
+                    ...(discoveredPlanets || []),
+                    ...(discoveredNebulae || []),
+                    ...(discoveredWormholes || []),
+                    ...(discoveredAsteroidGardens || []),
+                    ...(discoveredBlackHoles || []),
+                    ...(discoveredComets || []),
+                    ...(discoveredRoguePlanets || []),
+                    ...(discoveredDarkNebulae || []),
+                    ...(discoveredCrystalGardens || []),
+                    ...(discoveredProtostars || [])
+                ];
+                this.discoveryOverlay.renderTimestamps(renderContext, allObjects);
+            }
+
+            // Render coordinate sharing UI for selected object
+            const selectedObject = this.selectedStar || this.selectedPlanet || this.selectedNebula ||
+                                   this.selectedWormhole || this.selectedBlackHole || this.selectedComet ||
+                                   this.selectedAsteroidGarden || this.selectedRoguePlanet ||
+                                   this.selectedDarkNebula || this.selectedCrystalGarden || this.selectedProtostar;
+            if (selectedObject && this.discoveryOverlay.coordinateShareEnabled) {
+                this.discoveryOverlay.renderCoordinateShareUI(renderContext, selectedObject);
+            }
+        }
+
         // Draw origin (0,0) marker
         this.renderOriginMarker(ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale);
         
