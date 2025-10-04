@@ -131,6 +131,48 @@ interface HoverConfig {
     priority: number; // Lower number = higher priority
 }
 
+// Selection System Interfaces
+/**
+ * Configuration for celestial object selection behavior
+ */
+interface CelestialSelectionConfig {
+    /** Unique type identifier */
+    type: 'planet' | 'roguePlanet' | 'darkNebula' | 'protostar' | 'crystalGarden' |
+          'wormhole' | 'nebula' | 'comet' | 'blackHole' | 'asteroidGarden' | 'star';
+
+    /** Display name for debugging */
+    displayName: string;
+
+    /** Base click threshold in pixels */
+    clickThreshold: number;
+
+    /** Selection priority (lower = higher priority, 1 is highest) */
+    priority: number;
+
+    /** Minimum zoom level required for selection (optional) */
+    minZoomLevel?: number;
+
+    /** Property name for discovered objects array parameter */
+    discoveredParam: string;
+
+    /** Property name for selected object on StellarMap class */
+    selectedProperty: string;
+
+    /** Whether to check for null x/y coordinates before processing */
+    requiresNullCheck: boolean;
+}
+
+/**
+ * Result from finding the closest object of a given type
+ */
+interface ClosestObjectResult {
+    object: any | null;
+    distance: number;
+    type: string;
+    priority: number;
+    config: CelestialSelectionConfig;
+}
+
 class StellarMapHoverSystem {
     private hoveredObject: HoverableObject | null = null;
     private hoveredObjectType: string | null = null;
@@ -222,6 +264,113 @@ class StellarMapHoverSystem {
         ctx.restore();
     }
 }
+
+/**
+ * Centralized configuration for all celestial object selection behavior.
+ * Objects are ordered by priority (highest first) for clarity.
+ */
+const CELESTIAL_SELECTION_CONFIG: CelestialSelectionConfig[] = [
+    {
+        type: 'planet',
+        displayName: 'Planet',
+        clickThreshold: 10,
+        priority: 1,
+        minZoomLevel: 3.0,
+        discoveredParam: 'discoveredPlanets',
+        selectedProperty: 'selectedPlanet',
+        requiresNullCheck: true  // Planets can have null x/y
+    },
+    {
+        type: 'roguePlanet',
+        displayName: 'Rogue Planet',
+        clickThreshold: 12,
+        priority: 2,
+        discoveredParam: 'discoveredRoguePlanets',
+        selectedProperty: 'selectedRoguePlanet',
+        requiresNullCheck: false
+    },
+    {
+        type: 'darkNebula',
+        displayName: 'Dark Nebula',
+        clickThreshold: 12,
+        priority: 3,
+        discoveredParam: 'discoveredDarkNebulae',
+        selectedProperty: 'selectedDarkNebula',
+        requiresNullCheck: false
+    },
+    {
+        type: 'protostar',
+        displayName: 'Protostar',
+        clickThreshold: 15,
+        priority: 4,
+        discoveredParam: 'discoveredProtostars',
+        selectedProperty: 'selectedProtostar',
+        requiresNullCheck: false
+    },
+    {
+        type: 'crystalGarden',
+        displayName: 'Crystal Garden',
+        clickThreshold: 12,
+        priority: 5,
+        discoveredParam: 'discoveredCrystalGardens',
+        selectedProperty: 'selectedCrystalGarden',
+        requiresNullCheck: false
+    },
+    {
+        type: 'wormhole',
+        displayName: 'Wormhole',
+        clickThreshold: 20,
+        priority: 6,
+        discoveredParam: 'discoveredWormholes',
+        selectedProperty: 'selectedWormhole',
+        requiresNullCheck: false
+    },
+    {
+        type: 'nebula',
+        displayName: 'Nebula',
+        clickThreshold: 15,
+        priority: 7,
+        discoveredParam: 'discoveredNebulae',
+        selectedProperty: 'selectedNebula',
+        requiresNullCheck: true  // Nebulae can have null x/y
+    },
+    {
+        type: 'comet',
+        displayName: 'Comet',
+        clickThreshold: 15,
+        priority: 8,
+        discoveredParam: 'discoveredComets',
+        selectedProperty: 'selectedComet',
+        requiresNullCheck: false
+    },
+    {
+        type: 'blackHole',
+        displayName: 'Black Hole',
+        clickThreshold: 25,
+        priority: 9,
+        discoveredParam: 'discoveredBlackHoles',
+        selectedProperty: 'selectedBlackHole',
+        requiresNullCheck: false
+    },
+    {
+        type: 'asteroidGarden',
+        displayName: 'Asteroid Garden',
+        clickThreshold: 20,
+        priority: 10,
+        discoveredParam: 'discoveredAsteroidGardens',
+        selectedProperty: 'selectedAsteroidGarden',
+        requiresNullCheck: false
+    },
+    {
+        type: 'star',
+        displayName: 'Star',
+        clickThreshold: 10,
+        priority: 11,
+        discoveredParam: 'discoveredStars',
+        selectedProperty: 'selectedStar',
+        requiresNullCheck: false
+    }
+];
 
 interface GameStartingPosition {
     x: number;
@@ -548,428 +697,158 @@ export class StellarMap {
         this.panStartX = 0;
         this.panStartY = 0;
     }
-    
+
+    /**
+     * Find the closest object of a specific type to the click position
+     * @private
+     */
+    private findClosestObjectOfType(
+        config: CelestialSelectionConfig,
+        mouseX: number,
+        mouseY: number,
+        mapX: number,
+        mapY: number,
+        mapWidth: number,
+        mapHeight: number,
+        worldToMapScale: number,
+        objects: any[] | null | undefined
+    ): ClosestObjectResult | null {
+        // Return null if no objects of this type
+        if (!objects) {
+            return null;
+        }
+
+        let closestObject: any | null = null;
+        let closestDistance = Infinity;
+
+        // Iterate through all objects of this type
+        for (const obj of objects) {
+            // Skip objects with null coordinates if config requires null check
+            if (config.requiresNullCheck && (obj.x === null || obj.y === null)) {
+                continue;
+            }
+
+            // Calculate object position on map
+            const objMapX = mapX + mapWidth/2 + (obj.x - this.centerX) * worldToMapScale;
+            const objMapY = mapY + mapHeight/2 + (obj.y - this.centerY) * worldToMapScale;
+
+            // Check if object is within map bounds
+            if (objMapX >= mapX && objMapX <= mapX + mapWidth &&
+                objMapY >= mapY && objMapY <= mapY + mapHeight) {
+
+                // Calculate distance from click to object
+                const distance = Math.sqrt((mouseX - objMapX)**2 + (mouseY - objMapY)**2);
+
+                // Check if within click threshold and closer than previous closest
+                if (distance <= config.clickThreshold && distance < closestDistance) {
+                    closestObject = obj;
+                    closestDistance = distance;
+                }
+            }
+        }
+
+        // Return null if no object was found within threshold
+        if (!closestObject) {
+            return null;
+        }
+
+        // Return result object
+        return {
+            object: closestObject,
+            distance: closestDistance,
+            type: config.type,
+            priority: config.priority,
+            config: config
+        };
+    }
+
+    /**
+     * Clear all selection properties using the configuration array
+     * @private
+     */
+    private clearAllSelections(): void {
+        for (const config of CELESTIAL_SELECTION_CONFIG) {
+            (this as any)[config.selectedProperty] = null;
+        }
+    }
+
     handleStarSelection(mouseX: number, mouseY: number, discoveredStars: StarLike[], canvas: HTMLCanvasElement, discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null, input?: Input): boolean {
         if (!discoveredStars) return false;
-        
+
         // Calculate map bounds
         const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
         const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
-        
+
         // Check if click is within map bounds
         if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedBlackHole = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
+            this.clearAllSelections();
             return false;
         }
-        
-        // Find closest celestial object to click position (prioritize planets if in detail view)
-        let closestStar: StarLike | null = null;
-        let closestPlanet: PlanetLike | null = null;
-        let closestNebula: NebulaLike | null = null;
-        let closestAsteroidGarden: AsteroidGardenLike | null = null;
-        let closestStarDistance = Infinity;
-        let closestPlanetDistance = Infinity;
-        let closestNebulaDistance = Infinity;
-        let closestAsteroidGardenDistance = Infinity;
-        const clickThreshold = 10; // pixels
-        
-        // Check for planet clicks first (in detail view)
-        if (this.zoomLevel > 3.0 && discoveredPlanets) {
-            for (const planet of discoveredPlanets) {
-                // Skip planets without position data
-                if (planet.x === null || planet.y === null) continue;
-                
-                const planetMapX = mapX + mapWidth/2 + (planet.x - this.centerX) * worldToMapScale;
-                const planetMapY = mapY + mapHeight/2 + (planet.y - this.centerY) * worldToMapScale;
-                
-                // Check if planet is within map bounds and click threshold
-                if (planetMapX >= mapX && planetMapX <= mapX + mapWidth && 
-                    planetMapY >= mapY && planetMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - planetMapX)**2 + (mouseY - planetMapY)**2);
-                    if (distance <= clickThreshold && distance < closestPlanetDistance) {
-                        closestPlanet = planet;
-                        closestPlanetDistance = distance;
-                    }
-                }
+
+        // Map parameter names to actual discovered object arrays
+        const discoveredObjectsMap: Record<string, any[] | null | undefined> = {
+            'discoveredStars': discoveredStars,
+            'discoveredPlanets': discoveredPlanets,
+            'discoveredNebulae': discoveredNebulae,
+            'discoveredWormholes': discoveredWormholes,
+            'discoveredAsteroidGardens': discoveredAsteroidGardens,
+            'discoveredBlackHoles': discoveredBlackHoles,
+            'discoveredComets': discoveredComets,
+            'discoveredRoguePlanets': discoveredRoguePlanets,
+            'discoveredDarkNebulae': discoveredDarkNebulae,
+            'discoveredCrystalGardens': discoveredCrystalGardens,
+            'discoveredProtostars': discoveredProtostars
+        };
+
+        // Find closest objects for each type using the config array
+        const candidates: ClosestObjectResult[] = [];
+
+        for (const config of CELESTIAL_SELECTION_CONFIG) {
+            // Skip planets if zoom level is too low
+            if (config.minZoomLevel && this.zoomLevel < config.minZoomLevel) {
+                continue;
             }
-        }
-        
-        // Check for star clicks
-        for (const star of discoveredStars) {
-            const starMapX = mapX + mapWidth/2 + (star.x - this.centerX) * worldToMapScale;
-            const starMapY = mapY + mapHeight/2 + (star.y - this.centerY) * worldToMapScale;
-            
-            // Check if star is within map bounds and click threshold
-            if (starMapX >= mapX && starMapX <= mapX + mapWidth && 
-                starMapY >= mapY && starMapY <= mapY + mapHeight) {
-                
-                const distance = Math.sqrt((mouseX - starMapX)**2 + (mouseY - starMapY)**2);
-                if (distance <= clickThreshold && distance < closestStarDistance) {
-                    closestStar = star;
-                    closestStarDistance = distance;
-                }
-            }
-        }
-        
-        // Check for nebula clicks (visible at all zoom levels)
-        if (discoveredNebulae) {
-            for (const nebula of discoveredNebulae) {
-                // Skip nebulae without position data
-                if (nebula.x === null || nebula.y === null) continue;
-                
-                const nebulaMapX = mapX + mapWidth/2 + (nebula.x - this.centerX) * worldToMapScale;
-                const nebulaMapY = mapY + mapHeight/2 + (nebula.y - this.centerY) * worldToMapScale;
-                
-                // Check if nebula is within map bounds and click threshold
-                // Use larger threshold for nebulae since they're rendered as larger clouds
-                const nebulaClickThreshold = Math.max(15, clickThreshold);
-                if (nebulaMapX >= mapX && nebulaMapX <= mapX + mapWidth && 
-                    nebulaMapY >= mapY && nebulaMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - nebulaMapX)**2 + (mouseY - nebulaMapY)**2);
-                    if (distance <= nebulaClickThreshold && distance < closestNebulaDistance) {
-                        closestNebula = nebula;
-                        closestNebulaDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for asteroid garden clicks
-        if (discoveredAsteroidGardens) {
-            for (const asteroidGarden of discoveredAsteroidGardens) {
-                const gardenMapX = mapX + mapWidth/2 + (asteroidGarden.x - this.centerX) * worldToMapScale;
-                const gardenMapY = mapY + mapHeight/2 + (asteroidGarden.y - this.centerY) * worldToMapScale;
-                
-                // Use larger click threshold for asteroid gardens since they're spread out
-                const gardenClickThreshold = Math.max(20, clickThreshold);
-                if (gardenMapX >= mapX && gardenMapX <= mapX + mapWidth && 
-                    gardenMapY >= mapY && gardenMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - gardenMapX)**2 + (mouseY - gardenMapY)**2);
-                    if (distance <= gardenClickThreshold && distance < closestAsteroidGardenDistance) {
-                        closestAsteroidGarden = asteroidGarden;
-                        closestAsteroidGardenDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for wormhole clicks
-        let closestWormhole: WormholeLike | null = null;
-        let closestWormholeDistance = Infinity;
-        
-        if (discoveredWormholes) {
-            for (const wormhole of discoveredWormholes) {
-                const wormholeMapX = mapX + mapWidth/2 + (wormhole.x - this.centerX) * worldToMapScale;
-                const wormholeMapY = mapY + mapHeight/2 + (wormhole.y - this.centerY) * worldToMapScale;
-                
-                // Use larger click threshold for wormholes due to their vortex effect
-                const wormholeClickThreshold = Math.max(20, clickThreshold);
-                if (wormholeMapX >= mapX && wormholeMapX <= mapX + mapWidth && 
-                    wormholeMapY >= mapY && wormholeMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - wormholeMapX)**2 + (mouseY - wormholeMapY)**2);
-                    if (distance <= wormholeClickThreshold && distance < closestWormholeDistance) {
-                        closestWormhole = wormhole;
-                        closestWormholeDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Check for black hole clicks
-        let closestBlackHole: BlackHoleLike | null = null;
-        let closestBlackHoleDistance = Infinity;
-        
-        if (discoveredBlackHoles) {
-            for (const blackHole of discoveredBlackHoles) {
-                const blackHoleMapX = mapX + mapWidth/2 + (blackHole.x - this.centerX) * worldToMapScale;
-                const blackHoleMapY = mapY + mapHeight/2 + (blackHole.y - this.centerY) * worldToMapScale;
-                
-                // Use larger click threshold for black holes due to their accretion disc
-                const blackHoleClickThreshold = Math.max(25, clickThreshold);
-                if (blackHoleMapX >= mapX && blackHoleMapX <= mapX + mapWidth && 
-                    blackHoleMapY >= mapY && blackHoleMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - blackHoleMapX)**2 + (mouseY - blackHoleMapY)**2);
-                    if (distance <= blackHoleClickThreshold && distance < closestBlackHoleDistance) {
-                        closestBlackHole = blackHole;
-                        closestBlackHoleDistance = distance;
-                    }
-                }
+
+            // Get the discovered objects array for this type
+            const objects = discoveredObjectsMap[config.discoveredParam];
+
+            // Find closest object of this type
+            const result = this.findClosestObjectOfType(
+                config,
+                mouseX,
+                mouseY,
+                mapX,
+                mapY,
+                mapWidth,
+                mapHeight,
+                worldToMapScale,
+                objects
+            );
+
+            // Add to candidates if found
+            if (result) {
+                candidates.push(result);
             }
         }
 
-        // Check for comet clicks
-        let closestComet: CometLike | null = null;
-        let closestCometDistance = Infinity;
+        // Clear all selections first
+        this.clearAllSelections();
 
-        if (discoveredComets) {
-            for (const comet of discoveredComets) {
-                const cometMapX = mapX + mapWidth/2 + (comet.x - this.centerX) * worldToMapScale;
-                const cometMapY = mapY + mapHeight/2 + (comet.y - this.centerY) * worldToMapScale;
-
-                // Use slightly larger click threshold for comets due to their tail
-                const cometClickThreshold = Math.max(15, clickThreshold);
-                if (cometMapX >= mapX && cometMapX <= mapX + mapWidth && 
-                    cometMapY >= mapY && cometMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - cometMapX)**2 + (mouseY - cometMapY)**2);
-                    if (distance <= cometClickThreshold && distance < closestCometDistance) {
-                        closestComet = comet;
-                        closestCometDistance = distance;
-                    }
+        // Select the highest priority candidate (lowest priority number)
+        if (candidates.length > 0) {
+            // Sort by priority (ascending) then by distance (ascending)
+            candidates.sort((a, b) => {
+                if (a.priority !== b.priority) {
+                    return a.priority - b.priority;
                 }
-            }
+                return a.distance - b.distance;
+            });
+
+            // Select the winner
+            const winner = candidates[0];
+            (this as any)[winner.config.selectedProperty] = winner.object;
         }
 
-        // Check for rogue planet clicks (wandering worlds visible at all zoom levels)
-        let closestRoguePlanet: any | null = null;
-        let closestRoguePlanetDistance = Infinity;
-
-        if (discoveredRoguePlanets) {
-            for (const roguePlanet of discoveredRoguePlanets) {
-                const roguePlanetMapX = mapX + mapWidth/2 + (roguePlanet.x - this.centerX) * worldToMapScale;
-                const roguePlanetMapY = mapY + mapHeight/2 + (roguePlanet.y - this.centerY) * worldToMapScale;
-
-                // Use similar click threshold to regular planets
-                const roguePlanetClickThreshold = Math.max(12, clickThreshold);
-                if (roguePlanetMapX >= mapX && roguePlanetMapX <= mapX + mapWidth && 
-                    roguePlanetMapY >= mapY && roguePlanetMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - roguePlanetMapX)**2 + (mouseY - roguePlanetMapY)**2);
-                    if (distance <= roguePlanetClickThreshold && distance < closestRoguePlanetDistance) {
-                        closestRoguePlanet = roguePlanet;
-                        closestRoguePlanetDistance = distance;
-                    }
-                }
-            }
-        }
-
-        // Check for dark nebula clicks (void region objects visible at all zoom levels)
-        let closestDarkNebula: any | null = null;
-        let closestDarkNebulaDistance = Infinity;
-
-        if (discoveredDarkNebulae) {
-            for (const darkNebula of discoveredDarkNebulae) {
-                const darkNebulaMapX = mapX + mapWidth/2 + (darkNebula.x - this.centerX) * worldToMapScale;
-                const darkNebulaMapY = mapY + mapHeight/2 + (darkNebula.y - this.centerY) * worldToMapScale;
-                
-                // Dark nebulae are larger objects, so use a bigger click threshold
-                const darkNebulaClickThreshold = Math.max(15, clickThreshold * 1.2);
-                if (darkNebulaMapX >= mapX && darkNebulaMapX <= mapX + mapWidth && 
-                    darkNebulaMapY >= mapY && darkNebulaMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - darkNebulaMapX)**2 + (mouseY - darkNebulaMapY)**2);
-                    if (distance <= darkNebulaClickThreshold && distance < closestDarkNebulaDistance) {
-                        closestDarkNebula = darkNebula;
-                        closestDarkNebulaDistance = distance;
-                    }
-                }
-            }
-        }
-
-        // Check for crystal garden clicks
-        let closestCrystalGarden: any | null = null;
-        let closestCrystalGardenDistance = Infinity;
-
-        if (discoveredCrystalGardens) {
-            for (const crystalGarden of discoveredCrystalGardens) {
-                const gardenMapX = mapX + mapWidth/2 + (crystalGarden.x - this.centerX) * worldToMapScale;
-                const gardenMapY = mapY + mapHeight/2 + (crystalGarden.y - this.centerY) * worldToMapScale;
-                
-                // Crystal gardens are medium-sized objects
-                const gardenClickThreshold = Math.max(12, clickThreshold * 1.1);
-                if (gardenMapX >= mapX && gardenMapX <= mapX + mapWidth && 
-                    gardenMapY >= mapY && gardenMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - gardenMapX)**2 + (mouseY - gardenMapY)**2);
-                    if (distance <= gardenClickThreshold && distance < closestCrystalGardenDistance) {
-                        closestCrystalGarden = crystalGarden;
-                        closestCrystalGardenDistance = distance;
-                    }
-                }
-            }
-        }
-
-        // Check for protostar clicks
-        let closestProtostar: any | null = null;
-        let closestProtostarDistance = Infinity;
-
-        if (discoveredProtostars) {
-            for (const protostar of discoveredProtostars) {
-                const protostarMapX = mapX + mapWidth/2 + (protostar.x - this.centerX) * worldToMapScale;
-                const protostarMapY = mapY + mapHeight/2 + (protostar.y - this.centerY) * worldToMapScale;
-                
-                // Protostars are medium-large objects with jets
-                const protostarClickThreshold = Math.max(15, clickThreshold * 1.2);
-                if (protostarMapX >= mapX && protostarMapX <= mapX + mapWidth && 
-                    protostarMapY >= mapY && protostarMapY <= mapY + mapHeight) {
-                    
-                    const distance = Math.sqrt((mouseX - protostarMapX)**2 + (mouseY - protostarMapY)**2);
-                    if (distance <= protostarClickThreshold && distance < closestProtostarDistance) {
-                        closestProtostar = protostar;
-                        closestProtostarDistance = distance;
-                    }
-                }
-            }
-        }
-        
-        // Select the closest object (prioritize order: planets > rogue planets > dark nebulae > protostars > crystal gardens > wormholes > nebulae > comets > black holes > asteroid gardens > stars)
-        if (closestPlanet && closestPlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestRoguePlanetDistance, closestDarkNebulaDistance, closestProtostarDistance, closestCrystalGardenDistance)) {
-            this.selectedPlanet = closestPlanet;
-            this.selectedStar = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestRoguePlanet && closestRoguePlanetDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestDarkNebulaDistance, closestProtostarDistance, closestCrystalGardenDistance)) {
-            this.selectedRoguePlanet = closestRoguePlanet;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestDarkNebula && closestDarkNebulaDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestProtostarDistance, closestCrystalGardenDistance)) {
-            this.selectedDarkNebula = closestDarkNebula;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestProtostar && closestProtostarDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance, closestCrystalGardenDistance)) {
-            this.selectedProtostar = closestProtostar;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestCrystalGarden && closestCrystalGardenDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestWormholeDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
-            this.selectedCrystalGarden = closestCrystalGarden;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-        } else if (closestWormhole && closestWormholeDistance <= Math.min(closestStarDistance, closestNebulaDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
-            this.selectedWormhole = closestWormhole;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestNebula && closestNebulaDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance, closestCometDistance)) {
-            this.selectedNebula = closestNebula;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestComet && closestCometDistance <= Math.min(closestStarDistance, closestBlackHoleDistance, closestAsteroidGardenDistance)) {
-            this.selectedComet = closestComet;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestBlackHole && closestBlackHoleDistance <= Math.min(closestStarDistance, closestAsteroidGardenDistance)) {
-            this.selectedBlackHole = closestBlackHole;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestAsteroidGarden && closestAsteroidGardenDistance <= closestStarDistance) {
-            this.selectedAsteroidGarden = closestAsteroidGarden;
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else if (closestStar) {
-            this.selectedStar = closestStar;
-            this.selectedPlanet = null;
-            this.selectedNebula = null;
-            this.selectedWormhole = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-            this.selectedDarkNebula = null;
-            this.selectedProtostar = null;
-            this.selectedCrystalGarden = null;
-        } else {
-            this.selectedStar = null;
-            this.selectedPlanet = null;
-            this.selectedWormhole = null;
-            this.selectedNebula = null;
-            this.selectedBlackHole = null;
-            this.selectedAsteroidGarden = null;
-            this.selectedComet = null;
-            this.selectedRoguePlanet = null;
-        }
-        
         // Consume input to prevent ship movement when handling stellar map interactions
         if (input) {
             input.consumeTouch();
