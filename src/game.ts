@@ -9,7 +9,7 @@ import { ChunkManager, InfiniteStarField } from './world/world.js';
 import { Ship, ThrusterParticles, StarParticles } from './ship/ship.js';
 import { DiscoveryDisplay } from './ui/ui.js';
 import { DiscoveryLogbook } from './ui/discoverylogbook.js';
-import { StellarMap } from './ui/stellarmap.js';
+import { StellarMap } from './ui/StellarMap.js';
 import { LocalMinimap } from './ui/minimap.js';
 import { DiscoveryService } from './services/DiscoveryService.js';
 import { NamingService } from './naming/naming.js';

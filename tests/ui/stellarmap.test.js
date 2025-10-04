@@ -2,7 +2,7 @@
 // Testing the StellarMap class for coordinate transformations, zoom, pan, and selection
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { StellarMap } from '../../dist/ui/stellarmap.js';
+import { StellarMap } from '../../dist/ui/StellarMap.js';
 
 describe('StellarMap System', () => {
   let stellarMap;
@@ -1054,25 +1054,8 @@ describe('StellarMap System', () => {
       });
     });
 
-    describe('updateHoverState Method', () => {
-      it('should reset hover state and update cursor', () => {
-        stellarMap.hoveredStar = mockStars[0];
-        stellarMap.hoveredPlanet = mockPlanets[0];
-        
-        stellarMap.updateHoverState(400, 300, mockCanvas);
-        
-        expect(stellarMap.hoveredStar).toBe(null);
-        expect(stellarMap.hoveredPlanet).toBe(null);
-      });
-
-      it('should call updateCursor method', () => {
-        const updateCursorSpy = vi.spyOn(stellarMap, 'updateCursor');
-        
-        stellarMap.updateHoverState(400, 300, mockCanvas);
-        
-        expect(updateCursorSpy).toHaveBeenCalledWith(mockCanvas);
-      });
-    });
+    // Note: updateHoverState method was removed as dead code
+    // Hover state is now managed by detectHoverTarget which uses the centralized StellarMapHoverSystem
 
     describe('updateCursor Method', () => {
       it('should set pointer cursor when hovering over star', () => {
@@ -1395,63 +1378,9 @@ describe('StellarMap System', () => {
       });
     });
 
-    describe('generatePlanetDisplayName', () => {
-      it('should use stored object name when available', () => {
-        const planet = {
-          objectName: 'Stored Planet Name',
-          planetIndex: 1
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(name).toBe('Stored Planet Name');
-      });
-
-      it('should use naming service when no stored name', () => {
-        const planet = {
-          objectName: null,
-          parentStarX: 1000,
-          parentStarY: 2000,
-          planetTypeName: 'Rocky Planet',
-          planetIndex: 2,
-          x: 1050,
-          y: 2050
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(mockNamingService.generateDisplayName).toHaveBeenCalled();
-        expect(name).toBe('Test Star Alpha'); // From mock
-      });
-
-      it('should fallback to basic name when naming service fails', () => {
-        mockNamingService.generateDisplayName.mockImplementation(() => {
-          throw new Error('Naming service error');
-        });
-        
-        const planet = {
-          objectName: null,
-          planetIndex: 3
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(name).toBe('Planet 4'); // planetIndex + 1
-      });
-
-      it('should fallback when no naming service available', () => {
-        stellarMap.namingService = null;
-        
-        const planet = {
-          objectName: null,
-          planetIndex: 0
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(name).toBe('Planet 1'); // planetIndex + 1
-      });
-    });
+    // Note: generatePlanetDisplayName and other helper methods have been moved to InfoPanelRenderer
+    // These are now private implementation details and don't need to be tested directly
+    // The public API (renderPlanetInfoPanel, etc.) is tested through integration tests
   });
 
   describe('Inspector Mode', () => {
@@ -1505,12 +1434,12 @@ describe('StellarMap System', () => {
       expect(stellarMap.inspectorMode).toBe(true);
       
       // Toggle off
-      stellarMap.toggleInspectorMode();
+      await stellarMap.toggleInspectorMode();
       expect(stellarMap.inspectorMode).toBe(false);
-      
-      // Toggle back on (should re-enable with last seed)
-      stellarMap.toggleInspectorMode();
-      expect(stellarMap.inspectorMode).toBe(false); // Will be false since no last seed in this case
+
+      // Toggle back on (should re-enable with last seed - preserved from enable call)
+      await stellarMap.toggleInspectorMode();
+      expect(stellarMap.inspectorMode).toBe(true); // Re-enabled with preserved seed
     });
 
     it('should throw error when enabling without service', async () => {
