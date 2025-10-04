@@ -1054,25 +1054,8 @@ describe('StellarMap System', () => {
       });
     });
 
-    describe('updateHoverState Method', () => {
-      it('should reset hover state and update cursor', () => {
-        stellarMap.hoveredStar = mockStars[0];
-        stellarMap.hoveredPlanet = mockPlanets[0];
-        
-        stellarMap.updateHoverState(400, 300, mockCanvas);
-        
-        expect(stellarMap.hoveredStar).toBe(null);
-        expect(stellarMap.hoveredPlanet).toBe(null);
-      });
-
-      it('should call updateCursor method', () => {
-        const updateCursorSpy = vi.spyOn(stellarMap, 'updateCursor');
-        
-        stellarMap.updateHoverState(400, 300, mockCanvas);
-        
-        expect(updateCursorSpy).toHaveBeenCalledWith(mockCanvas);
-      });
-    });
+    // Note: updateHoverState method was removed as dead code
+    // Hover state is now managed by detectHoverTarget which uses the centralized StellarMapHoverSystem
 
     describe('updateCursor Method', () => {
       it('should set pointer cursor when hovering over star', () => {

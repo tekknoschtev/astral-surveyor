@@ -479,11 +479,8 @@ export class StellarMap {
     }
 
     handleMouseMove(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, input: Input): boolean {
-        // Always check for hover state when map is visible
-        if (this.visible) {
-            this.updateHoverState(mouseX, mouseY, canvas);
-        }
-        
+        // Hover state is handled by detectHoverTarget() which is called from game.ts
+
         if (!this.visible || !input.isMousePressed() || input.isRightPressed()) {
             return false;
         }
@@ -980,23 +977,6 @@ export class StellarMap {
         return true; // Consumed the event
     }
     
-    updateHoverState(mouseX: number, mouseY: number, canvas: HTMLCanvasElement): void {
-        // Get discovered objects from the chunk manager
-        // Note: This requires discoveredStars and discoveredPlanets to be passed in
-        // For now, we'll implement this as a separate method that game.ts can call
-        // This is a placeholder to maintain the hover detection structure
-        
-        // Reset hover state - will be set by detectHoverTarget when called from game.ts
-        this.hoveredStar = null;
-        this.hoveredPlanet = null;
-        this.hoveredNebula = null;
-        this.hoveredWormhole = null;
-        this.hoveredRoguePlanet = null;
-        
-        // Update cursor based on hover state
-        this.updateCursor(canvas);
-    }
-    
     detectHoverTarget(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
         if (!this.visible) return;
         
@@ -1036,43 +1016,6 @@ export class StellarMap {
         // Sync back to old properties for compatibility
         this.syncOldHoverStates();
         this.updateCursor(canvas);
-    }
-
-    // NEW: Centralized hover detection using the new hover system
-    private detectHoverTargetNew(mouseX: number, mouseY: number, canvas: HTMLCanvasElement, discoveredStars: StarLike[], discoveredPlanets?: PlanetLike[] | null, discoveredNebulae?: NebulaLike[] | null, discoveredWormholes?: WormholeLike[] | null, discoveredAsteroidGardens?: AsteroidGardenLike[] | null, discoveredBlackHoles?: BlackHoleLike[] | null, discoveredComets?: CometLike[] | null, discoveredRoguePlanets?: any[] | null, discoveredDarkNebulae?: any[] | null, discoveredCrystalGardens?: any[] | null, discoveredProtostars?: any[] | null): void {
-        if (!this.visible) return;
-        
-        // Calculate map bounds and scaling
-        const { mapX, mapY, mapWidth, mapHeight } = this.getMapBounds(canvas);
-        const worldToMapScale = Math.min(mapWidth, mapHeight) / (this.gridSize * 4 / this.zoomLevel);
-        
-        // Check if mouse is within map bounds
-        if (mouseX < mapX || mouseX > mapX + mapWidth || mouseY < mapY || mouseY > mapY + mapHeight) {
-            this.hoverSystem.clearHover();
-            this.clearAllOldHoverStates();
-            this.updateCursor(canvas);
-            return;
-        }
-
-        // Prepare object collections for the new hover system
-        const objectCollections: Record<string, HoverableObject[]> = {
-            'celestialStar': (discoveredStars || []).map(obj => ({...obj, type: 'celestialStar'})),
-            'planet': this.zoomLevel > 3.0 ? (discoveredPlanets || []).map(obj => ({...obj, type: 'planet'})) : [],
-            'nebula': (discoveredNebulae || []).map(obj => ({...obj, type: 'nebula'})),
-            'wormhole': (discoveredWormholes || []).map(obj => ({...obj, type: 'wormhole'})),
-            'asteroidGarden': (discoveredAsteroidGardens || []).map(obj => ({...obj, type: 'asteroidGarden'})),
-            'blackhole': (discoveredBlackHoles || []).map(obj => ({...obj, type: 'blackhole'})),
-            'comet': (discoveredComets || []).map(obj => ({...obj, type: 'comet'})),
-            'rogue-planet': (discoveredRoguePlanets || []).map(obj => ({...obj, type: 'rogue-planet'})),
-            'dark-nebula': (discoveredDarkNebulae || []).map(obj => ({...obj, type: 'dark-nebula'})),
-            'crystal-garden': (discoveredCrystalGardens || []).map(obj => ({...obj, type: 'crystal-garden'})),
-            'protostar': (discoveredProtostars || []).map(obj => ({...obj, type: 'protostar'}))
-        };
-
-        // Use the new centralized hover system
-        this.updateHoverStatesUsingCentralizedSystem(
-            mouseX, mouseY, canvas, mapX, mapY, mapWidth, mapHeight, worldToMapScale, objectCollections
-        );
     }
 
     private clearAllOldHoverStates(): void {
@@ -1135,36 +1078,6 @@ export class StellarMap {
         }
     }
 
-    private updateHoverStatesUsingCentralizedSystem(
-        mouseX: number, 
-        mouseY: number, 
-        canvas: HTMLCanvasElement,
-        mapX: number,
-        mapY: number,
-        mapWidth: number,
-        mapHeight: number,
-        worldToMapScale: number,
-        objectCollections: Record<string, HoverableObject[]>
-    ): void {
-        // Use the centralized hover system to detect what object is being hovered
-        this.hoverSystem.detectHover(
-            mouseX, 
-            mouseY, 
-            mapX, 
-            mapY, 
-            mapWidth, 
-            mapHeight, 
-            worldToMapScale,
-            this.centerX, 
-            this.centerY, 
-            objectCollections
-        );
-
-        // Update old system properties for backward compatibility
-        this.syncOldHoverStates();
-        this.updateCursor(canvas);
-    }
-    
     updateCursor(canvas: HTMLCanvasElement): void {
         if (this.hoveredStar || this.hoveredPlanet || this.hoveredNebula || this.hoveredWormhole || this.hoveredAsteroidGarden || this.hoveredBlackHole || this.hoveredComet || this.hoveredRoguePlanet || this.hoveredDarkNebula || this.hoveredCrystalGarden || this.hoveredProtostar) {
             canvas.style.cursor = 'pointer';
