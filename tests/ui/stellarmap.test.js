@@ -1395,63 +1395,9 @@ describe('StellarMap System', () => {
       });
     });
 
-    describe('generatePlanetDisplayName', () => {
-      it('should use stored object name when available', () => {
-        const planet = {
-          objectName: 'Stored Planet Name',
-          planetIndex: 1
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(name).toBe('Stored Planet Name');
-      });
-
-      it('should use naming service when no stored name', () => {
-        const planet = {
-          objectName: null,
-          parentStarX: 1000,
-          parentStarY: 2000,
-          planetTypeName: 'Rocky Planet',
-          planetIndex: 2,
-          x: 1050,
-          y: 2050
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(mockNamingService.generateDisplayName).toHaveBeenCalled();
-        expect(name).toBe('Test Star Alpha'); // From mock
-      });
-
-      it('should fallback to basic name when naming service fails', () => {
-        mockNamingService.generateDisplayName.mockImplementation(() => {
-          throw new Error('Naming service error');
-        });
-        
-        const planet = {
-          objectName: null,
-          planetIndex: 3
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(name).toBe('Planet 4'); // planetIndex + 1
-      });
-
-      it('should fallback when no naming service available', () => {
-        stellarMap.namingService = null;
-        
-        const planet = {
-          objectName: null,
-          planetIndex: 0
-        };
-        
-        const name = stellarMap.generatePlanetDisplayName(planet);
-        
-        expect(name).toBe('Planet 1'); // planetIndex + 1
-      });
-    });
+    // Note: generatePlanetDisplayName and other helper methods have been moved to InfoPanelRenderer
+    // These are now private implementation details and don't need to be tested directly
+    // The public API (renderPlanetInfoPanel, etc.) is tested through integration tests
   });
 
   describe('Inspector Mode', () => {
