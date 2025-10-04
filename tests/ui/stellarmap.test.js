@@ -2,7 +2,7 @@
 // Testing the StellarMap class for coordinate transformations, zoom, pan, and selection
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { StellarMap } from '../../dist/ui/stellarmap.js';
+import { StellarMap } from '../../dist/ui/StellarMap.js';
 
 describe('StellarMap System', () => {
   let stellarMap;
