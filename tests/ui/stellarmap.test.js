@@ -1434,12 +1434,12 @@ describe('StellarMap System', () => {
       expect(stellarMap.inspectorMode).toBe(true);
       
       // Toggle off
-      stellarMap.toggleInspectorMode();
+      await stellarMap.toggleInspectorMode();
       expect(stellarMap.inspectorMode).toBe(false);
-      
-      // Toggle back on (should re-enable with last seed)
-      stellarMap.toggleInspectorMode();
-      expect(stellarMap.inspectorMode).toBe(false); // Will be false since no last seed in this case
+
+      // Toggle back on (should re-enable with last seed - preserved from enable call)
+      await stellarMap.toggleInspectorMode();
+      expect(stellarMap.inspectorMode).toBe(true); // Re-enabled with preserved seed
     });
 
     it('should throw error when enabling without service', async () => {

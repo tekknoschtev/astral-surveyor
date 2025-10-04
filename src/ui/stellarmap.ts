@@ -21,6 +21,10 @@ import { InfoPanelRenderer } from './stellarmap/InfoPanelRenderer.js';
 import { DiscoveryOverlay } from './stellarmap/DiscoveryOverlay.js';
 import { DiscoveryVisualizationService } from '../services/DiscoveryVisualizationService.js';
 import { InteractionController } from './stellarmap/InteractionController.js';
+import { InspectorModeController } from './stellarmap/InspectorModeController.js';
+import { GridRenderer } from './stellarmap/GridRenderer.js';
+import { MarkerRenderer, type GameStartingPosition as MarkerGameStartingPosition } from './stellarmap/MarkerRenderer.js';
+import { MapUIRenderer } from './stellarmap/MapUIRenderer.js';
 
 // Interface definitions
 interface StarLike {
@@ -493,22 +497,42 @@ export class StellarMap {
     currentPositionColor: string;
     starColors: Record<string, string>;
     
-    // Inspector mode properties
-    inspectorMode: boolean;
-    inspectorSeed: number | null;
-    inspectorService: SeedInspectorService | null;
-    inspectorObjects: CelestialObjectData[];
-    inspectorZoomExtended: boolean; // Whether extended zoom is enabled
-    
-    // Statistics overlay properties
-    statisticsOverlayEnabled: boolean;
-    currentViewStatistics: {
-        objectCounts: Record<string, number>;
-        totalObjects: number;
-        density: number;
-        regionArea: number;
-    } | null;
-    objectTypeVisibility: Record<string, boolean>;
+    // Inspector mode controller
+    private inspectorController: InspectorModeController;
+
+    // Inspector mode delegation getters/setters
+    get inspectorMode(): boolean { return this.inspectorController.inspectorMode; }
+    set inspectorMode(value: boolean) { this.inspectorController.inspectorMode = value; }
+
+    get inspectorSeed(): number | null { return this.inspectorController.inspectorSeed; }
+    set inspectorSeed(value: number | null) { this.inspectorController.inspectorSeed = value; }
+
+    get inspectorService(): SeedInspectorService | null { return this.inspectorController.inspectorService; }
+    set inspectorService(value: SeedInspectorService | null) { this.inspectorController.inspectorService = value; }
+
+    get inspectorObjects(): CelestialObjectData[] { return this.inspectorController.inspectorObjects; }
+    set inspectorObjects(value: CelestialObjectData[]) { this.inspectorController.inspectorObjects = value; }
+
+    get inspectorZoomExtended(): boolean { return this.inspectorController.inspectorZoomExtended; }
+    set inspectorZoomExtended(value: boolean) { this.inspectorController.inspectorZoomExtended = value; }
+
+    get statisticsOverlayEnabled(): boolean { return this.inspectorController.statisticsOverlayEnabled; }
+    set statisticsOverlayEnabled(value: boolean) { this.inspectorController.statisticsOverlayEnabled = value; }
+
+    get currentViewStatistics() { return this.inspectorController.currentViewStatistics; }
+    set currentViewStatistics(value: any) { this.inspectorController.currentViewStatistics = value; }
+
+    get objectTypeVisibility(): Record<string, boolean> { return this.inspectorController.objectTypeVisibility; }
+    set objectTypeVisibility(value: Record<string, boolean>) { this.inspectorController.objectTypeVisibility = value; }
+
+    // Note: Tests directly access revealedChunks map - we need to expose the controller's private map
+    // This is a temporary bridge for legacy test compatibility
+    get revealedChunks() {
+        // Access the private field through a type assertion for test compatibility
+        // In production, tests should use the public API methods instead
+        return (this.inspectorController as any).revealedChunks;
+    }
+
     hoveredObjectTypeIndex: number;
     showDiscoveredObjects: boolean;
 
@@ -524,13 +548,12 @@ export class StellarMap {
     private infoPanelRenderer: InfoPanelRenderer;
     private discoveryOverlay: DiscoveryOverlay;
     private discoveryVisualizationService: DiscoveryVisualizationService;
+    private gridRenderer: GridRenderer;
+    private markerRenderer: MarkerRenderer;
+    private mapUIRenderer: MapUIRenderer;
 
     // Interaction controller
     private interactionController: InteractionController;
-
-    // Persistent revealed areas system
-    revealedChunks: Map<string, CelestialObjectData[]>;
-    revealedChunksMetadata: Map<string, { timestamp: number; seed: number; chunkX: number; chunkY: number }>;
 
     // Chunk Manager for region information
     chunkManager: ChunkManager | null;
@@ -539,6 +562,9 @@ export class StellarMap {
         // Initialize interaction controller first (it holds zoom, center, selection, hover, pan state)
         this.interactionController = new InteractionController();
 
+        // Initialize inspector mode controller
+        this.inspectorController = new InspectorModeController();
+
         this.visible = false;
         this.gridSize = 2000; // Grid spacing in world units
         this.namingService = null; // Will be injected
@@ -546,51 +572,23 @@ export class StellarMap {
         // Legacy pan properties
         this.panStartMapX = 0; // Map center when pan started
         this.panStartMapY = 0;
-        
+
         // Visual settings for subtle space aesthetic
         this.backgroundColor = '#000000F0'; // More opaque for better contrast
         this.gridColor = '#2a3a4a40'; // Very subtle dark blue-gray with transparency
         this.currentPositionColor = '#d4a574'; // Gentle amber accent
         this.starColors = {
             'G-Type Star': '#ffdd88',
-            'K-Type Star': '#ffaa44', 
+            'K-Type Star': '#ffaa44',
             'M-Type Star': '#ff6644',
             'Red Giant': '#ff4422',
             'Blue Giant': '#88ddff',
             'White Dwarf': '#ffffff',
             'Neutron Star': '#ddddff'
         };
-        
-        // Initialize inspector mode properties
-        this.inspectorMode = false;
-        this.inspectorSeed = null;
-        this.inspectorService = null;
-        this.inspectorObjects = [];
-        this.inspectorZoomExtended = false;
-        
-        // Initialize statistics overlay properties
-        this.statisticsOverlayEnabled = false;
-        this.currentViewStatistics = null;
-        this.objectTypeVisibility = {
-            'celestialStar': true,
-            'planet': true,
-            'moon': true,
-            'nebula': true,
-            'asteroidGarden': true,
-            'wormhole': true,
-            'blackhole': true,
-            'comet': true,
-            'rogue-planet': true,
-            'dark-nebula': true,
-            'crystal-garden': true,
-            'protostar': true
-        };
+
         this.hoveredObjectTypeIndex = -1;
         this.showDiscoveredObjects = true;
-        
-        // Initialize persistent revealed areas system
-        this.revealedChunks = new Map();
-        this.revealedChunksMetadata = new Map();
 
         // Initialize chunk manager
         this.chunkManager = null;
@@ -605,6 +603,9 @@ export class StellarMap {
         this.asteroidRenderer = new AsteroidRenderer();
         this.regionObjectRenderer = new RegionObjectRenderer();
         this.infoPanelRenderer = new InfoPanelRenderer();
+        this.gridRenderer = new GridRenderer(this.gridSize, this.gridColor);
+        this.markerRenderer = new MarkerRenderer(this.currentPositionColor);
+        this.mapUIRenderer = new MapUIRenderer();
 
         // Initialize discovery visualization
         this.discoveryVisualizationService = new DiscoveryVisualizationService();
@@ -1120,476 +1121,7 @@ export class StellarMap {
     }
 
     renderGrid(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number): void {
-        ctx.strokeStyle = this.gridColor;
-        ctx.lineWidth = 0.5; // Even more subtle lines
-        
-        // Dynamic grid size based on zoom level
-        let effectiveGridSize = this.gridSize;
-        if (this.zoomLevel < 0.1) {
-            // Galactic view: very large grid (20000 units)
-            effectiveGridSize = this.gridSize * 10;
-        } else if (this.zoomLevel < 0.5) {
-            // Sector view: large grid (10000 units)
-            effectiveGridSize = this.gridSize * 5;
-        } else if (this.zoomLevel > 5.0) {
-            // Detail view: small grid (500 units)
-            effectiveGridSize = this.gridSize / 4;
-        }
-        
-        // Calculate grid line spacing on screen
-        const gridSpacing = effectiveGridSize * scale;
-        
-        // Skip grid rendering if spacing is too small or too large
-        if (gridSpacing < 10 || gridSpacing > mapWidth) {
-            return;
-        }
-        
-        // Calculate offset based on map center
-        const offsetX = (this.centerX % effectiveGridSize) * scale;
-        const offsetY = (this.centerY % effectiveGridSize) * scale;
-        
-        // Draw vertical grid lines
-        for (let x = mapX - offsetX; x <= mapX + mapWidth; x += gridSpacing) {
-            if (x >= mapX && x <= mapX + mapWidth) {
-                ctx.beginPath();
-                ctx.moveTo(x, mapY);
-                ctx.lineTo(x, mapY + mapHeight);
-                ctx.stroke();
-            }
-        }
-        
-        // Draw horizontal grid lines
-        for (let y = mapY - offsetY; y <= mapY + mapHeight; y += gridSpacing) {
-            if (y >= mapY && y <= mapY + mapHeight) {
-                ctx.beginPath();
-                ctx.moveTo(mapX, y);
-                ctx.lineTo(mapX + mapWidth, y);
-                ctx.stroke();
-            }
-        }
-    }
-
-    renderCosmicRegions(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number): void {
-        // Completely disable all region display for now
-        return;
-    }
-
-    private drawCleanRegionLabels(
-        ctx: CanvasRenderingContext2D,
-        regionCenters: Map<string, {x: number, y: number, name: string, count: number}>,
-        mapX: number,
-        mapY: number,
-        mapWidth: number,
-        mapHeight: number,
-        scale: number
-    ): void {
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '14px "Courier New", monospace';
-        
-        const minDistance = 80; // Minimum distance between labels in screen pixels
-        const drawnPositions: Array<{x: number, y: number}> = [];
-        
-        for (const [regionType, center] of regionCenters) {
-            if (center.count < 2) continue; // Only show for regions with multiple sample points
-            
-            // Convert to screen coordinates
-            const screenX = mapX + mapWidth/2 + (center.x - this.centerX) * scale;
-            const screenY = mapY + mapHeight/2 + (center.y - this.centerY) * scale;
-            
-            // Check if this label would be too close to existing ones
-            let tooClose = false;
-            for (const pos of drawnPositions) {
-                const distance = Math.sqrt((screenX - pos.x) ** 2 + (screenY - pos.y) ** 2);
-                if (distance < minDistance) {
-                    tooClose = true;
-                    break;
-                }
-            }
-            
-            if (!tooClose && screenX >= mapX && screenX <= mapX + mapWidth && 
-                screenY >= mapY && screenY <= mapY + mapHeight) {
-                
-                // Draw subtle background
-                const textWidth = ctx.measureText(center.name).width;
-                ctx.fillStyle = '#000000aa';
-                ctx.fillRect(screenX - textWidth/2 - 8, screenY - 10, textWidth + 16, 20);
-                
-                // Draw region name
-                ctx.fillStyle = '#b0c4d4';
-                ctx.fillText(center.name, screenX, screenY);
-                
-                drawnPositions.push({x: screenX, y: screenY});
-            }
-        }
-        
-        ctx.restore();
-    }
-
-    private sampleRegionBoundaries(
-        mapX: number,
-        mapY: number,
-        mapWidth: number,
-        mapHeight: number,
-        scale: number,
-        sampleSpacing: number,
-        regionColors: Record<string, string>
-    ): Map<string, Array<{x: number, y: number}>> {
-        const boundaryPoints = new Map<string, Array<{x: number, y: number}>>();
-        
-        // Sample in screen-space grid, not world chunks
-        for (let screenX = mapX; screenX < mapX + mapWidth; screenX += sampleSpacing) {
-            for (let screenY = mapY; screenY < mapY + mapHeight; screenY += sampleSpacing) {
-                
-                // Convert screen coordinates to world coordinates
-                const worldX = this.centerX + (screenX - mapX - mapWidth/2) / scale;
-                const worldY = this.centerY + (screenY - mapY - mapHeight/2) / scale;
-                
-                try {
-                    // Sample region at this world point
-                    const chunkX = Math.floor(worldX / this.chunkManager!.chunkSize);
-                    const chunkY = Math.floor(worldY / this.chunkManager!.chunkSize);
-                    const currentRegion = this.chunkManager!.getChunkRegion(chunkX, chunkY);
-                    
-                    if (!currentRegion || !currentRegion.definition) continue;
-                    
-                    // Only process discovered regions in normal view
-                    const isDiscovered = this.chunkManager!.isRegionDiscovered(currentRegion.regionType);
-                    if (!isDiscovered && !this.inspectorMode) continue;
-                    
-                    // Check neighboring samples for boundary detection
-                    const neighbors = [
-                        {dx: sampleSpacing, dy: 0},
-                        {dx: 0, dy: sampleSpacing}
-                    ];
-                    
-                    for (const {dx, dy} of neighbors) {
-                        const neighScreenX = screenX + dx;
-                        const neighScreenY = screenY + dy;
-                        
-                        // Skip if neighbor is outside screen bounds
-                        if (neighScreenX >= mapX + mapWidth || neighScreenY >= mapY + mapHeight) continue;
-                        
-                        // Convert neighbor screen coordinates to world coordinates
-                        const neighWorldX = this.centerX + (neighScreenX - mapX - mapWidth/2) / scale;
-                        const neighWorldY = this.centerY + (neighScreenY - mapY - mapHeight/2) / scale;
-                        
-                        const neighChunkX = Math.floor(neighWorldX / this.chunkManager!.chunkSize);
-                        const neighChunkY = Math.floor(neighWorldY / this.chunkManager!.chunkSize);
-                        const neighborRegion = this.chunkManager!.getChunkRegion(neighChunkX, neighChunkY);
-                        
-                        if (!neighborRegion || !neighborRegion.definition) continue;
-                        
-                        // If neighbor region is different, this is a boundary point
-                        if (neighborRegion.regionType !== currentRegion.regionType) {
-                            const neighIsDiscovered = this.chunkManager!.isRegionDiscovered(neighborRegion.regionType);
-                            if (!neighIsDiscovered && !this.inspectorMode) continue;
-                            
-                            // Use color from region with higher influence
-                            const useCurrentColor = currentRegion.influence >= neighborRegion.influence;
-                            const color = useCurrentColor ? 
-                                regionColors[currentRegion.regionType] : 
-                                regionColors[neighborRegion.regionType];
-                            const colorKey = color || '#666666';
-                            
-                            if (!boundaryPoints.has(colorKey)) {
-                                boundaryPoints.set(colorKey, []);
-                            }
-                            
-                            // Record boundary point in world coordinates (for smooth curves)
-                            boundaryPoints.get(colorKey)!.push({x: worldX, y: worldY});
-                        }
-                    }
-                } catch (error) {
-                    continue;
-                }
-            }
-        }
-        
-        return boundaryPoints;
-    }
-
-    private renderContourBoundaries(
-        ctx: CanvasRenderingContext2D,
-        boundaryPoints: Map<string, Array<{x: number, y: number}>>,
-        regionColors: Record<string, string>
-    ): void {
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        for (const [color, points] of boundaryPoints) {
-            if (points.length < 1) continue; // Draw even single points for debugging
-            
-            ctx.strokeStyle = color + 'CC'; // Much more opaque for visibility
-            console.log(`Rendering ${points.length} boundary points with color ${color}`);
-            
-            // Simple approach: draw small circles at each boundary point for debugging
-            for (const point of points) {
-                const screenPoint = this.worldToScreenCoords(point);
-                ctx.beginPath();
-                ctx.arc(screenPoint.x, screenPoint.y, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Try multiple grouping tolerances and draw simple lines between nearby points
-            if (points.length >= 2) {
-                // Sort points for better connection
-                const sortedPoints = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
-                
-                ctx.beginPath();
-                let startPoint = this.worldToScreenCoords(sortedPoints[0]);
-                ctx.moveTo(startPoint.x, startPoint.y);
-                
-                // Connect to nearby points within reasonable distance
-                for (let i = 1; i < sortedPoints.length; i++) {
-                    const currentScreen = this.worldToScreenCoords(sortedPoints[i]);
-                    const prevScreen = this.worldToScreenCoords(sortedPoints[i-1]);
-                    
-                    // If points are reasonably close, connect them
-                    const distance = Math.sqrt(
-                        (currentScreen.x - prevScreen.x) ** 2 + 
-                        (currentScreen.y - prevScreen.y) ** 2
-                    );
-                    
-                    if (distance < 100) { // Screen pixels
-                        ctx.lineTo(currentScreen.x, currentScreen.y);
-                    } else {
-                        // Start a new path segment
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.moveTo(currentScreen.x, currentScreen.y);
-                    }
-                }
-                
-                ctx.stroke();
-            }
-        }
-    }
-
-    private groupNearbyPoints(points: Array<{x: number, y: number}>, tolerance: number): Array<Array<{x: number, y: number}>> {
-        if (points.length === 0) return [];
-        
-        const paths: Array<Array<{x: number, y: number}>> = [];
-        const used = new Set<number>();
-        
-        for (let i = 0; i < points.length; i++) {
-            if (used.has(i)) continue;
-            
-            const currentPath = [points[i]];
-            used.add(i);
-            
-            // Find nearby points to connect
-            let found = true;
-            while (found) {
-                found = false;
-                const lastPoint = currentPath[currentPath.length - 1];
-                
-                for (let j = 0; j < points.length; j++) {
-                    if (used.has(j)) continue;
-                    
-                    const dx = points[j].x - lastPoint.x;
-                    const dy = points[j].y - lastPoint.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance <= tolerance) {
-                        currentPath.push(points[j]);
-                        used.add(j);
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (currentPath.length > 1) {
-                paths.push(currentPath);
-            }
-        }
-        
-        return paths;
-    }
-
-    private worldToScreenCoords(worldPoint: {x: number, y: number}): {x: number, y: number} {
-        // This method needs access to current rendering context - we'll need to pass it in
-        // For now, using a simplified approach
-        const mapBounds = this.getMapBounds(document.querySelector('canvas') as HTMLCanvasElement);
-        const worldToMapScale = Math.min(mapBounds.mapWidth, mapBounds.mapHeight) / (this.gridSize * 4 / this.zoomLevel);
-        
-        return {
-            x: mapBounds.mapX + mapBounds.mapWidth/2 + (worldPoint.x - this.centerX) * worldToMapScale,
-            y: mapBounds.mapY + mapBounds.mapHeight/2 + (worldPoint.y - this.centerY) * worldToMapScale
-        };
-    }
-
-    private drawRegionLabelsFromSamples(
-        ctx: CanvasRenderingContext2D,
-        mapX: number,
-        mapY: number,
-        mapWidth: number,
-        mapHeight: number,
-        scale: number,
-        sampleSpacing: number
-    ): void {
-        // Only show labels at appropriate zoom levels
-        if (this.zoomLevel < 0.1 || this.zoomLevel > 1.5) return;
-        
-        const regionCenters = new Map<string, {x: number, y: number, name: string, count: number}>();
-        const minDistance = sampleSpacing * 3; // Minimum distance between labels
-        
-        // Sample region centers from sparse grid
-        const labelSampleSpacing = sampleSpacing * 2;
-        for (let screenX = mapX; screenX < mapX + mapWidth; screenX += labelSampleSpacing) {
-            for (let screenY = mapY; screenY < mapY + mapHeight; screenY += labelSampleSpacing) {
-                const worldX = this.centerX + (screenX - mapX - mapWidth/2) / scale;
-                const worldY = this.centerY + (screenY - mapY - mapHeight/2) / scale;
-                
-                try {
-                    const chunkX = Math.floor(worldX / this.chunkManager!.chunkSize);
-                    const chunkY = Math.floor(worldY / this.chunkManager!.chunkSize);
-                    const region = this.chunkManager!.getChunkRegion(chunkX, chunkY);
-                    
-                    if (!region || !region.definition) continue;
-                    
-                    const isDiscovered = this.chunkManager!.isRegionDiscovered(region.regionType);
-                    if (!isDiscovered && !this.inspectorMode) continue;
-                    
-                    const regionKey = region.regionType;
-                    if (!regionCenters.has(regionKey)) {
-                        regionCenters.set(regionKey, {
-                            x: screenX,
-                            y: screenY,
-                            name: region.definition.name,
-                            count: 1
-                        });
-                    } else {
-                        const center = regionCenters.get(regionKey)!;
-                        center.x = (center.x * center.count + screenX) / (center.count + 1);
-                        center.y = (center.y * center.count + screenY) / (center.count + 1);
-                        center.count++;
-                    }
-                } catch (error) {
-                    continue;
-                }
-            }
-        }
-        
-        // Draw labels with spacing control
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '12px "Courier New", monospace';
-        
-        const drawnPositions: Array<{x: number, y: number}> = [];
-        
-        for (const [regionType, center] of regionCenters) {
-            if (center.count < 3) continue; // Only show for significant regions
-            
-            // Check minimum distance from other labels
-            let tooClose = false;
-            for (const pos of drawnPositions) {
-                const distance = Math.sqrt((center.x - pos.x) ** 2 + (center.y - pos.y) ** 2);
-                if (distance < minDistance) {
-                    tooClose = true;
-                    break;
-                }
-            }
-            
-            if (!tooClose) {
-                // Draw text background
-                const textWidth = ctx.measureText(center.name).width;
-                ctx.fillStyle = '#000000c0';
-                ctx.fillRect(center.x - textWidth/2 - 4, center.y - 8, textWidth + 8, 16);
-                
-                // Draw label
-                ctx.fillStyle = '#b0c4d4cc';
-                ctx.fillText(center.name, center.x, center.y);
-                
-                drawnPositions.push({x: center.x, y: center.y});
-            }
-        }
-        
-        ctx.restore();
-    }
-
-    private isLineVisible(x1: number, y1: number, x2: number, y2: number, mapX: number, mapY: number, mapWidth: number, mapHeight: number): boolean {
-        // Simple bounds check - if any part of the line is within screen bounds
-        const minX = Math.min(x1, x2);
-        const maxX = Math.max(x1, x2);
-        const minY = Math.min(y1, y2);
-        const maxY = Math.max(y1, y2);
-        
-        return !(maxX < mapX || minX > mapX + mapWidth || maxY < mapY || minY > mapY + mapHeight);
-    }
-
-    private drawRegionLabels(
-        ctx: CanvasRenderingContext2D,
-        regionCenters: Map<string, {x: number, y: number, name: string, color: string, count: number}>,
-        mapX: number,
-        mapY: number,
-        mapWidth: number,
-        mapHeight: number,
-        scale: number
-    ): void {
-        // Only show labels at appropriate zoom levels to avoid clutter
-        if (this.zoomLevel < 0.1 || this.zoomLevel > 1.5) return;
-        
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Calculate font size based on zoom level
-        const fontSize = Math.max(10, Math.min(16, this.zoomLevel * 20));
-        ctx.font = `${fontSize}px "Courier New", monospace`;
-        
-        // Minimum distance between labels to prevent overlap
-        const minDistance = Math.max(50, 100 / this.zoomLevel);
-        const drawnPositions: Array<{x: number, y: number}> = [];
-        
-        for (const [regionType, center] of regionCenters) {
-            // Convert world coordinates to map coordinates
-            const labelMapX = mapX + mapWidth/2 + (center.x - this.centerX) * scale;
-            const labelMapY = mapY + mapHeight/2 + (center.y - this.centerY) * scale;
-            
-            // Only draw if label is within visible area
-            if (labelMapX < mapX || labelMapX > mapX + mapWidth || 
-                labelMapY < mapY || labelMapY > mapY + mapHeight) {
-                continue;
-            }
-            
-            // Check minimum distance from other labels
-            let tooClose = false;
-            for (const pos of drawnPositions) {
-                const distance = Math.sqrt((labelMapX - pos.x) ** 2 + (labelMapY - pos.y) ** 2);
-                if (distance < minDistance) {
-                    tooClose = true;
-                    break;
-                }
-            }
-            
-            if (!tooClose && center.count >= 3) { // Only show labels for regions with enough chunks
-                // Draw text background for readability
-                const textWidth = ctx.measureText(center.name).width;
-                const textHeight = fontSize;
-                const padding = 4;
-                
-                ctx.fillStyle = '#000000c0'; // Semi-transparent background
-                ctx.fillRect(
-                    labelMapX - textWidth/2 - padding,
-                    labelMapY - textHeight/2 - padding,
-                    textWidth + padding * 2,
-                    textHeight + padding * 2
-                );
-                
-                // Draw region label
-                ctx.fillStyle = center.color + 'cc'; // Semi-transparent color
-                ctx.fillText(center.name, labelMapX, labelMapY);
-                
-                drawnPositions.push({x: labelMapX, y: labelMapY});
-            }
-        }
-        
-        ctx.restore();
+        this.gridRenderer.renderGrid(ctx, mapX, mapY, mapWidth, mapHeight, scale, this.zoomLevel, this.centerX, this.centerY);
     }
 
     renderDiscoveredStars(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, discoveredStars: StarLike[]): void {
@@ -1749,180 +1281,21 @@ export class StellarMap {
 
 
     renderStartingPositionMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, startingPosition: GameStartingPosition): void{
-        // Edge case: Don't render starting position marker if it's the same as origin (0,0)
-        if (startingPosition.x === 0 && startingPosition.y === 0) {
-            return;
-        }
-        
-        // Convert starting position to map coordinates
-        const startMapX = mapX + mapWidth/2 + (startingPosition.x - this.centerX) * scale;
-        const startMapY = mapY + mapHeight/2 + (startingPosition.y - this.centerY) * scale;
-        
-        // Only draw if starting position is within map bounds
-        if (startMapX >= mapX && startMapX <= mapX + mapWidth && 
-            startMapY >= mapY && startMapY <= mapY + mapHeight) {
-            
-            // Use blue color for starting position
-            ctx.strokeStyle = '#4488ff';
-            ctx.fillStyle = '#4488ff40'; // Semi-transparent fill
-            ctx.lineWidth = 2;
-            
-            // Scale marker size based on zoom level
-            const markerSize = Math.max(4, Math.min(10, 6 / this.zoomLevel));
-            
-            // Draw diamond shape
-            ctx.beginPath();
-            ctx.moveTo(startMapX, startMapY - markerSize); // Top
-            ctx.lineTo(startMapX + markerSize, startMapY); // Right
-            ctx.lineTo(startMapX, startMapY + markerSize); // Bottom
-            ctx.lineTo(startMapX - markerSize, startMapY); // Left
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            
-            // Add label at lower zoom levels
-            if (this.zoomLevel < 0.5) {
-                ctx.fillStyle = '#4488ff';
-                ctx.font = '12px "Courier New", monospace';
-                ctx.textAlign = 'center';
-                
-                // Draw text background for readability
-                const labelText = 'Start';
-                const textWidth = ctx.measureText(labelText).width;
-                const bgPadding = 2;
-                ctx.fillStyle = '#000000C0';
-                ctx.fillRect(startMapX - textWidth/2 - bgPadding, startMapY + markerSize + 5, textWidth + bgPadding*2, 12);
-                
-                // Draw label text
-                ctx.fillStyle = '#4488ff';
-                ctx.fillText(labelText, startMapX, startMapY + markerSize + 15);
-                
-                // Reset text alignment
-                ctx.textAlign = 'left';
-            }
-        }
+        this.markerRenderer.renderStartingPositionMarker(ctx, mapX, mapY, mapWidth, mapHeight, scale, this.zoomLevel, this.centerX, this.centerY, startingPosition);
     }
 
     renderOriginMarker(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number): void {
-        // Convert origin (0,0) to map coordinates
-        const originMapX = mapX + mapWidth/2 + (0 - this.centerX) * scale;
-        const originMapY = mapY + mapHeight/2 + (0 - this.centerY) * scale;
-        
-        // Only draw if origin is within map bounds
-        if (originMapX >= mapX && originMapX <= mapX + mapWidth && 
-            originMapY >= mapY && originMapY <= mapY + mapHeight) {
-            
-            // Use distinctive red-orange color for origin
-            ctx.strokeStyle = '#ff6644';
-            ctx.fillStyle = '#ff664440'; // Semi-transparent fill
-            ctx.lineWidth = 2;
-            
-            // Scale marker size based on zoom level (larger when zoomed out)
-            const markerSize = Math.max(4, Math.min(12, 8 / this.zoomLevel));
-            const crossSize = markerSize * 1.5;
-            
-            // Draw cross/plus symbol
-            ctx.beginPath();
-            // Horizontal line
-            ctx.moveTo(originMapX - crossSize, originMapY);
-            ctx.lineTo(originMapX + crossSize, originMapY);
-            // Vertical line
-            ctx.moveTo(originMapX, originMapY - crossSize);
-            ctx.lineTo(originMapX, originMapY + crossSize);
-            ctx.stroke();
-            
-            // Draw center circle
-            ctx.beginPath();
-            ctx.arc(originMapX, originMapY, markerSize, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            
-            // Add label at lower zoom levels (when zoomed out and origin is more significant)
-            if (this.zoomLevel < 0.5) {
-                ctx.fillStyle = '#ff6644';
-                ctx.font = '12px "Courier New", monospace';
-                ctx.textAlign = 'center';
-                
-                // Draw text background for readability
-                const labelText = '(0,0)';
-                const textWidth = ctx.measureText(labelText).width;
-                const bgPadding = 2;
-                ctx.fillStyle = '#000000C0';
-                ctx.fillRect(originMapX - textWidth/2 - bgPadding, originMapY + crossSize + 5, textWidth + bgPadding*2, 12);
-                
-                // Draw label text
-                ctx.fillStyle = '#ff6644';
-                ctx.fillText(labelText, originMapX, originMapY + crossSize + 15);
-                
-                // Reset text alignment
-                ctx.textAlign = 'left';
-            }
-        }
+        this.markerRenderer.renderOriginMarker(ctx, mapX, mapY, mapWidth, mapHeight, scale, this.zoomLevel, this.centerX, this.centerY);
     }
 
     renderCurrentPosition(ctx: CanvasRenderingContext2D, mapX: number, mapY: number, mapWidth: number, mapHeight: number, scale: number, camera: Camera): void {
-        // Convert current position to map coordinates (same as other objects)
-        const currentMapX = mapX + mapWidth/2 + (camera.x - this.centerX) * scale;
-        const currentMapY = mapY + mapHeight/2 + (camera.y - this.centerY) * scale;
-        
-        // Only draw if current position is within map bounds (with some margin)
-        const margin = 20; // Allow marker to be slightly outside visible area
-        if (currentMapX >= mapX - margin && currentMapX <= mapX + mapWidth + margin && 
-            currentMapY >= mapY - margin && currentMapY <= mapY + mapHeight + margin) {
-            
-            // Draw current position as gentle marker
-            ctx.strokeStyle = this.currentPositionColor;
-            ctx.fillStyle = this.currentPositionColor + '40'; // Semi-transparent fill
-            ctx.lineWidth = 1;
-            
-            // Draw filled circle with subtle outline
-            ctx.beginPath();
-            ctx.arc(currentMapX, currentMapY, 6, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            
-            // Draw subtle outer ring
-            ctx.beginPath();
-            ctx.arc(currentMapX, currentMapY, 12, 0, Math.PI * 2);
-            ctx.stroke();
-        }
+        this.markerRenderer.renderCurrentPosition(ctx, mapX, mapY, mapWidth, mapHeight, scale, this.centerX, this.centerY, camera);
     }
 
     renderMapUI(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
-        // Set font to match game UI
-        ctx.font = '12px "Courier New", monospace';
-        ctx.fillStyle = '#b0c4d4'; // Soft blue-white for text
-        
-        // Title
-        const title = 'Stellar Map';
-        const titleWidth = ctx.measureText(title).width;
-        ctx.fillText(title, (canvas.width - titleWidth) / 2, 30);
-        
-        // Instructions removed - map is intuitive enough without them
-        
-        // Zoom info with descriptive labels
-        let zoomLabel = '';
-        if (this.zoomLevel <= 0.05) {
-            zoomLabel = 'Galactic View';
-        } else if (this.zoomLevel <= 0.2) {
-            zoomLabel = 'Sector View';
-        } else if (this.zoomLevel <= 1.0) {
-            zoomLabel = 'Regional View';
-        } else if (this.zoomLevel <= 3.0) {
-            zoomLabel = 'Local View';
-        } else {
-            zoomLabel = 'Detail View';
-        }
-        
-        const zoomText = `Zoom: ${this.zoomLevel.toFixed(2)}x (${zoomLabel})`;
-        const zoomWidth = ctx.measureText(zoomText).width;
-        ctx.fillText(zoomText, canvas.width - zoomWidth - 20, canvas.height - 65);
-        
-        // Center coordinates
-        const coordText = `Center: (${Math.round(this.centerX)}, ${Math.round(this.centerY)})`;
-        const coordWidth = ctx.measureText(coordText).width;
-        ctx.fillText(coordText, canvas.width - coordWidth - 20, canvas.height - 50);
-        
+        // Render map overlay (title, zoom, coordinates)
+        this.mapUIRenderer.renderMapOverlay(ctx, canvas, this.zoomLevel, this.centerX, this.centerY);
+
         // Information panel for selected star, planet, nebula, wormhole, black hole, or asteroid garden
         if (this.selectedStar && this.namingService) {
             this.infoPanelRenderer.renderStarInfoPanel(ctx, canvas, this.selectedStar);
@@ -1999,7 +1372,7 @@ export class StellarMap {
      * Initialize inspector mode with seed inspector service
      */
     initInspectorMode(seedInspectorService: SeedInspectorService): void {
-        this.inspectorService = seedInspectorService;
+        this.inspectorController.initInspectorMode(seedInspectorService);
     }
 
     /**
@@ -2007,53 +1380,36 @@ export class StellarMap {
      * @param seed - Universe seed to inspect
      */
     async enableInspectorMode(seed: number): Promise<void> {
-        if (!this.inspectorService) {
-            throw new Error('Inspector service not initialized. Call initInspectorMode() first.');
-        }
-
-        this.inspectorMode = true;
-        this.inspectorSeed = seed;
-        this.inspectorZoomExtended = true;
-        this.statisticsOverlayEnabled = true;
+        await this.inspectorController.enableInspectorMode(seed);
 
         // Reveal initial area around current position
-        const result = await this.revealChunks(seed, this.centerX, this.centerY, 2);
+        const result = await this.inspectorController.revealChunks(seed, this.centerX, this.centerY, 2);
         if (result.newChunks > 0) {
             console.log(`📍 Revealed ${result.newChunks} new chunks (${result.totalChunks} total in area)`);
         } else {
             console.log(`📍 All ${result.totalChunks} chunks in area already revealed`);
         }
-        console.log(`🔍 Inspector mode enabled for seed ${seed}`);
     }
 
     /**
      * Disable inspector mode and return to discovered-only view
      */
     disableInspectorMode(): void {
-        this.inspectorMode = false;
-        this.inspectorSeed = null;
-        this.inspectorObjects = [];
-        this.inspectorZoomExtended = false;
-        console.log('🔍 Inspector mode disabled - showing discovered objects only');
+        this.inspectorController.disableInspectorMode();
     }
 
     /**
      * Toggle between inspector mode and normal mode
      */
-    toggleInspectorMode(): void {
-        if (this.inspectorMode) {
-            this.disableInspectorMode();
-        } else if (this.inspectorSeed) {
-            // Re-enable with last used seed
-            this.enableInspectorMode(this.inspectorSeed);
-        }
+    async toggleInspectorMode(): Promise<void> {
+        await this.inspectorController.toggleInspectorMode();
     }
 
     /**
      * Check if inspector mode is active
      */
     isInspectorMode(): boolean {
-        return this.inspectorMode;
+        return this.inspectorController.isInspectorMode();
     }
 
     /**
@@ -2064,7 +1420,7 @@ export class StellarMap {
         // Inspector mode now uses persistent revealed chunks
         // Statistics are updated when chunks are revealed
         if (this.statisticsOverlayEnabled && this.inspectorSeed) {
-            await this.updateViewStatistics();
+            await this.inspectorController.updateViewStatistics();
         }
     }
 
@@ -2072,169 +1428,49 @@ export class StellarMap {
      * Enable statistics overlay
      */
     enableStatisticsOverlay(): void {
-        this.statisticsOverlayEnabled = true;
-        if (this.inspectorMode) {
-            this.updateViewStatistics();
-        }
+        this.inspectorController.enableStatisticsOverlay();
     }
 
     /**
      * Disable statistics overlay
      */
     disableStatisticsOverlay(): void {
-        this.statisticsOverlayEnabled = false;
-        this.currentViewStatistics = null;
+        this.inspectorController.disableStatisticsOverlay();
     }
 
     /**
      * Toggle statistics overlay on/off
      */
     toggleStatisticsOverlay(): void {
-        if (this.statisticsOverlayEnabled) {
-            this.disableStatisticsOverlay();
-        } else {
-            this.enableStatisticsOverlay();
-        }
-    }
-
-    /**
-     * Generate unique key for chunk identification
-     */
-    private getChunkKey(seed: number, chunkX: number, chunkY: number): string {
-        return `${seed}_${chunkX}_${chunkY}`;
+        this.inspectorController.toggleStatisticsOverlay();
     }
 
     /**
      * Check if a specific chunk is already revealed
      */
     isChunkRevealed(seed: number, chunkX: number, chunkY: number): boolean {
-        return this.revealedChunks.has(this.getChunkKey(seed, chunkX, chunkY));
-    }
-
-    /**
-     * Add chunk data to revealed areas
-     */
-    private addRevealedChunk(seed: number, chunkX: number, chunkY: number, objects: CelestialObjectData[]): void {
-        const key = this.getChunkKey(seed, chunkX, chunkY);
-        this.revealedChunks.set(key, objects);
-        this.revealedChunksMetadata.set(key, {
-            timestamp: Date.now(),
-            seed: seed,
-            chunkX: chunkX,
-            chunkY: chunkY
-        });
-    }
-
-    /**
-     * Get all revealed objects for the current seed
-     */
-    private getRevealedObjects(seed: number): CelestialObjectData[] {
-        const objects: CelestialObjectData[] = [];
-        for (const [key, chunkObjects] of this.revealedChunks.entries()) {
-            const metadata = this.revealedChunksMetadata.get(key);
-            if (metadata && metadata.seed === seed) {
-                objects.push(...chunkObjects);
-            }
-        }
-        return objects;
+        return this.inspectorController.isChunkRevealed(seed, chunkX, chunkY);
     }
 
     /**
      * Clear all revealed chunks for current or specified seed
      */
     clearRevealedChunks(seed?: number): void {
-        if (seed === undefined) {
-            // Clear all revealed chunks
-            this.revealedChunks.clear();
-            this.revealedChunksMetadata.clear();
-            console.log('🧹 Cleared all revealed chunks');
-        } else {
-            // Clear chunks for specific seed
-            const keysToDelete: string[] = [];
-            for (const [key, metadata] of this.revealedChunksMetadata.entries()) {
-                if (metadata.seed === seed) {
-                    keysToDelete.push(key);
-                }
-            }
-            
-            keysToDelete.forEach(key => {
-                this.revealedChunks.delete(key);
-                this.revealedChunksMetadata.delete(key);
-            });
-            
-            console.log(`🧹 Cleared ${keysToDelete.length} revealed chunks for seed ${seed}`);
-        }
+        this.inspectorController.clearRevealedChunks(seed);
     }
 
     /**
      * Reveal chunks around a center position with specified radius
      */
     async revealChunks(seed: number, centerWorldX: number, centerWorldY: number, chunkRadius: number = 2): Promise<{ newChunks: number; totalChunks: number }> {
-        if (!this.inspectorService) {
-            throw new Error('Inspector service not initialized');
-        }
+        return await this.inspectorController.revealChunks(seed, centerWorldX, centerWorldY, chunkRadius);
+    }
 
-        // Convert world coordinates to chunk coordinates
-        const chunkSize = GameConstants.DEFAULT_CHUNK_SIZE;
-        const centerChunkX = Math.floor(centerWorldX / chunkSize);
-        const centerChunkY = Math.floor(centerWorldY / chunkSize);
-
-        let newChunksRevealed = 0;
-        let totalChunksInArea = 0;
-
-        // Performance warning for large areas
-        const totalChunks = (chunkRadius * 2 + 1) * (chunkRadius * 2 + 1);
-        if (totalChunks > 1000) {
-            console.warn(`⚠️ Large reveal requested: ${totalChunks} chunks. This may take a while...`);
-        }
-
-        // Generate chunks in the specified radius
-        for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
-            for (let dy = -chunkRadius; dy <= chunkRadius; dy++) {
-                const chunkX = centerChunkX + dx;
-                const chunkY = centerChunkY + dy;
-                totalChunksInArea++;
-
-                // Skip if chunk is already revealed
-                if (this.isChunkRevealed(seed, chunkX, chunkY)) {
-                    continue;
-                }
-
-                // Generate objects for this chunk
-                const chunkCenterX = chunkX * chunkSize + chunkSize / 2;
-                const chunkCenterY = chunkY * chunkSize + chunkSize / 2;
-                
-                try {
-                    // Generate single chunk (radius = 0 means just the center chunk)
-                    const chunkObjects = await this.inspectorService.getRegionObjects(
-                        seed,
-                        chunkCenterX,
-                        chunkCenterY,
-                        0
-                    );
-
-                    // Add to revealed chunks
-                    this.addRevealedChunk(seed, chunkX, chunkY, chunkObjects);
-                    newChunksRevealed++;
-                } catch (error) {
-                    console.warn('Failed to reveal chunks:', error);
-                    // Continue with other chunks even if one fails
-                }
-            }
-        }
-
-        // Update inspector objects to use all revealed chunks for current seed
-        this.inspectorObjects = this.getRevealedObjects(seed);
-
-        // Update statistics if new chunks were revealed
-        if (newChunksRevealed > 0 && this.statisticsOverlayEnabled) {
-            await this.updateViewStatistics();
-        }
-
-        return {
-            newChunks: newChunksRevealed,
-            totalChunks: totalChunksInArea
-        };
+    /**
+     * Get inspector object color based on type
+     */
+    getInspectorObjectColor(objectType: string): string {
+        return this.inspectorController.getInspectorObjectColor(objectType);
     }
 
     /**
@@ -2340,113 +1576,6 @@ export class StellarMap {
         }
     }
 
-    /**
-     * Update statistics across all revealed chunks for current seed
-     */
-    private async updateViewStatistics(): Promise<void> {
-        if (!this.inspectorSeed) return;
-
-        try {
-            // Get all revealed objects for current seed
-            const revealedObjects = this.getRevealedObjects(this.inspectorSeed);
-            console.log(`🎯 DEBUG: updateViewStatistics - Found ${revealedObjects.length} revealed objects total`);
-            
-            if (revealedObjects.length === 0) {
-                this.currentViewStatistics = null;
-                return;
-            }
-
-            // Count objects by type from revealed chunks
-            const objectCounts: Record<string, number> = {
-                'celestialStar': 0,
-                'planet': 0,
-                'moon': 0,
-                'nebula': 0,
-                'asteroidGarden': 0,
-                'wormhole': 0,
-                'blackhole': 0,
-                'comet': 0,
-                'rogue-planet': 0,
-                'dark-nebula': 0,
-                'crystal-garden': 0,
-                'protostar': 0
-            };
-
-            // Count objects from revealed chunks
-            const debugObjectCounts: Record<string, number> = {};
-            for (const obj of revealedObjects) {
-                // Track for debugging
-                debugObjectCounts[obj.type] = (debugObjectCounts[obj.type] || 0) + 1;
-                
-                if (Object.prototype.hasOwnProperty.call(objectCounts, obj.type)) {
-                    objectCounts[obj.type]++;
-                } else {
-                    objectCounts[obj.type] = 1;
-                }
-            }
-            
-            console.log(`📊 DEBUG: Raw object counts from revealed chunks:`, debugObjectCounts);
-            console.log(`📊 DEBUG: Final object counts:`, objectCounts);
-
-            // Calculate total meaningful objects (exclude background stars for density)
-            const totalObjects = objectCounts.celestialStar + objectCounts.planet + 
-                               objectCounts.moon + objectCounts.nebula + 
-                               objectCounts.asteroidGarden + objectCounts.wormhole + 
-                               objectCounts.blackhole + objectCounts.comet + 
-                               objectCounts['rogue-planet'] + objectCounts['dark-nebula'] +
-                               objectCounts['crystal-garden'] + objectCounts['protostar'];
-
-            // Calculate area from revealed chunks count
-            const revealedChunkCount = this.getRevealedChunkCount(this.inspectorSeed);
-            const regionArea = revealedChunkCount * 1000000; // Each chunk is 1000x1000 units
-
-            const density = totalObjects / (regionArea / 1000000); // Objects per million square units
-
-            this.currentViewStatistics = {
-                objectCounts,
-                totalObjects,
-                density,
-                regionArea
-            };
-        } catch (error) {
-            console.warn('Failed to update view statistics:', error);
-            this.currentViewStatistics = null;
-        }
-    }
-
-    /**
-     * Get count of revealed chunks for a specific seed
-     */
-    private getRevealedChunkCount(seed: number): number {
-        let count = 0;
-        for (const metadata of this.revealedChunksMetadata.values()) {
-            if (metadata.seed === seed) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /**
-     * Get inspector object color based on type and mode
-     */
-    private getInspectorObjectColor(objectType: string): string {
-        const colors = {
-            celestialStar: '#ffdd88',       // Bright yellow for discoverable stars  
-            planet: '#88aa88',              // Green for planets
-            moon: '#cccccc',                // Light gray for moons
-            nebula: '#ff88cc',              // Pink for nebulae
-            asteroidGarden: '#cc8844',      // Orange for asteroid gardens
-            wormhole: '#8844ff',            // Purple for wormholes
-            blackhole: '#ff0000',           // Red for black holes
-            comet: '#88ccff',               // Light blue for comets
-            'rogue-planet': '#cc88aa',      // Muted purple for rogue planets
-            'dark-nebula': '#6a4a3a',       // Medium brown for dark nebulae (visible against black space)
-            'crystal-garden': '#44ffcc',    // Cyan-green for crystal gardens (light refraction theme)
-            'protostar': '#ffaa44'          // Orange-yellow for protostars (stellar formation theme)
-        };
-        return colors[objectType] || '#ffffff';
-    }
 
     /**
      * Render inspector mode objects (all objects, not just discovered)
@@ -2488,7 +1617,7 @@ export class StellarMap {
             const objMapX = mapX + ((obj.x - this.centerX) * scale) + mapWidth / 2;
             const objMapY = mapY + ((obj.y - this.centerY) * scale) + mapHeight / 2;
 
-            const color = this.getInspectorObjectColor(obj.type);
+            const color = this.inspectorController.getInspectorObjectColor(obj.type);
             
             // Render discoverable objects with appropriate symbols
             const size = obj.type === 'blackhole' ? 4 : 
@@ -2632,7 +1761,7 @@ export class StellarMap {
             const count = stats.objectCounts[type];
             const isVisible = this.objectTypeVisibility[type];
             const isHovered = this.hoveredObjectTypeIndex === i;
-            const color = this.getInspectorObjectColor(type);
+            const color = this.inspectorController.getInspectorObjectColor(type);
             
             // Draw clickable background with hover effect
             let bgColor = 'rgba(255, 255, 255, 0.03)'; // Default subtle background
