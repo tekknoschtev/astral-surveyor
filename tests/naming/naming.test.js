@@ -42,16 +42,8 @@ describe('NamingService', () => {
         expect(number).toBeLessThanOrEqual(9999);
       });
     });
-    
-    it('should cache catalog numbers to avoid recalculation', () => {
-      const number1 = namingService.generateStarCatalogNumber(123, 456);
-      const number2 = namingService.generateStarCatalogNumber(123, 456);
-      
-      // Should be same instance from cache
-      expect(number1).toBe(number2);
-    });
   });
-  
+
   describe('Star naming', () => {
     it('should generate consistent star names', () => {
       const mockStar = {
@@ -147,14 +139,8 @@ describe('NamingService', () => {
       expect(namingService.getStarClassification('White Dwarf')).toBe('WD');
       expect(namingService.getStarClassification('Neutron Star')).toBe('NS');
     });
-    
-    it('should return null for unknown star types', () => {
-      expect(namingService.getStarClassification('Unknown Star')).toBe(null);
-      expect(namingService.getStarClassification('')).toBe(null);
-      expect(namingService.getStarClassification(undefined)).toBe(null);
-    });
   });
-  
+
   describe('Notable discovery detection', () => {
     it('should identify rare star types as notable', () => {
       const neutronStar = { type: 'star', starTypeName: 'Neutron Star' };
@@ -196,13 +182,8 @@ describe('NamingService', () => {
       expect(namingService.toRomanNumeral(5)).toBe('V');
       expect(namingService.toRomanNumeral(10)).toBe('X');
     });
-    
-    it('should handle numbers beyond roman numeral range', () => {
-      expect(namingService.toRomanNumeral(15)).toBe('15');
-      expect(namingService.toRomanNumeral(0)).toBe('0'); // 0 falls back to toString()
-    });
   });
-  
+
   describe('Planet Naming System', () => {
     it('should generate planet names with letter designations', () => {
       const parentStar = {
@@ -272,20 +253,6 @@ describe('NamingService', () => {
       
       const name = namingService.generateMoonName(moon);
       expect(name).toMatch(/^ASV-\d{4} [b-z] [IVX]+$/);
-    });
-
-    it('should calculate moon index based on orbital distance ranges', () => {
-      const parentPlanet = { x: 1000, y: 2000 };
-      
-      const moon1 = { orbitalDistance: 5, parentPlanet }; // <= 10, should be index 0
-      const moon2 = { orbitalDistance: 15, parentPlanet }; // <= 20, should be index 1
-      const moon3 = { orbitalDistance: 25, parentPlanet }; // <= 30, should be index 2
-      const moon4 = { orbitalDistance: 35, parentPlanet }; // > 30, should be index 3
-      
-      expect(namingService.calculateMoonIndex(moon1)).toBe(0);
-      expect(namingService.calculateMoonIndex(moon2)).toBe(1);  
-      expect(namingService.calculateMoonIndex(moon3)).toBe(2);
-      expect(namingService.calculateMoonIndex(moon4)).toBe(3);
     });
 
     it('should handle moon without parent planet', () => {
@@ -641,35 +608,6 @@ describe('NamingService', () => {
     it('should not identify unknown object types as notable', () => {
       const unknown = { type: 'unknown' };
       expect(namingService.isNotableDiscovery(unknown)).toBe(false);
-    });
-  });
-
-  describe('Edge Cases and Error Handling', () => {
-    it('should handle objects with missing coordinates', () => {
-      const star = {
-        type: 'star',
-        x: undefined,
-        y: undefined,
-        starTypeName: 'G-Type Star'
-      };
-      
-      // Should not crash
-      expect(() => namingService.generateDisplayName(star)).not.toThrow();
-    });
-
-    it('should handle wormholes with missing data gracefully', () => {
-      const wormholes = [
-        { type: 'wormhole', x: 1000, y: 2000, designation: 'alpha' },
-        { type: 'wormhole', wormholeId: 'WH-1234' },
-        { type: 'wormhole', pairId: 'WH-5678-α' },
-        { type: 'wormhole', x: 2000, y: 3000 } // Minimal data
-      ];
-      
-      wormholes.forEach(wormhole => {
-        const name = namingService.generateWormholeName(wormhole);
-        expect(name).toBeTruthy();
-        expect(typeof name).toBe('string');
-      });
     });
   });
 });

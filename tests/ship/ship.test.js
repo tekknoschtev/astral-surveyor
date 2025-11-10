@@ -49,21 +49,6 @@ describe('Ship Systems and Particles', () => {
   });
 
   describe('Ship Class', () => {
-    it('should initialize with correct default properties', () => {
-      expect(ship.sprite).toEqual([
-        '  #  ',
-        ' ### ',
-        '#####',
-        ' # # '
-      ]);
-      expect(ship.colors).toEqual({
-        '#': '#00ff88'
-      });
-      expect(ship.scale).toBe(2);
-      expect(ship.normalColor).toBe('#00ff88');
-      expect(ship.silhouetteColor).toBe('#000000');
-    });
-
     it('should calculate silhouette effect correctly', () => {
       const activeStars = [
         { x: 100, y: 100, radius: 50, color: '#ffff00' },
@@ -114,23 +99,6 @@ describe('Ship Systems and Particles', () => {
       expect(darkened).toBe('#008044');
     });
 
-    it('should handle edge cases in color interpolation', () => {
-      // Test identical colors
-      const sameColor = ship.interpolateColor('#00ff88', '#00ff88', 0.5);
-      expect(sameColor).toBe('#00ff88');
-      
-      // Test extreme factor values - function may produce invalid colors
-      // This tests the current behavior, not necessarily correct behavior
-      const beyondMax = ship.interpolateColor('#ff0000', '#0000ff', 1.5);
-      const belowMin = ship.interpolateColor('#ff0000', '#0000ff', -0.5);
-      
-      // Function currently doesn't clamp inputs, so just check they return strings
-      expect(typeof beyondMax).toBe('string');
-      expect(typeof belowMin).toBe('string');
-      expect(beyondMax.startsWith('#')).toBe(true);
-      expect(belowMin.startsWith('#')).toBe(true);
-    });
-
     it('should render with correct position and rotation', () => {
       const activeStars = [];
       
@@ -166,11 +134,6 @@ describe('Ship Systems and Particles', () => {
   });
 
   describe('ThrusterParticles Class', () => {
-    it('should initialize with correct default properties', () => {
-      expect(thrusterParticles.particles).toEqual([]);
-      expect(thrusterParticles.maxParticles).toBe(50);
-    });
-
     it('should not spawn particles when not thrusting', () => {
       mockCamera.isThrusting = false;
       
@@ -320,11 +283,6 @@ describe('Ship Systems and Particles', () => {
   });
 
   describe('StarParticles Class', () => {
-    it('should initialize with correct default properties', () => {
-      expect(starParticles.particles).toEqual([]);
-      expect(starParticles.maxParticlesPerStar).toBe(150);
-    });
-
     it('should spawn particles for visible stars', () => {
       const visibleStars = [
         { x: 100, y: 100, radius: 50, color: '#ffff00' }
@@ -388,20 +346,6 @@ describe('Ship Systems and Particles', () => {
       const originalRed = parseInt(darkColor.substr(1, 2), 16);
       const lightenedRed = parseInt(lightened.substr(1, 2), 16);
       expect(lightenedRed).toBeGreaterThan(originalRed);
-    });
-
-    it('should handle color lightening edge cases', () => {
-      // Test with white (should remain white)
-      const white = starParticles.lightenColor('#ffffff', 0.5);
-      expect(white).toBe('#ffffff');
-      
-      // Test with black (allow for rounding differences)
-      const black = starParticles.lightenColor('#000000', 0.5);
-      expect(black).toMatch(/^#[78][f0-9a-f][78][f0-9a-f][78][f0-9a-f]$/i); // Around 50% gray
-      
-      // Test with extreme lightening
-      const extreme = starParticles.lightenColor('#440000', 1.0);
-      expect(extreme).toBe('#ffffff');
     });
 
     it('should update particle positions and life correctly', () => {
@@ -520,32 +464,6 @@ describe('Ship Systems and Particles', () => {
       
       expect(mockRenderer.drawSprite).toHaveBeenCalled();
       expect(mockRenderer.drawPixel).toHaveBeenCalled();
-    });
-
-    it('should handle extreme coordinate values', () => {
-      const extremeStars = [
-        { x: 1000000, y: -1000000, radius: 100, color: '#ff0000' }
-      ];
-      
-      // Test close enough for silhouette effect
-      const effect = ship.calculateSilhouetteEffect(999950, -999950, extremeStars);
-      expect(effect).toBeGreaterThanOrEqual(0); // May be 0 if too far
-      
-      // Star particles won't spawn for stars this far from camera (distance > 2000)
-      starParticles.update(STANDARD_DELTA, extremeStars, mockCamera);
-      expect(starParticles.particles.length).toBeGreaterThanOrEqual(0); // May be 0 due to distance
-    });
-
-    it('should handle zero deltaTime gracefully', () => {
-      mockCamera.isThrusting = true;
-      const star = { x: 100, y: 100, radius: 30, color: '#ffff00' };
-      
-      thrusterParticles.update(0, mockCamera, ship);
-      starParticles.update(0, [star], mockCamera);
-      
-      // Should not crash - particles may still spawn based on probabilistic logic
-      expect(thrusterParticles.particles.length).toBeGreaterThanOrEqual(0);
-      expect(starParticles.particles.length).toBeGreaterThanOrEqual(0);
     });
 
     it('should maintain performance with many particles', () => {

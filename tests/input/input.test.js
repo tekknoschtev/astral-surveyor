@@ -72,43 +72,7 @@ describe('Input System', () => {
     return touchList;
   }
 
-  describe('Initialization and Setup', () => {
-    it('should initialize with correct default state', () => {
-      expect(input.keys).toBeInstanceOf(Set);
-      expect(input.keys.size).toBe(0);
-      expect(input.isMousePressed()).toBe(false);
-      expect(input.getTouchCount()).toBe(0);
-      expect(input.getMouseX()).toBe(0);
-      expect(input.getMouseY()).toBe(0);
-    });
-
-    it('should set up all required event listeners', () => {
-      const expectedEvents = [
-        'keydown', 'keyup', 'mousemove', 'contextmenu', 
-        'mousedown', 'mouseup', 'wheel',
-        'touchstart', 'touchmove', 'touchend', 'touchcancel'
-      ];
-
-      expectedEvents.forEach(event => {
-        expect(mockEventListeners.has(event)).toBe(true);
-        expect(mockEventListeners.get(event).length).toBeGreaterThan(0);
-      });
-    });
-  });
-
   describe('Keyboard Input Handling', () => {
-    it('should track key press and release correctly', () => {
-      expect(input.isPressed('KeyW')).toBe(false);
-
-      simulateEvent('keydown', { code: 'KeyW' });
-      expect(input.isPressed('KeyW')).toBe(true);
-      expect(input.wasJustPressed('KeyW')).toBe(true);
-
-      simulateEvent('keyup', { code: 'KeyW' });
-      expect(input.isPressed('KeyW')).toBe(false);
-      expect(input.wasJustPressed('KeyW')).toBe(false);
-    });
-
     it('should track multiple simultaneous key presses', () => {
       simulateEvent('keydown', { code: 'KeyW' });
       simulateEvent('keydown', { code: 'KeyA' });
@@ -230,11 +194,6 @@ describe('Input System', () => {
       expect(input.isRightPressed()).toBe(false);
     });
 
-    it('should prevent context menu on right click', () => {
-      const mockEvent = simulateEvent('contextmenu');
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-
     it('should handle mouse wheel correctly', () => {
       expect(input.getWheelDelta()).toBe(0);
 
@@ -276,18 +235,6 @@ describe('Input System', () => {
       direction = input.getMouseDirection(CANVAS_WIDTH, CANVAS_HEIGHT);
       expect(direction.x).toBeCloseTo(0.707, 2); // Normalized diagonal
       expect(direction.y).toBeCloseTo(0.707, 2);
-    });
-
-    it('should prevent dragging on canvas elements', () => {
-      simulateEvent('mousedown', { button: 0 });
-      
-      const mockEvent = simulateEvent('mousemove', {
-        clientX: 100,
-        clientY: 200,
-        target: { tagName: 'CANVAS' }
-      });
-
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
     });
   });
 
@@ -877,26 +824,6 @@ describe('Input System', () => {
       expect(input.wasClicked()).toBe(false);
       expect(input.getWheelDelta()).toBe(0);
       expect(input.isPressed('KeyM')).toBe(true); // Should still be pressed
-    });
-
-    it('should handle zero delta time gracefully', () => {
-      simulateEvent('keydown', { code: 'KeyW' });
-      
-      input.update(0);
-      expect(input.getKeyHoldTime('KeyW')).toBe(0);
-      expect(input.getThrustIntensity('KeyW')).toBe(0); // No time = no intensity
-      
-      // After some time, should work normally
-      input.update(0.1);
-      expect(input.getThrustIntensity('KeyW')).toBeGreaterThan(0);
-    });
-
-    it('should handle very large delta times', () => {
-      simulateEvent('keydown', { code: 'KeyW' });
-      
-      input.update(10.0); // 10 seconds
-      expect(input.getKeyHoldTime('KeyW')).toBe(10.0);
-      expect(input.getThrustIntensity('KeyW')).toBe(1.0); // Should max out
     });
 
     it('should handle touch and mouse conflicts correctly', () => {

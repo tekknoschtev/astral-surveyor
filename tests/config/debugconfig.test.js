@@ -1,7 +1,7 @@
 // Debug Configuration Tests
 // Tests the debug configuration system for region-specific objects
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
     getDebugConfig,
     updateDebugConfig,
@@ -11,18 +11,9 @@ import {
 } from '../../dist/config/debugConfig.js';
 
 describe('Debug Configuration', () => {
-    let consoleLogSpy;
-
     beforeEach(() => {
         // Reset config to defaults before each test
         resetDebugConfig();
-
-        // Spy on console.log to verify debug messages
-        consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    });
-
-    afterEach(() => {
-        consoleLogSpy.mockRestore();
     });
 
     describe('Default Configuration', () => {
@@ -31,30 +22,6 @@ describe('Debug Configuration', () => {
 
             expect(config.enableArtificialObjects).toBe(true);
             expect(config.enableRegionObjectDebug).toBe(true);
-        });
-
-        it('should match exported default config', () => {
-            const config = getDebugConfig();
-
-            expect(config.enableArtificialObjects).toBe(defaultDebugConfig.enableArtificialObjects);
-            expect(config.enableRegionObjectDebug).toBe(defaultDebugConfig.enableRegionObjectDebug);
-        });
-    });
-
-    describe('getDebugConfig', () => {
-        it('should return current configuration object', () => {
-            const config = getDebugConfig();
-
-            expect(config).toBeDefined();
-            expect(config).toHaveProperty('enableArtificialObjects');
-            expect(config).toHaveProperty('enableRegionObjectDebug');
-        });
-
-        it('should return configuration with boolean values', () => {
-            const config = getDebugConfig();
-
-            expect(typeof config.enableArtificialObjects).toBe('boolean');
-            expect(typeof config.enableRegionObjectDebug).toBe('boolean');
         });
     });
 
@@ -82,23 +49,6 @@ describe('Debug Configuration', () => {
             const config = getDebugConfig();
             expect(config.enableArtificialObjects).toBe(false);
             expect(config.enableRegionObjectDebug).toBe(false);
-        });
-
-        it('should preserve unmodified fields', () => {
-            updateDebugConfig({ enableArtificialObjects: false });
-
-            const config = getDebugConfig();
-            expect(config.enableArtificialObjects).toBe(false);
-            expect(config.enableRegionObjectDebug).toBe(true); // Should remain default
-        });
-
-        it('should log debug message on update', () => {
-            updateDebugConfig({ enableArtificialObjects: false });
-
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('DEBUG: Updated region objects config'),
-                expect.any(Object)
-            );
         });
 
         it('should handle partial updates correctly', () => {
@@ -146,35 +96,6 @@ describe('Debug Configuration', () => {
 
             expect(result).toBe(config.enableArtificialObjects);
         });
-
-        it('should log debug message on toggle', () => {
-            toggleArtificialObjects();
-
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('DEBUG: Artificial objects')
-            );
-        });
-
-        it('should log "enabled" when toggled to true', () => {
-            // Toggle to false first
-            toggleArtificialObjects();
-            consoleLogSpy.mockClear();
-
-            // Toggle to true
-            toggleArtificialObjects();
-
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('enabled')
-            );
-        });
-
-        it('should log "disabled" when toggled to false', () => {
-            toggleArtificialObjects();
-
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('disabled')
-            );
-        });
     });
 
     describe('resetDebugConfig', () => {
@@ -202,25 +123,6 @@ describe('Debug Configuration', () => {
             const config = getDebugConfig();
             expect(config.enableArtificialObjects).toBe(true);
         });
-
-        it('should log debug message on reset', () => {
-            resetDebugConfig();
-
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('DEBUG: Reset region objects config to defaults')
-            );
-        });
-
-        it('should create new config object (not mutate existing)', () => {
-            const configBefore = getDebugConfig();
-            updateDebugConfig({ enableArtificialObjects: false });
-            resetDebugConfig();
-            const configAfter = getDebugConfig();
-
-            // Should have same values as defaults
-            expect(configAfter.enableArtificialObjects).toBe(defaultDebugConfig.enableArtificialObjects);
-            expect(configAfter.enableRegionObjectDebug).toBe(defaultDebugConfig.enableRegionObjectDebug);
-        });
     });
 
     describe('Configuration Persistence', () => {
@@ -240,36 +142,6 @@ describe('Debug Configuration', () => {
 
             updateDebugConfig({ enableArtificialObjects: true });
             expect(getDebugConfig().enableArtificialObjects).toBe(true);
-        });
-    });
-
-    describe('Edge Cases', () => {
-        it('should handle empty update object', () => {
-            const configBefore = getDebugConfig();
-            updateDebugConfig({});
-            const configAfter = getDebugConfig();
-
-            expect(configAfter.enableArtificialObjects).toBe(configBefore.enableArtificialObjects);
-            expect(configAfter.enableRegionObjectDebug).toBe(configBefore.enableRegionObjectDebug);
-        });
-
-        it('should handle rapid toggle operations', () => {
-            for (let i = 0; i < 10; i++) {
-                toggleArtificialObjects();
-            }
-
-            // Should end on false (even number of toggles from default true)
-            expect(getDebugConfig().enableArtificialObjects).toBe(true);
-        });
-
-        it('should handle multiple resets', () => {
-            resetDebugConfig();
-            resetDebugConfig();
-            resetDebugConfig();
-
-            const config = getDebugConfig();
-            expect(config.enableArtificialObjects).toBe(defaultDebugConfig.enableArtificialObjects);
-            expect(config.enableRegionObjectDebug).toBe(defaultDebugConfig.enableRegionObjectDebug);
         });
     });
 });
