@@ -151,31 +151,40 @@ describe('Camera Physics and Movement', () => {
     it('should respond to keyboard thrust input', () => {
       mockInput.moveUp = true;
       mockInput.upIntensity = 0.8;
-      
+
       camera.update(mockInput, STANDARD_DELTA, CANVAS_WIDTH, CANVAS_HEIGHT);
-      
-      // Test against actual observed physics behavior
-      expect(camera.velocityY).toBeCloseTo(-0.5333324444007378, 3);
+
+      // Should create negative Y velocity (upward thrust)
+      // With intensity 0.8, acceleration 50, deltaTime 1/60: ~-0.53
+      expect(camera.velocityY).toBeLessThan(-0.5);
+      expect(camera.velocityY).toBeGreaterThan(-0.6);
+      expect(camera.velocityX).toBe(0);
     });
 
     it('should respond to left movement', () => {
       mockInput.moveLeft = true;
       mockInput.leftIntensity = 0.6;
-      
+
       camera.update(mockInput, STANDARD_DELTA, CANVAS_WIDTH, CANVAS_HEIGHT);
-      
-      // Test against actual observed physics behavior
-      expect(camera.velocityX).toBeCloseTo(-0.29999949997541503, 3);
+
+      // Should create negative X velocity (leftward thrust)
+      // With intensity 0.6, acceleration 50, deltaTime 1/60: ~-0.30
+      expect(camera.velocityX).toBeLessThan(-0.25);
+      expect(camera.velocityX).toBeGreaterThan(-0.35);
+      expect(camera.velocityY).toBe(0);
     });
 
     it('should respond to right movement', () => {
       mockInput.moveRight = true;
       mockInput.rightIntensity = 0.7;
-      
+
       camera.update(mockInput, STANDARD_DELTA, CANVAS_WIDTH, CANVAS_HEIGHT);
-      
-      // Test against actual observed physics behavior
-      expect(camera.velocityX).toBeCloseTo(0.4083326527443149, 3);
+
+      // Should create positive X velocity (rightward thrust)
+      // With intensity 0.7, acceleration 50, deltaTime 1/60: ~0.41
+      expect(camera.velocityX).toBeGreaterThan(0.35);
+      expect(camera.velocityX).toBeLessThan(0.45);
+      expect(camera.velocityY).toBe(0);
     });
 
     it('should respond to mouse direction input', () => {

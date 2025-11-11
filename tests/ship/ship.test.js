@@ -217,11 +217,8 @@ describe('Ship Systems and Particles', () => {
         const deltaX = Math.abs(updatedParticle.x - initialParticle.x);
         const deltaY = Math.abs(updatedParticle.y - initialParticle.y);
         const totalMovement = deltaX + deltaY;
-        
-        // Should have moved some distance (unless velocities are very small)
-        expect(totalMovement).toBeGreaterThanOrEqual(0);
-        
-        // If particle has significant velocity, it should move noticeably
+
+        // Particles with significant velocity should move noticeably
         const speed = Math.sqrt(initialParticle.velocityX * initialParticle.velocityX + initialParticle.velocityY * initialParticle.velocityY);
         if (speed > 1) {
           expect(totalMovement).toBeGreaterThan(0.001);
@@ -364,11 +361,8 @@ describe('Ship Systems and Particles', () => {
           const deltaX = Math.abs(updatedParticle.x - initialParticle.x);
           const deltaY = Math.abs(updatedParticle.y - initialParticle.y);
           const totalMovement = deltaX + deltaY;
-          
-          // Should have moved some distance
-          expect(totalMovement).toBeGreaterThanOrEqual(0);
-          
-          // If particle has significant velocity, it should move noticeably
+
+          // Particles with significant velocity should move noticeably
           const speed = Math.sqrt(initialParticle.velocityX * initialParticle.velocityX + initialParticle.velocityY * initialParticle.velocityY);
           if (speed > 1) {
             expect(totalMovement).toBeGreaterThan(0.001);

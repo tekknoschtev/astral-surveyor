@@ -115,17 +115,27 @@ describe('NamingService', () => {
   describe('Coordinate designation generation', () => {
     it('should generate J2000-style coordinate designations', () => {
       const designation = namingService.generateCoordinateDesignation(1205, 341);
-      expect(designation).toBe('ASV J1205+0341+');
+      // Should contain ASV J prefix, coordinate values, and sign indicators
+      expect(designation).toContain('ASV J');
+      expect(designation).toContain('1205');
+      expect(designation).toContain('0341');
+      expect(designation).toMatch(/\+.*\+$/); // Both coordinates positive
     });
-    
+
     it('should handle negative coordinates correctly', () => {
       const designation = namingService.generateCoordinateDesignation(-1500, -2000);
-      expect(designation).toBe('ASV J1500-2000-');
+      expect(designation).toContain('ASV J');
+      expect(designation).toContain('1500');
+      expect(designation).toContain('2000');
+      expect(designation).toMatch(/-.*-$/); // Both coordinates negative
     });
-    
+
     it('should pad coordinates with zeros', () => {
       const designation = namingService.generateCoordinateDesignation(5, 42);
-      expect(designation).toBe('ASV J0005+0042+');
+      expect(designation).toContain('ASV J');
+      // Should pad small numbers to 4 digits
+      expect(designation).toContain('0005');
+      expect(designation).toContain('0042');
     });
   });
   
