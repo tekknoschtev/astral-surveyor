@@ -183,7 +183,7 @@ export class DiscoveryService {
             'crystal-garden': 40,   // Beautiful details need proximity
             'protostar': 60         // Forming star features
         };
-        
-        return discoveryRanges[type] || 50; // Default fallback
+
+        return discoveryRanges[type] ?? 50; // Default fallback (use ?? to allow 0)
     }
 }
