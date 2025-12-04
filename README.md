@@ -56,6 +56,27 @@ You can play the game here: **<https://tekknoschtev.github.io/astral-surveyor/>*
 - **Scientific Naming**: Greek letter designations (α/β) distinguish paired wormholes with proper astronomical classification
 - **Serene Traversal**: Smooth, momentum-preserving travel with tranquil visual and audio transitions
 
+### ☄️ **Comet Systems**
+- **Orbital Comets**: Comets follow realistic elliptical orbits around their parent stars
+- **Dynamic Tails**: Spectacular ion and dust tails that always point away from the star
+- **Multiple Types**: Short-period, long-period, and hyperbolic comets with varying orbital characteristics
+- **Visual Effects**: Glowing coma, streaming tails, and subtle orbital mechanics
+
+### 🌌 **Cosmic Regions**
+- **Varied Exploration**: Six distinct cosmic region types create diverse exploration experiences
+- **The Void**: Sparse systems but higher probability of exotic phenomena like wormholes and black holes
+- **Star-Forge Clusters**: Dense stellar nurseries with abundant nebulae and young hot stars
+- **Galactic Core**: Ultra-dense regions with older stars and increased exotic object probability
+- **Asteroid Graveyards**: Sparse stellar regions dominated by vast asteroid fields
+- **Ancient Expanse**: Old stellar regions with balanced distribution and mysterious artifacts
+- **Stellar Nurseries**: Active star formation with brilliant nebulae and proto-stellar objects
+
+### 🔮 **Region-Specific Celestial Objects**
+- **Rogue Planets**: Wandering worlds untethered to any star (ice, rock, and volcanic variants)
+- **Dark Nebulae**: Star-occluding cosmic clouds (dense-core, wispy, and globular types)
+- **Crystal Gardens**: Rare crystalline formations (pure, mixed, and rare-earth variants)
+- **Protostars**: Young forming stars embedded in their birth nebulae (class-0, class-1, class-2)
+
 ### 🎵 **Immersive Audio Design**
 - **Enhanced Discovery Chimes**: Unique audio signatures with ethereal reverb effects for each celestial object type
 - **Softer Tones**: Gentle frequencies designed for tranquil, non-jarring exploration experience
@@ -150,6 +171,37 @@ Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL tra
 | - | *~1 per 2000 chunks* | **Paired α/β designations** | **Deep, resonant discovery tones** |
 | - | *Extremely valuable* | **Momentum-preserving traversal** | **Serene dimensional shift effects** |
 
+### **Comet Types**
+Encounter orbital comets with realistic elliptical trajectories:
+
+| Comet Type | Orbital Period | Features | Visual Effects |
+|------------|----------------|----------|----------------|
+| **Short-Period** | < 200 years | Regular visitors, predictable orbits | Bright coma, short tail |
+| **Long-Period** | 200+ years | Rare appearances, highly elliptical | Dramatic tail, distant origins |
+| **Hyperbolic** | One-time | Interstellar visitors passing through | Spectacular display, unique trajectory |
+
+### **Region-Specific Objects**
+Rare celestial phenomena found only in specific cosmic regions:
+
+| Object Type | Variants | Features | Discovery Value |
+|-------------|----------|----------|-----------------|
+| **Rogue Planet** | Ice, Rock, Volcanic | Starless worlds with unique surface effects | High |
+| **Dark Nebula** | Dense-core, Wispy, Globular | Star-occluding clouds, brown tones | High |
+| **Crystal Garden** | Pure, Mixed, Rare-earth | Crystalline formations with shimmer effects | Very High |
+| **Protostar** | Class-0, Class-1, Class-2 | Forming stars embedded in birth nebulae | Rare |
+
+### **Cosmic Regions**
+Six distinct region types create varied exploration experiences:
+
+| Region Type | Star Density | Notable Features |
+|-------------|--------------|------------------|
+| **The Void** | Very Low | 3x wormholes, 2x black holes, sparse systems |
+| **Star-Forge Cluster** | High | 4x nebulae, young hot stars, active formation |
+| **Galactic Core** | Very High | 8x black holes, older stars, dense clusters |
+| **Asteroid Graveyard** | Low | 6x asteroid gardens, sparse stellar activity |
+| **Ancient Expanse** | Normal | Balanced distribution, ancient artifacts |
+| **Stellar Nursery** | High | 5x nebulae, 2x comets, proto-stellar objects |
+
 ## 🛠️ Technical Features
 
 ### **Modern Service-Oriented Architecture**
@@ -160,7 +212,7 @@ Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL tra
 - **Performance Monitoring**: Real-time tracking, optimization, and regression detection
 - **ES6 Modules**: Modern module system with proper imports/exports
 - **Build Pipeline**: TypeScript compilation with cross-platform build scripts
-- **Test Coverage**: 100% test success rate with 1,500+ comprehensive tests
+- **Test Coverage**: Comprehensive test suite with high coverage on core systems
 
 ### **Browser-First Architecture**
 - **No Installation Required**: Runs directly in any modern web browser
@@ -199,7 +251,7 @@ Discover extremely rare Einstein-Rosen bridges that enable instantaneous FTL tra
 
 ## 🛠️ For Developers
 
-Interested in contributing to Astral Surveyor? The game is built with modern TypeScript, features a comprehensive plugin system, and has 2400+ tests ensuring quality.
+Interested in contributing to Astral Surveyor? The game is built with modern TypeScript and features a comprehensive plugin system with extensive test coverage.
 
 **Quick Start:**
 ```bash
@@ -208,9 +260,9 @@ npm install && npm run build && npm test
 
 **Key Technologies:**
 - TypeScript with full type safety
-- Service-oriented architecture with dependency injection  
+- Service-oriented architecture with dependency injection
 - Plugin system for extensible celestial objects, audio, and gameplay
-- Comprehensive test suite with 1,500+ tests using Vitest
+- Comprehensive test suite using Vitest
 
 For complete development setup, architecture details, testing strategies, and contribution guidelines, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
 
