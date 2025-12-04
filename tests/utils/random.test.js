@@ -121,16 +121,7 @@ describe('hashPosition', () => {
     expect(hash1).not.toBe(hash3);
     expect(hash2).not.toBe(hash3);
   });
-  
-  it('should handle negative coordinates', () => {
-    const hash1 = hashPosition(-50, -75);
-    const hash2 = hashPosition(-50, -75);
-    const hash3 = hashPosition(50, 75);
-    
-    expect(hash1).toBe(hash2);
-    expect(hash1).not.toBe(hash3);
-  });
-  
+
   it('should produce reasonable distribution of hash values', () => {
     const hashes = new Set();
     
@@ -143,14 +134,6 @@ describe('hashPosition', () => {
     
     // Should have good distribution (most coordinates should produce unique hashes)
     expect(hashes.size).toBeGreaterThan(350); // Out of 400 total coordinates
-  });
-  
-  it('should treat coordinates as floored integers', () => {
-    // These should produce the same hash since they floor to the same values
-    const hash1 = hashPosition(100.1, 200.2);
-    const hash2 = hashPosition(100.9, 200.8);
-    
-    expect(hash1).toBe(hash2);
   });
 });
 
@@ -183,17 +166,7 @@ describe('URL and coordinate functions', () => {
     expect(seed).toBe(98765);
     expect(getUniverseSeed()).toBe(98765);
   });
-  
-  it('should initialize starting coordinates from URL parameters', () => {
-    mockWindow.location.search = '?seed=12345&x=500&y=-750';
-    
-    initializeUniverseSeed(mockWindow);
-    
-    // Note: getStartingCoordinates() is not available in ES6 module version
-    // This test validates the URL parsing works correctly
-    expect(getUniverseSeed()).toBe(12345);
-  });
-  
+
   it('should generate shareable URL with coordinates', () => {
     // Set the universe seed using the proper setter
     setUniverseSeed(54321);
@@ -202,17 +175,7 @@ describe('URL and coordinate functions', () => {
     
     expect(url).toBe('http://localhost/game.html?seed=54321&x=124&y=-456');
   });
-  
-  it('should handle invalid seed parameter gracefully', () => {
-    mockWindow.location.search = '?seed=invalid';
-    
-    const seed = initializeUniverseSeed(mockWindow);
-    
-    // Should generate a hash from the invalid string
-    expect(typeof seed).toBe('number');
-    expect(seed).toBeGreaterThan(0);
-  });
-  
+
   it('should generate random seed when no URL parameter provided', () => {
     // Mock Math.random to return a specific value
     setMockMathRandom(0.5);

@@ -51,10 +51,13 @@ src/                    # TypeScript source files
 │   ├── comets.ts           # Comet system with advanced visual effects
 │   ├── nebulae.ts          # Nebula generation and types
 │   ├── wormholes.ts        # Wormhole discovery objects
+│   ├── RegionSpecificObjects.ts  # Rogue planets, dark nebulae, crystal gardens, protostars
 │   ├── CelestialTypes.ts   # Type definitions for all celestial objects
 │   └── celestial.ts        # Barrel export file
 ├── world/              # World generation domain
 │   ├── ChunkManager.ts     # Chunk-based world management
+│   ├── CosmicRegions.ts    # Region types with spawn modifiers
+│   ├── RegionGenerator.ts  # Region spawning and management
 │   ├── InfiniteStarField.ts # Star field generation
 │   └── world.ts            # Barrel export file
 ├── config/             # Configuration management
@@ -108,7 +111,7 @@ git clone <repository-url>
 cd astral-surveyor
 npm install            # Install dependencies
 npm run build          # Initial build
-npm test              # Verify everything works (1,500+ tests)
+npm test              # Verify everything works
 ```
 
 ### **Daily Development Workflow**
@@ -149,7 +152,7 @@ npm run serve         # Start local development server on port 3000
 ### **Test Architecture**
 - Tests import from compiled JavaScript in `dist/`
 - **Coverage targets**: 80%+ on critical systems
-- **Current test count**: 1,500+ comprehensive tests covering all major systems
+- **Extensive coverage**: Comprehensive tests covering all major systems
 - **Coverage**: High coverage on core logic (naming, random utilities, services)
 
 ### **Test Organization**
@@ -234,9 +237,16 @@ tests/
 
 ### **Celestial Object System** (`src/celestial/`)
 - **Complete Object Types**: Stars, planets, moons, comets, nebulae, wormholes, black holes, asteroid gardens
+- **Region-Specific Objects**: Rogue planets, dark nebulae, crystal gardens, protostars
 - **Comet System**: Advanced visual effects with dynamic tails and specialized discovery mechanics
 - **Procedural Generation**: Realistic distributions and physical plausibility
 - **Orbital Mechanics**: Following Kepler's laws for planets and moons
+
+### **Cosmic Regions** (`src/world/CosmicRegions.ts`)
+- **Six Region Types**: Void, Star-Forge, Galactic Core, Asteroid Graveyard, Ancient Expanse, Stellar Nursery
+- **Spawn Modifiers**: Each region modifies spawn rates for different celestial object types
+- **Visual Characteristics**: Region-specific star density and color biases
+- **Varied Exploration**: Creates diverse exploration experiences across the universe
 
 ### **Discovery System** (`src/services/DiscoveryService.ts`, `src/celestial/`)
 - Centralized discovery logic service with enhanced visualization
@@ -276,7 +286,7 @@ tests/
 1. Create feature branch from main
 2. Make changes in `src/` directory only (follow service architecture)
 3. Write tests first for new services or architectural changes (TDD)
-4. Run `npm run build && npm test` before committing (all 2,400+ tests must pass)
+4. Run `npm run build && npm test` before committing (all tests must pass)
 4a. Run `npm run lint` to ensure code quality standards are met
 5. Exclude `dist/` from commits (it's auto-generated)
 6. Create PR - GitHub Actions will verify build + tests
@@ -318,7 +328,7 @@ All code must pass linting and formatting checks before merge - enforced by CI.
 1. **Branch Strategy**: Create feature branch from main (`git checkout -b feature/your-feature`)
 2. **Development**: Make changes in `src/` directory only (never edit `dist/`)
 3. **Testing**: Write tests first for new services or architectural changes (TDD)
-4. **Validation**: Run `npm run build && npm test && npm run lint` (all 1,500+ tests must pass)
+4. **Validation**: Run `npm run build && npm test && npm run lint` (all tests must pass)
 5. **Commit**: Exclude `dist/` from commits (it's auto-generated)
 6. **PR Creation**: GitHub Actions will verify build + tests automatically
 7. **Review**: Consider performance impact and update documentation if needed

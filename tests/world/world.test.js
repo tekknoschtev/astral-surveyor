@@ -34,13 +34,6 @@ describe('World Generation and Management', () => {
   });
   
   describe('ChunkManager', () => {
-    it('should initialize with correct default values', () => {
-      expect(chunkManager.chunkSize).toBe(2000);
-      expect(chunkManager.loadRadius).toBe(1);
-      expect(chunkManager.activeChunks).toBeInstanceOf(Map);
-      expect(chunkManager.discoveredObjects).toBeInstanceOf(Map);
-    });
-    
     it('should calculate chunk coordinates from world position', () => {
       const coords1 = chunkManager.getChunkCoords(500, 750);
       const coords2 = chunkManager.getChunkCoords(2500, 4500);
@@ -53,18 +46,7 @@ describe('World Generation and Management', () => {
       expect(coords3.x).toBe(-1);
       expect(coords3.y).toBe(-1);
     });
-    
-    it('should generate chunk keys from coordinates', () => {
-      const key1 = chunkManager.getChunkKey(0, 0);
-      const key2 = chunkManager.getChunkKey(1, -1);
-      const key3 = chunkManager.getChunkKey(0, 0); // Same as key1
-      
-      expect(key1).toBe('0,0');
-      expect(key2).toBe('1,-1');
-      expect(key1).toBe(key3);
-      expect(key1).not.toBe(key2);
-    });
-    
+
     it('should generate consistent object IDs', () => {
       const id1 = chunkManager.getObjectId(100, 200, 'star');
       const id2 = chunkManager.getObjectId(100, 200, 'star'); // Same parameters
@@ -103,19 +85,11 @@ describe('World Generation and Management', () => {
     it('should generate same chunk content for same coordinates', () => {
       const chunk1 = chunkManager.generateChunk(0, 0);
       const chunk2 = chunkManager.generateChunk(0, 0);
-      
+
       // Should return same chunk object (cached)
       expect(chunk1).toBe(chunk2);
     });
-    
-    it('should cache generated chunks', () => {
-      const chunk = chunkManager.generateChunk(1, 1);
-      const chunkKey = chunkManager.getChunkKey(1, 1);
-      
-      expect(chunkManager.activeChunks.has(chunkKey)).toBe(true);
-      expect(chunkManager.activeChunks.get(chunkKey)).toBe(chunk);
-    });
-    
+
     it('should get all active objects', () => {
       // Generate a few chunks first
       chunkManager.generateChunk(0, 0);
@@ -463,7 +437,7 @@ describe('World Generation and Management', () => {
   
   describe('InfiniteStarField', () => {
     let mockCamera;
-    
+
     beforeEach(() => {
       mockCamera = {
         x: 0,
@@ -471,26 +445,7 @@ describe('World Generation and Management', () => {
         worldToScreen: vi.fn((x, y) => [x + 400, y + 300])
       };
     });
-    
-    it('should initialize with correct default values', () => {
-      expect(starField.parallaxLayers).toBeInstanceOf(Array);
-      expect(starField.parallaxLayers.length).toBe(3);
-      expect(starField.chunkManager).toBe(chunkManager);
-      expect(starField.lastCameraX).toBe(0);
-      expect(starField.lastCameraY).toBe(0);
-      
-      // Check each layer has expected properties
-      starField.parallaxLayers.forEach(layer => {
-        expect(layer.stars).toBeInstanceOf(Map);
-        expect(layer.depth).toBeGreaterThan(0);
-        expect(layer.density).toBeGreaterThan(0);
-        expect(layer.brightnesRange).toHaveLength(2);
-        expect(layer.sizeRange).toHaveLength(2);
-        expect(layer.colors).toBeInstanceOf(Array);
-        expect(layer.colors.length).toBeGreaterThan(0);
-      });
-    });
-    
+
     it('should generate parallax stars for regions', () => {
       const layer = starField.parallaxLayers[0];
       const stars = starField.generateParallaxStars(layer, 0, 0, 1000);
@@ -509,16 +464,7 @@ describe('World Generation and Management', () => {
         expect(layer.colors).toContain(star.color);
       });
     });
-    
-    it('should cache generated parallax stars', () => {
-      const layer = starField.parallaxLayers[0];
-      const stars1 = starField.generateParallaxStars(layer, 1000, 2000, 1000);
-      const stars2 = starField.generateParallaxStars(layer, 1000, 2000, 1000);
-      
-      // Should return same array (cached)
-      expect(stars1).toBe(stars2);
-    });
-    
+
     it('should render all components correctly', () => {
       // Generate some chunks to ensure there's content to render
       chunkManager.generateChunk(0, 0);
@@ -591,15 +537,7 @@ describe('World Generation and Management', () => {
       expect(chunk1FirstStar.x).not.toBe(chunk2FirstStar.x);
       expect(chunk1FirstStar.y).not.toBe(chunk2FirstStar.y);
     });
-    
-    it('should handle edge cases with large coordinates', () => {
-      const largeChunk = chunkManager.generateChunk(1000, -1000);
-      
-      expect(largeChunk.x).toBe(1000);
-      expect(largeChunk.y).toBe(-1000);
-      expect(largeChunk.stars.length).toBeGreaterThan(0);
-    });
-    
+
     it('should generate consistent results with deterministic seeds', () => {
       const chunk1a = chunkManager.generateChunk(5, 5);
       

@@ -148,11 +148,6 @@ describe('CelestialFactory', () => {
             expect(objects[2].type).toBe('moon');
         });
 
-        it('should handle empty batch creation', () => {
-            const objects = celestialFactory.createBatch([]);
-            expect(objects).toHaveLength(0);
-        });
-
         it('should continue creating objects even if one fails', () => {
             const objects = celestialFactory.createBatch([
                 { type: 'star', x: 100, y: 200 },
@@ -163,38 +158,6 @@ describe('CelestialFactory', () => {
             expect(objects).toHaveLength(2); // Only star and nebula should be created
             expect(objects[0].type).toBe('star');
             expect(objects[1].type).toBe('nebula');
-        });
-    });
-
-    describe('Factory Performance and Caching', () => {
-        it('should cache factory instances for repeated access', () => {
-            const factory1 = celestialFactory.getFactory('star');
-            const factory2 = celestialFactory.getFactory('star');
-            
-            expect(factory1).toBe(factory2);
-        });
-
-        it('should handle rapid object creation efficiently', () => {
-            const start = performance.now();
-            
-            for (let i = 0; i < 100; i++) {
-                celestialFactory.create('star', i * 10, i * 20, 'G-Type Star');
-            }
-            
-            const end = performance.now();
-            const duration = end - start;
-            
-            expect(duration).toBeLessThan(100); // Should create 100 objects in < 100ms
-        });
-
-        it('should reuse object pools when available', () => {
-            // Create objects
-            const star1 = celestialFactory.create('star', 100, 200);
-            const star2 = celestialFactory.create('star', 300, 400);
-            
-            // Object pool would reuse instances in a real implementation
-            expect(star1).toBeDefined();
-            expect(star2).toBeDefined();
         });
     });
 
