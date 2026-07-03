@@ -24,7 +24,7 @@ export class PlanetRenderer extends BaseRenderer {
     ): void {
         if (!discoveredPlanets) return;
 
-        const { ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale, centerX, centerY } = context;
+        const { ctx, mapX, mapY, mapWidth, mapHeight, worldToMapScale } = context;
 
         // Group planets by their parent star for orbital rendering
         const planetsByStarId = new Map<string, PlanetLike[]>();
@@ -99,8 +99,6 @@ export class PlanetRenderer extends BaseRenderer {
         planets: PlanetLike[],
         context: MapRenderContext
     ): void {
-        const { mapX, mapY, mapWidth, mapHeight, centerX, centerY, worldToMapScale } = context;
-
         // Calculate unique orbital radii for this star system based on actual map positions
         const orbitalRadii = new Set<number>();
 

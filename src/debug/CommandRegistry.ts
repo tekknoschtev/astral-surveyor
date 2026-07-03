@@ -186,7 +186,7 @@ export class CommandRegistry {
             parameters: [
                 { name: 'command', type: 'string', optional: true, description: 'Command to get help for' }
             ],
-            execute: (params: string[], context: CommandContext) => {
+            execute: (params: string[], _context: CommandContext) => {
                 if (params.length === 0) {
                     this.showGeneralHelp();
                 } else {
@@ -209,7 +209,7 @@ export class CommandRegistry {
                   values: ['star', 'planet', 'nebula', 'asteroid', 'blackhole', 'comet', 'rogue-planet', 'dark-nebula', 'crystal-garden', 'wormhole'],
                   description: 'Object type to list variants for' }
             ],
-            execute: (params: string[], context: CommandContext) => {
+            execute: (params: string[], _context: CommandContext) => {
                 this.showObjectTypesList(params[0]);
             },
             autocomplete: (partial: string) => {
@@ -285,7 +285,7 @@ export class CommandRegistry {
                   values: ['true', 'false'],
                   description: 'Value to set (true/false)' }
             ],
-            execute: (params: string[], context: CommandContext) => {
+            execute: (params: string[], _context: CommandContext) => {
                 this.setSetting(params[0], params[1]);
             },
             autocomplete: (partial: string) => {
@@ -445,7 +445,7 @@ export class CommandRegistry {
         
         if (clearAll) {
             // Clear debug objects from all loaded chunks
-            for (const [chunkKey, chunk] of chunkManager.activeChunks) {
+            for (const [chunkKey] of chunkManager.activeChunks) {
                 if (chunkManager.debugObjects) {
                     const beforeCount = chunkManager.debugObjects.length;
                     chunkManager.debugObjects = chunkManager.debugObjects.filter(obj => {
@@ -483,8 +483,7 @@ export class CommandRegistry {
         
         const objectType = params[0];
         const variant = params[1] || null;
-        const distance = params[2] ? parseFloat(params[2]) : null;
-        
+
         // Use imported DebugSpawner
         
         try {

@@ -7,11 +7,6 @@ import type { Renderer } from '../graphics/renderer.js';
 import type { Camera } from '../camera/camera.js';
 
 // Interface definitions
-interface SpriteData {
-    sprite: string[];
-    colors: Record<string, string>;
-}
-
 interface StarLike {
     x: number;
     y: number;
@@ -257,7 +252,6 @@ export class StarParticles {
     update(deltaTime: number, stars: StarLike[], camera: Camera): void {
         // Spawn new particles for visible stars
         for (const star of stars) {
-            const [screenX, screenY] = camera.worldToScreen(star.x, star.y, 9999, 9999); // Use large canvas size for distance check
             const distanceToCamera = Math.sqrt((star.x - camera.x) ** 2 + (star.y - camera.y) ** 2);
             
             // Only spawn particles for stars that are reasonably close

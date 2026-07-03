@@ -323,7 +323,7 @@ export class ErrorBoundary {
     /**
      * Handle graceful degradation based on error type
      */
-    handleGracefulDegradation(error: Error, service: string): GracefulDegradation {
+    handleGracefulDegradation(error: Error, _service: string): GracefulDegradation {
         const classification = this.classifyError(error);
 
         switch (classification.type) {

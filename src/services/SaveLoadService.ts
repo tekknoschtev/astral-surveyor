@@ -34,7 +34,7 @@ export class SaveLoadService {
         private discoveryLogbook: DiscoveryLogbook,
         private chunkManager: ChunkManager,
         discoveryManager?: SimplifiedDiscoveryService,
-        settingsService?: any // Optional for backward compatibility
+        _settingsService?: any // Optional for backward compatibility
     ) {
         if (discoveryManager) {
             this.discoveryManager = discoveryManager;

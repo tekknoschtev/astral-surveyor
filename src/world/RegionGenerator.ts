@@ -184,7 +184,6 @@ export class RegionGenerator {
         const rng = new SeededRandom(macroSeed);
         
         const regionCenters: RegionPoint[] = [];
-        const regionTypes = Object.keys(CosmicRegionTypes);
         const macroAreaSize = REGION_CONFIG.macroAreaSize;
         const regionsToPlace = REGION_CONFIG.regionsPerMacroArea;
         

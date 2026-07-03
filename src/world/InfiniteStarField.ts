@@ -111,8 +111,6 @@ export class InfiniteStarField {
     }
 
     render(renderer: Renderer, camera: Camera): void {
-        const { canvas } = renderer;
-        
         // Render parallax background layers first (back to front)
         this.renderParallaxLayers(renderer, camera);
         

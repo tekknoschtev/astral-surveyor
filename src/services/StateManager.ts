@@ -192,10 +192,7 @@ export class StateManager {
         const sourceWormhole = this.traversalDestination.wormhole;
         const destChunkX = Math.floor(camera.x / 2000);
         const destChunkY = Math.floor(camera.y / 2000);
-        
-        const betaChunkX = Math.floor(sourceWormhole.twinX / 2000);
-        const betaChunkY = Math.floor(sourceWormhole.twinY / 2000);
-        
+
         // Get or generate the destination chunk
         const destChunk = chunkManager.generateChunk(destChunkX, destChunkY);
         if (!destChunk) {
@@ -289,16 +286,11 @@ export class StateManager {
      */
     private cleanupDuplicateBetaWormholes(duplicateBetas: any[], chunkManager: any): void {
         // Keep the first one, remove the rest
-        const keepWormhole = duplicateBetas[0];
         const removeWormholes = duplicateBetas.slice(1);
-        
+
         // Get all chunks and remove duplicates from each chunk
-        let totalRemoved = 0;
-        
         for (const chunk of chunkManager.activeChunks.values()) {
             if (chunk.wormholes) {
-                const originalLength = chunk.wormholes.length;
-                
                 // Remove duplicates but keep the first occurrence
                 chunk.wormholes = chunk.wormholes.filter(w => {
                     if (removeWormholes.includes(w)) {
@@ -306,11 +298,6 @@ export class StateManager {
                     }
                     return true; // Keep this wormhole
                 });
-                
-                const removed = originalLength - chunk.wormholes.length;
-                if (removed > 0) {
-                    totalRemoved += removed;
-                }
             }
         }
     }

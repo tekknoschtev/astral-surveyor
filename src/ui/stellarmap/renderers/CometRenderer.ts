@@ -91,7 +91,7 @@ export class CometRenderer extends BaseRenderer {
         ctx: CanvasRenderingContext2D,
         comet: CometLike,
         context: MapRenderContext,
-        zoomLevel: number
+        _zoomLevel: number
     ): void {
         if (!comet.parentStarX || !comet.parentStarY) return;
 

@@ -16,11 +16,10 @@ import { NamingService } from './naming/naming.js';
 import { TouchUI } from './ui/touchui.js';
 import { SoundManager } from './audio/soundmanager.js';
 import { SimplifiedDiscoveryService } from './services/SimplifiedDiscoveryService.js';
-import { createDiscoveryService } from './services/DiscoveryServiceFactory.js';
 import { StateManager } from './services/StateManager.js';
 import { DebugSpawner } from './debug/debug-spawner.js';
 import { DeveloperConsole } from './debug/DeveloperConsole.js';
-import { createGameComponents, GameComponents } from './services/GameFactory.js';
+import { createGameComponents } from './services/GameFactory.js';
 import { CommandRegistry } from './debug/CommandRegistry.js';
 import { AudioService } from './services/AudioService.js';
 import { SettingsService } from './services/SettingsService.js';
@@ -931,7 +930,7 @@ export class Game {
             if (regionInfo && regionInfo.definition && regionInfo.influence > 0.3) {
                 return regionInfo.regionType;
             }
-        } catch (error) {
+        } catch {
             // Silently handle region lookup errors
         }
         return undefined;

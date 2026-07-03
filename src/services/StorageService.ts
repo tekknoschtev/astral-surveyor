@@ -173,7 +173,7 @@ export class StorageService implements IStorageService {
                 // localStorage typically has ~5-10MB limit, but we can't reliably detect it
                 quotaRemaining: undefined
             };
-        } catch (error) {
+        } catch {
             return { available: true }; // Available but couldn't calculate usage
         }
     }
@@ -193,7 +193,7 @@ export class StorageService implements IStorageService {
             localStorage.removeItem(testKey);
             
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }

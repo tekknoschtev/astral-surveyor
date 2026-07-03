@@ -80,7 +80,7 @@ export class LocalMinimap {
     /**
      * Update minimap state - refresh object positions for orbital movement
      */
-    update(deltaTime: number): void {
+    update(_deltaTime: number): void {
         // The minimap data is refreshed each render cycle, so orbital movement
         // should automatically be reflected. No additional state tracking needed.
     }
@@ -88,7 +88,7 @@ export class LocalMinimap {
     /**
      * Get minimap bounds for click detection
      */
-    getBounds(canvasWidth: number, canvasHeight: number): { x: number; y: number; width: number; height: number } {
+    getBounds(_canvasWidth: number, _canvasHeight: number): { x: number; y: number; width: number; height: number } {
         return {
             x: this.padding,
             y: this.padding + this.topOffset,
@@ -103,7 +103,7 @@ export class LocalMinimap {
     render(renderer: Renderer, camera: Camera): void {
         if (!this.visible) return;
         
-        const { canvas, ctx } = renderer;
+        const { ctx } = renderer;
         
         // Save context state
         ctx.save();
@@ -300,9 +300,6 @@ export class LocalMinimap {
         // Get player's current chunk coordinates
         const playerChunkCoords = this.chunkManager.getChunkCoords(camera.x, camera.y);
         
-        let totalObjects = 0;
-        let processedChunks = 0;
-        
         // Query all chunks within radius (like seed inspector)
         for (let chunkX = playerChunkCoords.x - this.chunkRadius; chunkX <= playerChunkCoords.x + this.chunkRadius; chunkX++) {
             for (let chunkY = playerChunkCoords.y - this.chunkRadius; chunkY <= playerChunkCoords.y + this.chunkRadius; chunkY++) {
@@ -314,8 +311,6 @@ export class LocalMinimap {
                 const chunk = this.chunkManager.getChunk(chunkKey);
                 
                 if (chunk) {
-                    processedChunks++;
-                    
                     // Process all object types in this chunk
                     this.processChunkObjects(chunk.celestialStars, 'star', objects, camera);
                     this.processChunkObjects(chunk.planets, 'planet', objects, camera);
@@ -329,16 +324,10 @@ export class LocalMinimap {
                     this.processChunkObjects(chunk.darkNebulae, 'dark-nebula', objects, camera);
                     this.processChunkObjects(chunk.crystalGardens, 'crystal-garden', objects, camera);
                     this.processChunkObjects(chunk.protostars, 'protostar', objects, camera);
-                    
-                    totalObjects += Object.values(chunk).reduce((sum, arr) => {
-                        return sum + (Array.isArray(arr) ? arr.length : 0);
-                    }, 0);
                 }
             }
         }
-        
-        // Debug logging can be uncommented if needed for troubleshooting
-        // console.log(`Minimap: Scanned ${processedChunks} chunks, found ${totalObjects} total objects, showing ${objects.length} on minimap`);
+
         return objects;
     }
     
@@ -349,8 +338,8 @@ export class LocalMinimap {
     private processChunkObjects(
         objectArray: any[], 
         type: DetectableObject['type'], 
-        result: DetectableObject[], 
-        camera: Camera
+        result: DetectableObject[],
+        _camera: Camera
     ): void {
         if (!objectArray || objectArray.length === 0) return;
         

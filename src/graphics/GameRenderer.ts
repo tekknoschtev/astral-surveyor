@@ -49,7 +49,7 @@ export class GameRenderer {
         const activeObjects = this.cachedActiveObjects || this.chunkManager.getAllActiveObjects();
         
         // Performance optimization: Calculate screen bounds for render culling
-        const screenBounds = this.calculateScreenBounds();
+        const _screenBounds = this.calculateScreenBounds();
         
         // Render nebulae first (background layer) - with culling disabled for now
         for (const obj of activeObjects.nebulae) {
