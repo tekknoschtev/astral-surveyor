@@ -224,7 +224,7 @@ export class DiscoveryDisplay {
                 if (regionInfo && regionInfo.definition) {
                     regionText = this.getRegionDescription(regionInfo.definition.name, regionInfo.influence);
                 }
-            } catch (error) {
+            } catch {
                 // Silently handle any region lookup errors
                 regionText = '';
             }

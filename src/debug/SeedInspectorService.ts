@@ -6,7 +6,7 @@
  * @since 0.1.0
  */
 
-import { SeededRandom, hashPosition, setUniverseSeed, getUniverseSeed } from '../utils/random.js';
+import { setUniverseSeed, getUniverseSeed } from '../utils/random.js';
 import type { ChunkManager } from '../world/ChunkManager.js';
 
 /**

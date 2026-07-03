@@ -2,15 +2,6 @@
 import { Input } from '../input/input.js';
 
 // Type definitions
-interface CelestialObject {
-    x: number;
-    y: number;
-    type: string;
-    distanceToShip(camera: Camera): number;
-    brakingDistance?: number;
-    discoveryDistance: number;
-}
-
 interface StellarMap {
     isVisible(): boolean;
 }
@@ -71,7 +62,7 @@ export class Camera {
         this.loadDistanceTraveled();
     }
 
-    update(input: CameraInput, deltaTime: number, canvasWidth: number, canvasHeight: number, celestialObjects: any[] = [], stellarMap: StellarMap | null = null): void {
+    update(input: CameraInput, deltaTime: number, canvasWidth: number, canvasHeight: number, celestialObjects: any[] = [], _stellarMap: StellarMap | null = null): void {
         // Skip movement input processing if input has been consumed by UI elements (like settings menu)
         if (input.isTouchConsumed && input.isTouchConsumed()) {
             // Still update position from existing velocity but don't process new input

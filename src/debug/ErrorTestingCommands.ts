@@ -2,7 +2,7 @@
 // Used to validate error recovery mechanisms and logging
 
 import { getErrorService } from '../services/ErrorService.js';
-import { getLogger, LogLevel } from '../services/LoggerService.js';
+import { getLogger } from '../services/LoggerService.js';
 import { UIErrorBoundary } from '../ui/UIErrorBoundary.js';
 
 export interface ErrorTestScenario {

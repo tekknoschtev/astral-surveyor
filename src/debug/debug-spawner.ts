@@ -2,7 +2,7 @@
 // This file should be completely excluded from production builds
 
 import { SeededRandom } from '../utils/random.js';
-import { generateWormholePair, Wormhole } from '../celestial/wormholes.js';
+import { generateWormholePair } from '../celestial/wormholes.js';
 import { generateBlackHole, BlackHole, BlackHoleTypes } from '../celestial/blackholes.js';
 import { Star, Planet, StarTypes, PlanetTypes } from '../celestial/celestial.js';
 import { Nebula, selectNebulaType } from '../celestial/nebulae.js';

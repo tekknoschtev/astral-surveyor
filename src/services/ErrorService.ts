@@ -69,7 +69,7 @@ export class ErrorService {
 
     // Backward compatibility stubs for deleted complex methods
     getDegradedServices(): string[] { return []; }
-    markServiceRecovered(service: string): void { /* simplified - no op */ }
+    markServiceRecovered(_service: string): void { /* simplified - no op */ }
     executeWithRetry<T>(
         service: string,
         operation: string,
@@ -85,7 +85,7 @@ export class ErrorService {
     }
     getHealthStatus(): any { return { status: 'healthy' }; }
     getRecentErrors(): any[] { return []; }
-    onServiceDegraded(callback: (data: ServiceDegradationData) => void): void { /* no op */ }
+    onServiceDegraded(_callback: (data: ServiceDegradationData) => void): void { /* no op */ }
 
     // Private method to log and emit errors
     private logError(service: string, operation: string, error: Error, userMessage?: string): void {

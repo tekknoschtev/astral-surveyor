@@ -1151,7 +1151,7 @@ export class ChunkGenerator {
         }
     }
     
-    private generateWormholeId(chunkX: number, chunkY: number, rng: SeededRandom): string {
+    private generateWormholeId(chunkX: number, chunkY: number, _rng: SeededRandom): string {
         // Generate unique but predictable wormhole ID
         const baseId = Math.abs(hashPosition(chunkX, chunkY)) % 9999;
         return `WH-${baseId.toString().padStart(4, '0')}`;

@@ -1,7 +1,7 @@
 // UI Error Boundary - Handles UI component errors with graceful degradation
 // Provides user-friendly error messages and fallback UI when components fail
 
-import { ErrorService, ErrorEvents, ErrorEventData, ServiceDegradationData } from '../services/ErrorService.js';
+import { ErrorService, ErrorEventData, ServiceDegradationData } from '../services/ErrorService.js';
 import { GameConfig } from '../config/gameConfig.js';
 
 export interface UIErrorState {

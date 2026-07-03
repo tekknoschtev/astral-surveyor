@@ -41,7 +41,7 @@ export class AudioService {
                 if (this.soundManager.setVolume) {
                     this.soundManager.setVolume('master', volume);
                 }
-            } catch (error) {
+            } catch {
                 // Ignore sound manager errors gracefully
             }
             this.saveSettings();
@@ -89,7 +89,7 @@ export class AudioService {
                 } else if (objectType === 'crystal-garden') {
                     this.soundManager.playCrystalGardenDiscovery('pure');
                 }
-            } catch (error) {
+            } catch {
                 // Ignore sound manager errors gracefully
             }
         }
@@ -125,7 +125,7 @@ export class AudioService {
                 this.volume = settings.volume || 0.8;
                 this.muted = settings.muted || false;
             }
-        } catch (error) {
+        } catch {
             // Use defaults
         }
     }
@@ -134,7 +134,7 @@ export class AudioService {
         try {
             const settings = { volume: this.volume, muted: this.muted };
             localStorage.setItem('astralSurveyor_audioSettings', JSON.stringify(settings));
-        } catch (error) {
+        } catch {
             // Ignore save errors
         }
     }

@@ -7,7 +7,7 @@ import type { Camera } from '../camera/camera.js';
 import type { Input } from '../input/input.js';
 import type { SimplifiedDiscoveryService } from '../services/SimplifiedDiscoveryService.js';
 import type { DiscoveryEntry } from '../services/ObjectDiscovery.js';
-import type { DiscoveryFilter, DiscoveryCategory, DiscoveryStatistics } from '../services/DiscoveryStats.js';
+import type { DiscoveryStatistics } from '../services/DiscoveryStats.js';
 import type { DiscoveryDisplay } from './ui.js';
 
 // Legacy interface for backward compatibility
@@ -25,8 +25,6 @@ interface DiscoveryData {
 }
 
 // UI state interfaces
-type SortField = 'timestamp' | 'name' | 'type' | 'rarity';
-type SortDirection = 'asc' | 'desc';
 type ViewMode = 'list' | 'detail';
 
 interface UIState {
@@ -264,7 +262,6 @@ export class DiscoveryLogbook {
             return;
         }
 
-        const panelX = canvasWidth - this.panelWidth - 20;
         const panelY = 80;
 
         if (this.uiState.viewMode === 'detail') {
@@ -301,10 +298,10 @@ export class DiscoveryLogbook {
     // Check if mouse coordinates are over the logbook panel
     isMouseOver(mouseX: number, mouseY: number, canvasWidth: number, _canvasHeight: number): boolean {
         if (!this.visible) return false;
-        
+
         const panelX = canvasWidth - this.panelWidth - 20;
         const panelY = 80;
-        
+
         return mouseX >= panelX && mouseX <= panelX + this.panelWidth &&
                mouseY >= panelY && mouseY <= panelY + this.panelHeight;
     }
@@ -799,10 +796,9 @@ export class DiscoveryLogbook {
     /**
      * Handle mouse clicks for interactive elements
      */
-    handleClick(mouseX: number, mouseY: number, canvasWidth: number, canvasHeight: number, camera?: Camera): boolean {
+    handleClick(mouseX: number, mouseY: number, canvasWidth: number, canvasHeight: number, _camera?: Camera): boolean {
         if (!this.visible) return false;
         
-        const panelX = canvasWidth - this.panelWidth - 20;
         const panelY = 80;
         
         // Check if click is within panel

@@ -1440,7 +1440,7 @@ export class SoundManager {
     /**
      * Smooth volume updates for organic evolution
      */
-    private updateLayerVolume(layer: any, currentTime: number): void {
+    private updateLayerVolume(_layer: any, _currentTime: number): void {
         // This method can add micro-variations or smooth interpolation if needed
         // Currently the linearRampToValueAtTime handles the volume changes
     }
@@ -1867,7 +1867,7 @@ export class SoundManager {
             for (const layer of this.ambientLayers) {
                 try {
                     layer.oscillator.stop();
-                } catch (error) {
+                } catch {
                     // Oscillator might already be stopped, ignore error
                 }
             }
@@ -1877,7 +1877,7 @@ export class SoundManager {
                 for (const note of this.melodicState.currentSequence) {
                     try {
                         note.oscillator.stop();
-                    } catch (error) {
+                    } catch {
                         // Oscillator might already be stopped, ignore error
                     }
                 }
