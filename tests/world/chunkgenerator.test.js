@@ -39,6 +39,52 @@ describe('Chunk generation determinism', () => {
         expect(second).toBe(first);
     });
 
+    it('should run registered object generators in the original generation order', () => {
+        const manager = new ChunkManager();
+
+        expect(manager.generator.registeredObjectGenerators).toEqual([
+            'nebulae',
+            'asteroidGardens',
+            'wormholes',
+            'blackHoles',
+            'roguePlanets',
+            'darkNebulae',
+            'crystalGardens',
+            'protostars'
+        ]);
+    });
+
+    it('should invoke a custom registered generator for each newly generated chunk', () => {
+        const manager = new ChunkManager();
+        const calls = [];
+        manager.generator.registerObjectGenerator({
+            name: 'test-objects',
+            generate: (chunkX, chunkY, chunk) => calls.push({ chunkX, chunkY, chunk })
+        });
+
+        const chunk = manager.generateChunk(4, 5);
+
+        // Wormhole generation can recursively create a remote chunk, so assert
+        // on the call for this chunk specifically
+        const callForChunk = calls.filter(c => c.chunkX === 4 && c.chunkY === 5);
+        expect(callForChunk).toHaveLength(1);
+        expect(callForChunk[0].chunk).toBe(chunk);
+    });
+
+    it('should not re-run object generators for cached chunks', () => {
+        const manager = new ChunkManager();
+        const seen = [];
+        manager.generator.registerObjectGenerator({
+            name: 'counter',
+            generate: (chunkX, chunkY) => seen.push(`${chunkX},${chunkY}`)
+        });
+
+        manager.generateChunk(6, 6);
+        manager.generateChunk(6, 6);
+
+        expect(seen.filter(key => key === '6,6')).toHaveLength(1);
+    });
+
     it('should generate at least one star system across a region of chunks', () => {
         // Guards against a refactor accidentally short-circuiting generation:
         // with ~8% star system chance per chunk, 100 chunks virtually always

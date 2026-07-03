@@ -37,11 +37,75 @@ interface CompanionWeight {
     weight: number;
 }
 
+// A registered generator for one celestial object type, run for every newly
+// generated chunk after the star-system core. Each built-in generator derives
+// its own seed from the chunk position, so one type's output never depends on
+// another's RNG state. Plugins can register additional types.
+export interface ChunkObjectGenerator {
+    name: string;
+    generate(chunkX: number, chunkY: number, chunk: Chunk): void;
+}
+
 export class ChunkGenerator {
     private world: WorldContext;
+    private objectGenerators: ChunkObjectGenerator[] = [];
 
     constructor(world: WorldContext) {
         this.world = world;
+        this.registerDefaultObjectGenerators();
+    }
+
+    // The built-in celestial object types, in their original generation order
+    private registerDefaultObjectGenerators(): void {
+        this.registerObjectGenerator({
+            name: 'nebulae',
+            generate: (chunkX, chunkY, chunk) => this.generateNebulaeForChunk(chunkX, chunkY, chunk)
+        });
+        this.registerObjectGenerator({
+            name: 'asteroidGardens',
+            generate: (chunkX, chunkY, chunk) => this.generateAsteroidGardensForChunk(chunkX, chunkY, chunk)
+        });
+        this.registerObjectGenerator({
+            name: 'wormholes',
+            generate: (chunkX, chunkY, chunk) => {
+                // Place pending wormhole pairs first; only generate new wormholes
+                // if no pending pair landed in this chunk
+                this.placePendingWormholePairs(chunkX, chunkY, chunk);
+                if (chunk.wormholes.length === 0) {
+                    this.generateWormholesForChunk(chunkX, chunkY, chunk);
+                }
+            }
+        });
+        this.registerObjectGenerator({
+            name: 'blackHoles',
+            generate: (chunkX, chunkY, chunk) => this.generateBlackHolesForChunk(chunkX, chunkY, chunk)
+        });
+        this.registerObjectGenerator({
+            name: 'roguePlanets',
+            generate: (chunkX, chunkY, chunk) => this.generateRoguePlanetsForChunk(chunkX, chunkY, chunk)
+        });
+        this.registerObjectGenerator({
+            name: 'darkNebulae',
+            generate: (chunkX, chunkY, chunk) => this.generateDarkNebulaeForChunk(chunkX, chunkY, chunk)
+        });
+        this.registerObjectGenerator({
+            name: 'crystalGardens',
+            generate: (chunkX, chunkY, chunk) => this.generateCrystalGardensForChunk(chunkX, chunkY, chunk)
+        });
+        this.registerObjectGenerator({
+            name: 'protostars',
+            generate: (chunkX, chunkY, chunk) => this.generateProtostarsForChunk(chunkX, chunkY, chunk)
+        });
+    }
+
+    // Extension point: plugins add new celestial object types here. Generators
+    // run for every newly generated chunk, after core star-system generation.
+    registerObjectGenerator(generator: ChunkObjectGenerator): void {
+        this.objectGenerators.push(generator);
+    }
+
+    get registeredObjectGenerators(): string[] {
+        return this.objectGenerators.map(g => g.name);
     }
 
     // Accessor mirrors: the generation code below was moved verbatim from
@@ -304,28 +368,10 @@ export class ChunkGenerator {
             this.generateCometsForStarSystem(star, starSystemRng, chunk, regionSpawnRates.comets);
         }
 
-        // Generate nebulae for this chunk (separate from star systems)
-        this.generateNebulaeForChunk(chunkX, chunkY, chunk);
-        
-        // Generate asteroid gardens for this chunk
-        this.generateAsteroidGardensForChunk(chunkX, chunkY, chunk);
-        
-        // Check for pending wormhole pairs that should be placed in this chunk FIRST
-        this.placePendingWormholePairs(chunkX, chunkY, chunk);
-        
-        // Generate new wormholes for this chunk (extremely rare) - only if no pending pairs were placed
-        if (chunk.wormholes.length === 0) {
-            this.generateWormholesForChunk(chunkX, chunkY, chunk);
+        // Run the registered per-type object generators in order
+        for (const generator of this.objectGenerators) {
+            generator.generate(chunkX, chunkY, chunk);
         }
-        
-        // Generate black holes for this chunk (ultra-rare - cosmic reset points)
-        this.generateBlackHolesForChunk(chunkX, chunkY, chunk);
-
-        // Generate region-specific objects for this chunk
-        this.generateRoguePlanetsForChunk(chunkX, chunkY, chunk);
-        this.generateDarkNebulaeForChunk(chunkX, chunkY, chunk);
-        this.generateCrystalGardensForChunk(chunkX, chunkY, chunk);
-        this.generateProtostarsForChunk(chunkX, chunkY, chunk);
 
         this.activeChunks.set(chunkKey, chunk);
         return chunk;
