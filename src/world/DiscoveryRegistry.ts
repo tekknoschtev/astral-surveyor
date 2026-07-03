@@ -2,6 +2,10 @@
 // Extracted from ChunkManager so discovery state is independent of chunk
 // generation. Discovery data survives chunk unloading: when an object's chunk
 // is active we report live data, otherwise we reconstruct from stored data.
+//
+// Each getDiscoveredX method shares one skeleton (collectDiscoveries): iterate
+// the discovery map, filter by ID prefix, parse coordinates out of the ID, and
+// hand off to a per-type builder that prefers live chunk data over stored data.
 
 import { SeededRandom, hashPosition } from '../utils/random.js';
 import { Star, Planet, Moon, PlanetTypes } from '../celestial/celestial.js';
@@ -9,6 +13,7 @@ import { Nebula } from '../celestial/nebulae.js';
 import { AsteroidGarden } from '../celestial/asteroids.js';
 import { Wormhole } from '../celestial/wormholes.js';
 import { BlackHole } from '../celestial/blackholes.js';
+import type { Comet } from '../celestial/comets.js';
 import type { Chunk } from './ChunkManager.js';
 
 // Minimal view of the chunk system the registry needs for live-object lookups
@@ -17,6 +22,9 @@ export interface ChunkSource {
     activeChunks: Map<string, Chunk>;
     selectStarType(rng: SeededRandom): { name: string };
 }
+
+// The chunk collections that hold positioned celestial objects
+type ChunkObjectCollection = Exclude<keyof Chunk, 'x' | 'y' | 'stars'>;
 
 interface NebulaTypeData {
     name: string;
@@ -303,667 +311,476 @@ export class DiscoveryRegistry {
         }
     }
 
-    getDiscoveredStars(): DiscoveredStar[] {
-        const discoveredStars: DiscoveredStar[] = [];
-
-        // Get all discovered objects that are stars
+    // Shared skeleton for the getDiscoveredX methods: walk the discovery map,
+    // filter by ID prefix, split the ID, and let a per-type builder produce the
+    // result (or null to skip the entry).
+    private collectDiscoveries<T>(
+        prefix: string,
+        minParts: number,
+        build: (parts: string[], data: DiscoveryData) => T | null,
+        sortByTimestamp = false
+    ): T[] {
+        const results: T[] = [];
         for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('star_')) {
-                // Extract coordinates from object ID
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const x = parseFloat(parts[1]);
-                    const y = parseFloat(parts[2]);
+            if (!objId.startsWith(prefix)) continue;
+            const parts = objId.split('_');
+            if (parts.length < minParts) continue;
+            const item = build(parts, discoveryData);
+            if (item !== null) {
+                results.push(item);
+            }
+        }
+        if (sortByTimestamp) {
+            // Most recent first
+            (results as Array<T & { timestamp: number }>).sort((a, b) => b.timestamp - a.timestamp);
+        }
+        return results;
+    }
 
-                    // Find the star in active chunks or reconstruct minimal data
-                    let starData: DiscoveredStar | null = null;
-
-                    // Check if star is in currently active chunks
-                    for (const chunk of this.chunks.activeChunks.values()) {
-                        for (const star of chunk.celestialStars) {
-                            if (Math.floor(star.x) === Math.floor(x) && Math.floor(star.y) === Math.floor(y)) {
-                                starData = {
-                                    x: star.x,
-                                    y: star.y,
-                                    starTypeName: star.starTypeName,
-                                    timestamp: discoveryData.timestamp
-                                };
-                                break;
-                            }
-                        }
-                        if (starData) break;
-                    }
-
-                    // If not in active chunks, use stored discovery data
-                    if (!starData) {
-                        // Use stored star type from discovery data, fallback to regeneration if not available
-                        let starTypeName = discoveryData.starTypeName;
-
-                        if (!starTypeName) {
-                            // Fallback: regenerate star type deterministically
-                            const chunkX = Math.floor(x / this.chunks.chunkSize);
-                            const chunkY = Math.floor(y / this.chunks.chunkSize);
-                            const starSystemSeed = hashPosition(chunkX * this.chunks.chunkSize, chunkY * this.chunks.chunkSize) + 2;
-                            const starSystemRng = new SeededRandom(starSystemSeed);
-                            const starType = this.chunks.selectStarType(starSystemRng);
-                            starTypeName = starType.name;
-                        }
-
-                        starData = {
-                            x: x,
-                            y: y,
-                            starTypeName: starTypeName!,
-                            timestamp: discoveryData.timestamp
-                        };
-                    }
-
-                    discoveredStars.push(starData);
+    private findInActiveChunks<K extends ChunkObjectCollection>(
+        collection: K,
+        predicate: (obj: Chunk[K][number]) => boolean
+    ): Chunk[K][number] | null {
+        for (const chunk of this.chunks.activeChunks.values()) {
+            for (const obj of chunk[collection]) {
+                if (predicate(obj)) {
+                    return obj;
                 }
             }
         }
+        return null;
+    }
 
-        return discoveredStars;
+    // Positions in object IDs are floored, so live lookups match on floored coordinates
+    private findByFlooredPosition<K extends ChunkObjectCollection>(
+        collection: K,
+        x: number,
+        y: number
+    ): Chunk[K][number] | null {
+        return this.findInActiveChunks(collection, obj => Math.floor(obj.x) === x && Math.floor(obj.y) === y);
+    }
+
+    getDiscoveredStars(): DiscoveredStar[] {
+        return this.collectDiscoveries('star_', 3, (parts, discoveryData) => {
+            const x = parseFloat(parts[1]);
+            const y = parseFloat(parts[2]);
+
+            const star = this.findByFlooredPosition('celestialStars', Math.floor(x), Math.floor(y));
+            if (star) {
+                return {
+                    x: star.x,
+                    y: star.y,
+                    starTypeName: star.starTypeName,
+                    timestamp: discoveryData.timestamp
+                };
+            }
+
+            // Use stored star type from discovery data, fallback to regeneration if not available
+            let starTypeName = discoveryData.starTypeName;
+            if (!starTypeName) {
+                // Fallback: regenerate star type deterministically
+                const chunkX = Math.floor(x / this.chunks.chunkSize);
+                const chunkY = Math.floor(y / this.chunks.chunkSize);
+                const starSystemSeed = hashPosition(chunkX * this.chunks.chunkSize, chunkY * this.chunks.chunkSize) + 2;
+                const starSystemRng = new SeededRandom(starSystemSeed);
+                starTypeName = this.chunks.selectStarType(starSystemRng).name;
+            }
+
+            return {
+                x: x,
+                y: y,
+                starTypeName: starTypeName,
+                timestamp: discoveryData.timestamp
+            };
+        });
     }
 
     getDiscoveredMoons(): DiscoveredMoon[] {
-        const discoveredMoons: DiscoveredMoon[] = [];
+        return this.collectDiscoveries('moon_', 3, (parts, discoveryData) => {
+            const planetX = Math.floor(parseFloat(parts[1]));
+            const planetY = Math.floor(parseFloat(parts[2]));
 
-        // Get all discovered objects that are moons
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('moon_')) {
-                // Extract coordinates from object ID
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const planetX = parseFloat(parts[1]);
-                    const planetY = parseFloat(parts[2]);
+            // Moons are only reported while their chunk is loaded
+            const moon = this.findInActiveChunks('moons', m =>
+                !!m.parentPlanet &&
+                Math.floor(m.parentPlanet.x) === planetX &&
+                Math.floor(m.parentPlanet.y) === planetY);
+            if (!moon || !moon.parentPlanet) return null;
 
-                    // Find the moon in active chunks
-                    let moonData: DiscoveredMoon | null = null;
-
-                    for (const chunk of this.chunks.activeChunks.values()) {
-                        for (const moon of chunk.moons) {
-                            if (moon.parentPlanet &&
-                                Math.floor(moon.parentPlanet.x) === Math.floor(planetX) &&
-                                Math.floor(moon.parentPlanet.y) === Math.floor(planetY)) {
-                                moonData = {
-                                    x: moon.x,
-                                    y: moon.y,
-                                    parentPlanetX: moon.parentPlanet.x,
-                                    parentPlanetY: moon.parentPlanet.y,
-                                    timestamp: discoveryData.timestamp
-                                };
-                                break;
-                            }
-                        }
-                        if (moonData) break;
-                    }
-
-                    if (moonData) {
-                        discoveredMoons.push(moonData);
-                    }
-                }
-            }
-        }
-
-        return discoveredMoons;
+            return {
+                x: moon.x,
+                y: moon.y,
+                parentPlanetX: moon.parentPlanet.x,
+                parentPlanetY: moon.parentPlanet.y,
+                timestamp: discoveryData.timestamp
+            };
+        });
     }
 
     getDiscoveredPlanets(): DiscoveredPlanet[] {
-        const discoveredPlanets: DiscoveredPlanet[] = [];
+        return this.collectDiscoveries('planet_', 5, (parts, discoveryData) => {
+            // ID format: planet_{starX}_{starY}_planet_{planetIndex}
+            if (parts[3] !== 'planet') return null;
+            const starX = parseFloat(parts[1]);
+            const starY = parseFloat(parts[2]);
+            const planetIndex = parseInt(parts[4]);
 
-        // Get all discovered objects that are planets
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('planet_') && objId.includes('_planet_')) {
-                // Parse the planet ID format: planet_{starX}_{starY}_planet_{planetIndex}
-                const parts = objId.split('_');
-                if (parts.length >= 5) {
-                    const starX = parseFloat(parts[1]);
-                    const starY = parseFloat(parts[2]);
-                    const planetIndex = parseInt(parts[4]);
-
-                    // Find the planet in active chunks or reconstruct minimal data
-                    let planetData: DiscoveredPlanet | null = null;
-
-                    // Check if planet is in currently active chunks
-                    for (const chunk of this.chunks.activeChunks.values()) {
-                        for (const star of chunk.celestialStars) {
-                            if (Math.floor(star.x) === Math.floor(starX) && Math.floor(star.y) === Math.floor(starY)) {
-                                // Found the parent star, look for the planet
-                                if (star.planets && star.planets[planetIndex]) {
-                                    const planet = star.planets[planetIndex];
-                                    planetData = {
-                                        x: planet.x,
-                                        y: planet.y,
-                                        parentStarX: star.x,
-                                        parentStarY: star.y,
-                                        planetTypeName: planet.planetTypeName,
-                                        planetType: planet.planetType,
-                                        planetIndex: planetIndex,
-                                        objectName: discoveryData.objectName,
-                                        timestamp: discoveryData.timestamp
-                                    };
-                                }
-                                break;
-                            }
-                        }
-                        if (planetData) break;
-                    }
-
-                    // If not in active chunks, use stored discovery data
-                    if (!planetData) {
-                        // Use stored planet type from discovery data
-                        const planetTypeName = discoveryData.planetTypeName;
-                        let planetType = null;
-
-                        if (planetTypeName) {
-                            // Find the planet type object
-                            planetType = Object.values(PlanetTypes).find(type => type.name === planetTypeName);
-                        }
-
-                        if (!planetTypeName || !planetType) {
-                            // Fallback: regenerate planet type deterministically if needed
-                            // This would require recreating the star system, but for now skip incomplete data
-                            continue;
-                        }
-
-                        planetData = {
-                            x: null, // Position would need to be recalculated from orbital data
-                            y: null,
-                            parentStarX: starX,
-                            parentStarY: starY,
-                            planetTypeName: planetTypeName,
-                            planetType: planetType,
-                            planetIndex: planetIndex,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-                    }
-
-                    if (planetData) {
-                        discoveredPlanets.push(planetData);
-                    }
-                }
+            // Prefer live data when the parent star's chunk is loaded
+            const star = this.findByFlooredPosition('celestialStars', Math.floor(starX), Math.floor(starY));
+            if (star && star.planets && star.planets[planetIndex]) {
+                const planet = star.planets[planetIndex];
+                return {
+                    x: planet.x,
+                    y: planet.y,
+                    parentStarX: star.x,
+                    parentStarY: star.y,
+                    planetTypeName: planet.planetTypeName,
+                    planetType: planet.planetType,
+                    planetIndex: planetIndex,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp
+                };
             }
-        }
 
-        return discoveredPlanets;
+            // Reconstruct from stored discovery data; skip entries without a
+            // stored type (position would require recreating the star system)
+            const planetTypeName = discoveryData.planetTypeName;
+            const planetType = planetTypeName
+                ? Object.values(PlanetTypes).find(type => type.name === planetTypeName)
+                : undefined;
+            if (!planetTypeName || !planetType) return null;
+
+            return {
+                x: null, // Position would need to be recalculated from orbital data
+                y: null,
+                parentStarX: starX,
+                parentStarY: starY,
+                planetTypeName: planetTypeName,
+                planetType: planetType,
+                planetIndex: planetIndex,
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp
+            };
+        });
     }
 
     getDiscoveredNebulae(): DiscoveredNebula[] {
-        const discoveredNebulae: DiscoveredNebula[] = [];
+        return this.collectDiscoveries('nebula_', 3, (parts, discoveryData) => {
+            const nebulaX = parseInt(parts[1]);
+            const nebulaY = parseInt(parts[2]);
 
-        // Get all discovered objects that are nebulae
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('nebula_')) {
-                // Extract coordinates from nebula ID
-                // Format: nebula_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const nebulaX = parseInt(parts[1]);
-                    const nebulaY = parseInt(parts[2]);
-
-                    // Find the nebula in active chunks or reconstruct minimal data
-                    let nebulaData: DiscoveredNebula | null = null;
-
-                    // Check if nebula is in currently active chunks
-                    const nebula = this.findNebulaByPosition(nebulaX, nebulaY);
-                    if (nebula) {
-                        nebulaData = {
-                            x: nebula.x,
-                            y: nebula.y,
-                            nebulaType: nebula.nebulaType,
-                            nebulaTypeData: nebula.nebulaTypeData,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-                    }
-
-                    // If not in active chunks, use stored discovery data
-                    if (!nebulaData) {
-                        // Use stored nebula type from discovery data, fallback to regeneration if not available
-                        let nebulaType = discoveryData.nebulaType;
-                        let nebulaTypeData = discoveryData.nebulaTypeData;
-
-                        if (!nebulaType) {
-                            // Fallback: regenerate nebula type deterministically
-                            const chunkX = Math.floor(nebulaX / this.chunks.chunkSize);
-                            const chunkY = Math.floor(nebulaY / this.chunks.chunkSize);
-                            const nebulaeSeed = hashPosition(chunkX * this.chunks.chunkSize, chunkY * this.chunks.chunkSize) ^ 0xABCDEF01;
-                            const nebulaeRng = new SeededRandom(nebulaeSeed);
-
-                            // Regenerate nebula type using the same logic as in generateNebulaeForChunk
-                            const nebulaTypes = ['emission', 'reflection', 'planetary', 'dark'];
-                            nebulaType = nebulaTypes[nebulaeRng.nextInt(0, nebulaTypes.length - 1)];
-
-                            // Generate basic type data
-                            nebulaTypeData = {
-                                name: `${nebulaType.charAt(0).toUpperCase()}${nebulaType.slice(1)} Nebula`,
-                                color: this.getBasicNebulaColors(nebulaType)?.[0] || '#ff00ff'
-                            };
-                        }
-
-                        nebulaData = {
-                            x: nebulaX,
-                            y: nebulaY,
-                            nebulaType: nebulaType!,
-                            nebulaTypeData: nebulaTypeData,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-                    }
-
-                    if (nebulaData) {
-                        discoveredNebulae.push(nebulaData);
-                    }
-                }
+            const nebula = this.findByFlooredPosition('nebulae', nebulaX, nebulaY);
+            if (nebula) {
+                return {
+                    x: nebula.x,
+                    y: nebula.y,
+                    nebulaType: nebula.nebulaType,
+                    nebulaTypeData: nebula.nebulaTypeData,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp
+                };
             }
-        }
 
-        // Sort by discovery time (most recent first)
-        discoveredNebulae.sort((a, b) => b.timestamp - a.timestamp);
-        return discoveredNebulae;
+            // Use stored nebula type from discovery data, fallback to regeneration if not available
+            let nebulaType = discoveryData.nebulaType;
+            let nebulaTypeData = discoveryData.nebulaTypeData;
+            if (!nebulaType) {
+                // Fallback: regenerate nebula type deterministically
+                const chunkX = Math.floor(nebulaX / this.chunks.chunkSize);
+                const chunkY = Math.floor(nebulaY / this.chunks.chunkSize);
+                const nebulaeSeed = hashPosition(chunkX * this.chunks.chunkSize, chunkY * this.chunks.chunkSize) ^ 0xABCDEF01;
+                const nebulaeRng = new SeededRandom(nebulaeSeed);
+
+                // Regenerate nebula type using the same logic as in generateNebulaeForChunk
+                const nebulaTypes = ['emission', 'reflection', 'planetary', 'dark'];
+                nebulaType = nebulaTypes[nebulaeRng.nextInt(0, nebulaTypes.length - 1)];
+
+                // Generate basic type data
+                nebulaTypeData = {
+                    name: `${nebulaType.charAt(0).toUpperCase()}${nebulaType.slice(1)} Nebula`,
+                    color: this.getBasicNebulaColors(nebulaType)?.[0] || '#ff00ff'
+                };
+            }
+
+            return {
+                x: nebulaX,
+                y: nebulaY,
+                nebulaType: nebulaType,
+                nebulaTypeData: nebulaTypeData,
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp
+            };
+        }, true);
     }
 
     getDiscoveredWormholes(): DiscoveredWormhole[] {
-        const discoveredWormholes: DiscoveredWormhole[] = [];
+        return this.collectDiscoveries('wormhole_', 4, (parts, discoveryData) => {
+            // ID format: wormhole_x_y_designation
+            const wormholeX = parseInt(parts[1]);
+            const wormholeY = parseInt(parts[2]);
+            const designation = parts[3] as 'alpha' | 'beta';
 
-        // Get all discovered objects that are wormholes
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('wormhole_')) {
-                // Extract coordinates and designation from wormhole ID
-                // Format: wormhole_x_y_designation (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 4) {
-                    const wormholeX = parseInt(parts[1]);
-                    const wormholeY = parseInt(parts[2]);
-                    const designation = parts[3] as 'alpha' | 'beta';
+            const wormhole = this.findInActiveChunks('wormholes', w =>
+                Math.floor(w.x) === wormholeX && Math.floor(w.y) === wormholeY && w.designation === designation);
+            if (wormhole) {
+                return {
+                    x: wormhole.x,
+                    y: wormhole.y,
+                    wormholeId: wormhole.wormholeId,
+                    designation: wormhole.designation,
+                    pairId: wormhole.pairId,
+                    twinX: wormhole.twinX,
+                    twinY: wormhole.twinY,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp
+                };
+            }
 
-                    // Try to find wormhole in active chunks first
-                    const wormhole = this.findWormholeByPosition(wormholeX, wormholeY, designation);
+            if (!discoveryData.wormholeId || !discoveryData.designation) return null;
 
-                    if (wormhole) {
-                        // Use live wormhole data if available
-                        const wormholeData: DiscoveredWormhole = {
-                            x: wormhole.x,
-                            y: wormhole.y,
-                            wormholeId: wormhole.wormholeId,
-                            designation: wormhole.designation,
-                            pairId: wormhole.pairId,
-                            twinX: wormhole.twinX,
-                            twinY: wormhole.twinY,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
+            // Wormhole chunk not loaded - reconstruct from discovery data
+            const wormholeData: DiscoveredWormhole = {
+                x: wormholeX,
+                y: wormholeY,
+                wormholeId: discoveryData.wormholeId,
+                designation: designation,
+                pairId: `${discoveryData.wormholeId}-${designation === 'alpha' ? 'α' : 'β'}`,
+                twinX: 0, // Will be updated if twin is found
+                twinY: 0, // Will be updated if twin is found
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp
+            };
 
-                        discoveredWormholes.push(wormholeData);
-                    } else if (discoveryData.wormholeId && discoveryData.designation) {
-                        // Wormhole chunk not loaded - reconstruct from discovery data
-                        const wormholeData: DiscoveredWormhole = {
-                            x: wormholeX,
-                            y: wormholeY,
-                            wormholeId: discoveryData.wormholeId,
-                            designation: designation,
-                            pairId: `${discoveryData.wormholeId}-${designation === 'alpha' ? 'α' : 'β'}`,
-                            twinX: 0, // Will be updated if twin is found
-                            twinY: 0, // Will be updated if twin is found
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        // Try to find twin coordinates from discovery data
-                        for (const [twinObjId, twinData] of this.discoveredObjects) {
-                            if (twinObjId.startsWith('wormhole_') && twinData.wormholeId === discoveryData.wormholeId && twinData.designation !== designation) {
-                                const twinParts = twinObjId.split('_');
-                                if (twinParts.length >= 4) {
-                                    wormholeData.twinX = parseInt(twinParts[1]);
-                                    wormholeData.twinY = parseInt(twinParts[2]);
-                                    break;
-                                }
-                            }
-                        }
-
-                        discoveredWormholes.push(wormholeData);
+            // Try to find twin coordinates from discovery data
+            for (const [twinObjId, twinData] of this.discoveredObjects) {
+                if (twinObjId.startsWith('wormhole_') && twinData.wormholeId === discoveryData.wormholeId && twinData.designation !== designation) {
+                    const twinParts = twinObjId.split('_');
+                    if (twinParts.length >= 4) {
+                        wormholeData.twinX = parseInt(twinParts[1]);
+                        wormholeData.twinY = parseInt(twinParts[2]);
+                        break;
                     }
                 }
             }
-        }
 
-        // Sort by discovery time (most recent first)
-        discoveredWormholes.sort((a, b) => b.timestamp - a.timestamp);
-        return discoveredWormholes;
+            return wormholeData;
+        }, true);
     }
 
     getDiscoveredAsteroidGardens(): DiscoveredAsteroidGarden[] {
-        const discoveredAsteroidGardens: DiscoveredAsteroidGarden[] = [];
+        return this.collectDiscoveries('asteroids_', 3, (parts, discoveryData) => {
+            if (!discoveryData.gardenType) return null;
+            const gardenX = parseInt(parts[1]);
+            const gardenY = parseInt(parts[2]);
 
-        // Get all discovered objects that are asteroid gardens
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('asteroids_') && discoveryData.gardenType) {
-                // Extract coordinates from asteroid garden ID
-                // Format: asteroids_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const gardenX = parseInt(parts[1]);
-                    const gardenY = parseInt(parts[2]);
-                    const garden = this.findAsteroidGardenByPosition(gardenX, gardenY);
-
-                    if (garden) {
-                        const gardenData: DiscoveredAsteroidGarden = {
-                            x: garden.x,
-                            y: garden.y,
-                            gardenType: garden.gardenType,
-                            gardenTypeData: garden.gardenTypeData,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        discoveredAsteroidGardens.push(gardenData);
-                    } else {
-                        // Fallback for asteroid gardens in inactive chunks
-                        // Use stored discovery data with basic color scheme
-                        const fallbackGardenData: DiscoveredAsteroidGarden = {
-                            x: gardenX,
-                            y: gardenY,
-                            gardenType: discoveryData.gardenType!,
-                            gardenTypeData: discoveryData.gardenTypeData || {
-                                name: discoveryData.gardenType! + ' Asteroid Garden',
-                                colors: this.getBasicGardenColors(discoveryData.gardenType!)
-                            },
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        discoveredAsteroidGardens.push(fallbackGardenData);
-                        // Using fallback data for asteroid garden in inactive chunk (normal behavior)
-                    }
-                }
+            const garden = this.findByFlooredPosition('asteroidGardens', gardenX, gardenY);
+            if (garden) {
+                return {
+                    x: garden.x,
+                    y: garden.y,
+                    gardenType: garden.gardenType,
+                    gardenTypeData: garden.gardenTypeData,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp
+                };
             }
-        }
 
-        // Sort by discovery time (most recent first)
-        discoveredAsteroidGardens.sort((a, b) => b.timestamp - a.timestamp);
-        return discoveredAsteroidGardens;
+            // Fallback for asteroid gardens in inactive chunks: stored data with basic colors
+            return {
+                x: gardenX,
+                y: gardenY,
+                gardenType: discoveryData.gardenType,
+                gardenTypeData: discoveryData.gardenTypeData || {
+                    name: discoveryData.gardenType + ' Asteroid Garden',
+                    colors: this.getBasicGardenColors(discoveryData.gardenType)
+                },
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp
+            };
+        }, true);
     }
 
     getDiscoveredBlackHoles(): DiscoveredBlackHole[] {
-        const discoveredBlackHoles: DiscoveredBlackHole[] = [];
+        return this.collectDiscoveries('blackhole_', 3, (parts, discoveryData) => {
+            const blackHoleX = parseInt(parts[1]);
+            const blackHoleY = parseInt(parts[2]);
 
-        // Get all discovered objects that are black holes
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('blackhole_')) {
-                // Extract coordinates from black hole ID
-                // Format: blackhole_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const blackHoleX = parseInt(parts[1]);
-                    const blackHoleY = parseInt(parts[2]);
-
-                    // Try to find black hole in active chunks first
-                    const blackHole = this.findBlackHoleByPosition(blackHoleX, blackHoleY);
-
-                    if (blackHole) {
-                        // Use live black hole data if available
-                        const blackHoleData: DiscoveredBlackHole = {
-                            x: blackHole.x,
-                            y: blackHole.y,
-                            blackHoleTypeName: blackHole.blackHoleTypeName,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        discoveredBlackHoles.push(blackHoleData);
-                    } else if (discoveryData.blackHoleTypeName) {
-                        // Black hole chunk not loaded - reconstruct from discovery data
-                        const blackHoleData: DiscoveredBlackHole = {
-                            x: blackHoleX,
-                            y: blackHoleY,
-                            blackHoleTypeName: discoveryData.blackHoleTypeName,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        discoveredBlackHoles.push(blackHoleData);
-                    }
-                }
+            const blackHole = this.findByFlooredPosition('blackholes', blackHoleX, blackHoleY);
+            if (blackHole) {
+                return {
+                    x: blackHole.x,
+                    y: blackHole.y,
+                    blackHoleTypeName: blackHole.blackHoleTypeName,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp
+                };
             }
-        }
 
-        // Sort by discovery time (most recent first)
-        discoveredBlackHoles.sort((a, b) => b.timestamp - a.timestamp);
-        return discoveredBlackHoles;
+            if (!discoveryData.blackHoleTypeName) return null;
+
+            // Black hole chunk not loaded - reconstruct from discovery data
+            return {
+                x: blackHoleX,
+                y: blackHoleY,
+                blackHoleTypeName: discoveryData.blackHoleTypeName,
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp
+            };
+        }, true);
     }
 
     getDiscoveredComets(): DiscoveredComet[] {
-        const discoveredComets: DiscoveredComet[] = [];
+        return this.collectDiscoveries('comet_', 4, (parts, discoveryData) => {
+            // ID format: comet_x_y_index
+            const cometX = parseInt(parts[1]);
+            const cometY = parseInt(parts[2]);
+            const cometIndex = parseInt(parts[3]);
 
-        // Get all discovered objects that are comets
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('comet_')) {
-                // Extract coordinates from comet ID
-                // Format: comet_x_y_index (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 4) {
-                    const cometX = parseInt(parts[1]);
-                    const cometY = parseInt(parts[2]);
-                    const cometIndex = parseInt(parts[3]);
-
-                    // Try to find comet in active chunks first
-                    const comet = this.findCometByIdentifier(cometIndex, cometX, cometY);
-
-                    if (comet) {
-                        // Use live comet data if available
-                        const cometData: DiscoveredComet = {
-                            x: comet.x,
-                            y: comet.y,
-                            parentStarX: comet.parentStar.x,
-                            parentStarY: comet.parentStar.y,
-                            cometTypeName: comet.cometType.name,
-                            cometType: {
-                                name: comet.cometType.name,
-                                tailColors: comet.cometType.tailColors,
-                                nucleusColor: comet.cometType.nucleusColor
-                            },
-                            orbit: {
-                                semiMajorAxis: comet.orbit.semiMajorAxis,
-                                eccentricity: comet.orbit.eccentricity,
-                                perihelionDistance: comet.orbit.perihelionDistance,
-                                aphelionDistance: comet.orbit.aphelionDistance,
-                                argumentOfPerihelion: comet.orbit.argumentOfPerihelion
-                            },
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        discoveredComets.push(cometData);
-                    } else {
-                        // Use stored discovery data if comet is not in active chunks
-                        // This happens when the comet was discovered but its chunk is no longer loaded
-                        const storedCometData: DiscoveredComet = {
-                            x: cometX,
-                            y: cometY,
-                            parentStarX: 0, // Will need to reconstruct or store this
-                            parentStarY: 0,
-                            cometTypeName: discoveryData.cometTypeName || 'Unknown Comet',
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp
-                        };
-
-                        discoveredComets.push(storedCometData);
-                    }
-                }
+            const comet = this.findCometByIdentifier(cometIndex, cometX, cometY);
+            if (comet) {
+                return {
+                    x: comet.x,
+                    y: comet.y,
+                    parentStarX: comet.parentStar.x,
+                    parentStarY: comet.parentStar.y,
+                    cometTypeName: comet.cometType.name,
+                    cometType: {
+                        name: comet.cometType.name,
+                        tailColors: comet.cometType.tailColors,
+                        nucleusColor: comet.cometType.nucleusColor
+                    },
+                    orbit: {
+                        semiMajorAxis: comet.orbit.semiMajorAxis,
+                        eccentricity: comet.orbit.eccentricity,
+                        perihelionDistance: comet.orbit.perihelionDistance,
+                        aphelionDistance: comet.orbit.aphelionDistance,
+                        argumentOfPerihelion: comet.orbit.argumentOfPerihelion
+                    },
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp
+                };
             }
-        }
 
-        return discoveredComets;
+            // Comet's chunk is no longer loaded - use stored discovery data
+            return {
+                x: cometX,
+                y: cometY,
+                parentStarX: 0, // Will need to reconstruct or store this
+                parentStarY: 0,
+                cometTypeName: discoveryData.cometTypeName || 'Unknown Comet',
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp
+            };
+        });
     }
 
     getDiscoveredRoguePlanets(): DiscoveredRoguePlanet[] {
-        const discoveredRoguePlanets: DiscoveredRoguePlanet[] = [];
+        return this.collectDiscoveries('rogue-planet_', 3, (parts, discoveryData) => {
+            const roguePlanetX = parseInt(parts[1]);
+            const roguePlanetY = parseInt(parts[2]);
 
-        // Get all discovered objects that are rogue planets
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('rogue-planet_')) {
-                // Extract coordinates from rogue planet ID
-                // Format: rogue-planet_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const roguePlanetX = parseInt(parts[1]);
-                    const roguePlanetY = parseInt(parts[2]);
-
-                    // Try to find rogue planet in active chunks first
-                    const roguePlanet = this.findRoguePlanetByCoordinates(roguePlanetX, roguePlanetY);
-
-                    if (roguePlanet) {
-                        // Use active rogue planet data
-                        const roguePlanetData: DiscoveredRoguePlanet = {
-                            x: roguePlanet.x,
-                            y: roguePlanet.y,
-                            variant: roguePlanet.variant,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp,
-                            type: 'rogue-planet',
-                            radius: roguePlanet.radius
-                        };
-
-                        discoveredRoguePlanets.push(roguePlanetData);
-                    } else {
-                        // Use stored discovery data if rogue planet is not in active chunks
-                        const storedRoguePlanetData: DiscoveredRoguePlanet = {
-                            x: roguePlanetX,
-                            y: roguePlanetY,
-                            variant: (discoveryData as any).variant || 'rock', // Fallback to rock variant
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp,
-                            type: 'rogue-planet',
-                            radius: (discoveryData as any).radius || 13 // Fallback radius
-                        };
-
-                        discoveredRoguePlanets.push(storedRoguePlanetData);
-                    }
-                }
+            const roguePlanet = this.findByFlooredPosition('roguePlanets', roguePlanetX, roguePlanetY);
+            if (roguePlanet) {
+                return {
+                    x: roguePlanet.x,
+                    y: roguePlanet.y,
+                    variant: roguePlanet.variant,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp,
+                    type: 'rogue-planet' as const,
+                    radius: roguePlanet.radius
+                };
             }
-        }
 
-        return discoveredRoguePlanets;
+            // Use stored discovery data if rogue planet is not in active chunks
+            return {
+                x: roguePlanetX,
+                y: roguePlanetY,
+                variant: (discoveryData as any).variant || 'rock', // Fallback to rock variant
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp,
+                type: 'rogue-planet' as const,
+                radius: (discoveryData as any).radius || 13 // Fallback radius
+            };
+        });
     }
 
     getDiscoveredDarkNebulae(): DiscoveredDarkNebula[] {
-        const discoveredDarkNebulae: DiscoveredDarkNebula[] = [];
+        return this.collectDiscoveries('dark-nebula_', 3, (parts, discoveryData) => {
+            const darkNebulaX = parseInt(parts[1]);
+            const darkNebulaY = parseInt(parts[2]);
 
-        // Get all discovered objects that are dark nebulae
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('dark-nebula_')) {
-                // Extract coordinates from dark nebula ID
-                // Format: dark-nebula_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const darkNebulaX = parseInt(parts[1]);
-                    const darkNebulaY = parseInt(parts[2]);
-
-                    // Try to find dark nebula in active chunks first
-                    const darkNebula = this.findDarkNebulaByCoordinates(darkNebulaX, darkNebulaY);
-
-                    if (darkNebula) {
-                        // Use active dark nebula data
-                        const darkNebulaData: DiscoveredDarkNebula = {
-                            x: darkNebula.x,
-                            y: darkNebula.y,
-                            variant: darkNebula.variant,
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp,
-                            type: 'dark-nebula',
-                            radius: darkNebula.radius
-                        };
-                        discoveredDarkNebulae.push(darkNebulaData);
-                    } else {
-                        // Use stored discovery data as fallback
-                        const fallbackData: DiscoveredDarkNebula = {
-                            x: darkNebulaX,
-                            y: darkNebulaY,
-                            variant: 'wispy', // Default variant
-                            objectName: discoveryData.objectName,
-                            timestamp: discoveryData.timestamp,
-                            type: 'dark-nebula',
-                            radius: 200 // Default radius
-                        };
-                        discoveredDarkNebulae.push(fallbackData);
-                    }
-                }
+            const darkNebula = this.findByFlooredPosition('darkNebulae', darkNebulaX, darkNebulaY);
+            if (darkNebula) {
+                return {
+                    x: darkNebula.x,
+                    y: darkNebula.y,
+                    variant: darkNebula.variant,
+                    objectName: discoveryData.objectName,
+                    timestamp: discoveryData.timestamp,
+                    type: 'dark-nebula' as const,
+                    radius: darkNebula.radius
+                };
             }
-        }
 
-        return discoveredDarkNebulae;
+            // Use stored discovery data as fallback
+            return {
+                x: darkNebulaX,
+                y: darkNebulaY,
+                variant: 'wispy' as const, // Default variant
+                objectName: discoveryData.objectName,
+                timestamp: discoveryData.timestamp,
+                type: 'dark-nebula' as const,
+                radius: 200 // Default radius
+            };
+        });
     }
 
     getDiscoveredCrystalGardens(): DiscoveredCrystalGarden[] {
-        const discoveredCrystalGardens: DiscoveredCrystalGarden[] = [];
+        return this.collectDiscoveries('crystal-garden_', 3, (parts, discoveryData) => {
+            const crystalGardenX = parseInt(parts[1]);
+            const crystalGardenY = parseInt(parts[2]);
 
-        // Get all discovered objects that are crystal gardens
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('crystal-garden_')) {
-                // Extract coordinates from crystal garden ID
-                // Format: crystal-garden_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const crystalGardenX = parseInt(parts[1]);
-                    const crystalGardenY = parseInt(parts[2]);
+            // Crystal gardens are only reported while their chunk is loaded
+            const crystalGarden = this.findByFlooredPosition('crystalGardens', crystalGardenX, crystalGardenY);
+            if (!crystalGarden) return null;
 
-                    // Find the actual crystal garden object
-                    const crystalGarden = this.findCrystalGardenByCoordinates(crystalGardenX, crystalGardenY);
-                    if (crystalGarden) {
-                        discoveredCrystalGardens.push({
-                            name: discoveryData.objectName || 'Crystal Garden',
-                            type: 'crystal-garden',
-                            x: crystalGarden.x,
-                            y: crystalGarden.y,
-                            variant: crystalGarden.variant,
-                            radius: crystalGarden.radius,
-                            primaryColor: crystalGarden.primaryColor,
-                            crystalCount: crystalGarden.crystalClusters ? crystalGarden.crystalClusters.length : 0,
-                            discoveryTimestamp: discoveryData.timestamp
-                        });
-                    }
-                }
-            }
-        }
-
-        return discoveredCrystalGardens;
+            return {
+                name: discoveryData.objectName || 'Crystal Garden',
+                type: 'crystal-garden' as const,
+                x: crystalGarden.x,
+                y: crystalGarden.y,
+                variant: crystalGarden.variant,
+                radius: crystalGarden.radius,
+                primaryColor: crystalGarden.primaryColor,
+                crystalCount: crystalGarden.crystalClusters ? crystalGarden.crystalClusters.length : 0,
+                discoveryTimestamp: discoveryData.timestamp
+            };
+        });
     }
 
     getDiscoveredProtostars(): DiscoveredProtostar[] {
-        const discoveredProtostars: DiscoveredProtostar[] = [];
+        return this.collectDiscoveries('protostar_', 3, (parts, discoveryData) => {
+            const protostarX = parseInt(parts[1]);
+            const protostarY = parseInt(parts[2]);
 
-        // Get all discovered objects that are protostars
-        for (const [objId, discoveryData] of this.discoveredObjects) {
-            if (objId.startsWith('protostar_')) {
-                // Extract coordinates from protostar ID
-                // Format: protostar_x_y (from getObjectId)
-                const parts = objId.split('_');
-                if (parts.length >= 3) {
-                    const protostarX = parseInt(parts[1]);
-                    const protostarY = parseInt(parts[2]);
+            // Protostars are only reported while their chunk is loaded
+            const protostar = this.findByFlooredPosition('protostars', protostarX, protostarY);
+            if (!protostar) return null;
 
-                    // Find the actual protostar object
-                    const protostar = this.findProtostarByCoordinates(protostarX, protostarY);
-                    if (protostar) {
-                        discoveredProtostars.push({
-                            name: discoveryData.objectName || 'Protostar',
-                            type: 'protostar',
-                            x: protostar.x,
-                            y: protostar.y,
-                            variant: protostar.variant,
-                            radius: protostar.radius,
-                            stellarClassification: protostar.stellarClassification,
-                            coreColor: protostar.coreColor,
-                            coreTemperature: protostar.coreTemperature,
-                            discoveryTimestamp: discoveryData.timestamp
-                        });
-                    }
-                }
-            }
-        }
-
-        return discoveredProtostars;
+            return {
+                name: discoveryData.objectName || 'Protostar',
+                type: 'protostar' as const,
+                x: protostar.x,
+                y: protostar.y,
+                variant: protostar.variant,
+                radius: protostar.radius,
+                stellarClassification: protostar.stellarClassification,
+                coreColor: protostar.coreColor,
+                coreTemperature: protostar.coreTemperature,
+                discoveryTimestamp: discoveryData.timestamp
+            };
+        });
     }
 
     markRegionDiscovered(regionType: string, regionName: string, discoveryX: number, discoveryY: number, influence: number): void {
@@ -995,130 +812,17 @@ export class DiscoveryRegistry {
         this.discoveredObjects.clear();
     }
 
-    // Helper method to find a nebula by its position in active chunks
-    private findNebulaByPosition(x: number, y: number): Nebula | null {
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const nebula of chunk.nebulae) {
-                // Check if nebula position matches (using floor to match getObjectId)
-                if (Math.floor(nebula.x) === x && Math.floor(nebula.y) === y) {
-                    return nebula;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Helper method to find a wormhole by its position and designation in active chunks
-    private findWormholeByPosition(x: number, y: number, designation: 'alpha' | 'beta'): Wormhole | null {
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const wormhole of chunk.wormholes) {
-                // Check if wormhole position and designation match (using floor to match getObjectId)
-                if (Math.floor(wormhole.x) === x && Math.floor(wormhole.y) === y && wormhole.designation === designation) {
-                    return wormhole;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Helper method to find an asteroid garden by its position in active chunks
-    private findAsteroidGardenByPosition(x: number, y: number): AsteroidGarden | null {
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const garden of chunk.asteroidGardens) {
-                // Check if asteroid garden position matches (using floor to match getObjectId)
-                if (Math.floor(garden.x) === x && Math.floor(garden.y) === y) {
-                    return garden;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Helper method to find a black hole by its position in active chunks
-    private findBlackHoleByPosition(x: number, y: number): BlackHole | null {
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const blackHole of chunk.blackholes) {
-                // Check if black hole position matches (using floor to match getObjectId)
-                if (Math.floor(blackHole.x) === x && Math.floor(blackHole.y) === y) {
-                    return blackHole;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Helper method to find a comet by identifier in active chunks
-    private findCometByIdentifier(cometIndex: number, originalCometX: number, originalCometY: number): any | null {
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const comet of chunk.comets) {
-                // Match by comet index first (most reliable identifier)
-                if (comet.cometIndex === cometIndex) {
-                    // Additional verification: check if this comet could have been at the original position
-                    // We'll be more lenient here since comets move significantly
-                    const distanceFromOriginal = Math.sqrt(
-                        (comet.x - originalCometX) ** 2 + (comet.y - originalCometY) ** 2
-                    );
-
-                    // If the comet is within a reasonable orbital distance of the original position,
-                    // or if the cometIndex matches (which should be unique per star system),
-                    // consider it a match
-                    const maxOrbitalDistance = comet.orbit?.semiMajorAxis ? comet.orbit.semiMajorAxis * 2 : 1000;
-
-                    if (distanceFromOriginal <= maxOrbitalDistance) {
-                        return comet;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private findRoguePlanetByCoordinates(x: number, y: number): any {
-        // Search through all active chunks for a rogue planet with matching coordinates
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const roguePlanet of chunk.roguePlanets) {
-                if (Math.floor(roguePlanet.x) === x && Math.floor(roguePlanet.y) === y) {
-                    return roguePlanet;
-                }
-            }
-        }
-        return null;
-    }
-
-    private findDarkNebulaByCoordinates(x: number, y: number): any {
-        // Search through all active chunks for a dark nebula with matching coordinates
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const darkNebula of chunk.darkNebulae) {
-                if (Math.floor(darkNebula.x) === x && Math.floor(darkNebula.y) === y) {
-                    return darkNebula;
-                }
-            }
-        }
-        return null;
-    }
-
-    private findCrystalGardenByCoordinates(x: number, y: number): any {
-        // Search through all active chunks for a crystal garden with matching coordinates
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const crystalGarden of chunk.crystalGardens) {
-                if (Math.floor(crystalGarden.x) === x && Math.floor(crystalGarden.y) === y) {
-                    return crystalGarden;
-                }
-            }
-        }
-        return null;
-    }
-
-    private findProtostarByCoordinates(x: number, y: number): any {
-        // Search through all active chunks for a protostar with matching coordinates
-        for (const chunk of this.chunks.activeChunks.values()) {
-            for (const protostar of chunk.protostars) {
-                if (Math.floor(protostar.x) === x && Math.floor(protostar.y) === y) {
-                    return protostar;
-                }
-            }
-        }
-        return null;
+    // Comets move along their orbits, so match by index and verify the comet is
+    // within a plausible orbital distance of where it was discovered
+    private findCometByIdentifier(cometIndex: number, originalCometX: number, originalCometY: number): Comet | null {
+        return this.findInActiveChunks('comets', comet => {
+            if (comet.cometIndex !== cometIndex) return false;
+            const distanceFromOriginal = Math.sqrt(
+                (comet.x - originalCometX) ** 2 + (comet.y - originalCometY) ** 2
+            );
+            const maxOrbitalDistance = comet.orbit?.semiMajorAxis ? comet.orbit.semiMajorAxis * 2 : 1000;
+            return distanceFromOriginal <= maxOrbitalDistance;
+        });
     }
 
     // Helper method to get basic colors for asteroid garden types (fallback when chunk not active)

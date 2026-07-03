@@ -176,6 +176,18 @@ describe('DiscoveryRegistry', () => {
     });
 
     describe('getDiscoveredWormholes', () => {
+        it('should use live wormhole data when in an active chunk', () => {
+            const chunk = createEmptyChunk();
+            chunk.wormholes.push({ x: 100.2, y: 200.7, wormholeId: 'WH-1', designation: 'alpha', pairId: 'WH-1-α', twinX: 5000, twinY: 6000 });
+            registry = new DiscoveryRegistry(createChunkSource([chunk]));
+            registry.markObjectDiscovered({ type: 'wormhole', x: 100.2, y: 200.7, wormholeId: 'WH-1', designation: 'alpha' });
+
+            const wormholes = registry.getDiscoveredWormholes();
+            expect(wormholes).toHaveLength(1);
+            expect(wormholes[0].x).toBe(100.2);
+            expect(wormholes[0].pairId).toBe('WH-1-α');
+        });
+
         it('should reconstruct wormhole pairs and locate twins from discovery data', () => {
             registry.markObjectDiscovered({ type: 'wormhole', x: 100, y: 200, wormholeId: 'WH-1234', designation: 'alpha' });
             registry.markObjectDiscovered({ type: 'wormhole', x: 5000, y: 6000, wormholeId: 'WH-1234', designation: 'beta' });
@@ -210,6 +222,30 @@ describe('DiscoveryRegistry', () => {
             expect(regions).toHaveLength(1);
             expect(regions[0].regionName).toBe('The Ancient Expanse');
             expect(regions[0].discoveryX).toBe(10);
+        });
+    });
+
+    describe('Result ordering and ID filtering', () => {
+        it('should return nebulae most recently discovered first', () => {
+            registry.discoveredObjects.set('nebula_10_20', { discovered: true, timestamp: 100, nebulaType: 'emission', nebulaTypeData: { name: 'Emission Nebula' } });
+            registry.discoveredObjects.set('nebula_30_40', { discovered: true, timestamp: 200, nebulaType: 'dark', nebulaTypeData: { name: 'Dark Nebula' } });
+
+            const nebulae = registry.getDiscoveredNebulae();
+            expect(nebulae.map(n => n.nebulaType)).toEqual(['dark', 'emission']);
+        });
+
+        it('should return asteroid gardens most recently discovered first', () => {
+            registry.discoveredObjects.set('asteroids_10_20', { discovered: true, timestamp: 100, gardenType: 'metallic' });
+            registry.discoveredObjects.set('asteroids_30_40', { discovered: true, timestamp: 200, gardenType: 'icy' });
+
+            const gardens = registry.getDiscoveredAsteroidGardens();
+            expect(gardens.map(g => g.gardenType)).toEqual(['icy', 'metallic']);
+        });
+
+        it('should ignore IDs that do not match the planet ID format', () => {
+            registry.discoveredObjects.set('planet_100_200', { discovered: true, timestamp: 100, planetTypeName: 'Rocky Planet' });
+
+            expect(registry.getDiscoveredPlanets()).toHaveLength(0);
         });
     });
 
