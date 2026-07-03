@@ -100,7 +100,6 @@ export class SettingsService {
                 
                 // Sync initial state with audio service
                 this.syncWithAudioService();
-            } else {
             }
         } catch (error) {
             console.warn('Failed to load settings, using defaults:', error);

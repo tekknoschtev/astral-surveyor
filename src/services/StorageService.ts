@@ -84,7 +84,7 @@ export class StorageService implements IStorageService {
             const storageData = JSON.parse(stored);
             
             // Validate storage data structure
-            if (!storageData || typeof storageData !== 'object' || !storageData.hasOwnProperty('data')) {
+            if (!storageData || typeof storageData !== 'object' || !Object.prototype.hasOwnProperty.call(storageData, 'data')) {
                 return { success: false, error: 'Invalid storage data format' };
             }
 

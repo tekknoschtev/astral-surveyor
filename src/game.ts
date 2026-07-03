@@ -228,7 +228,7 @@ export class Game {
                         ...activeObjects.roguePlanets,
                         ...activeObjects.darkNebulae,
                         ...activeObjects.protostars
-                    ].filter(obj => obj.hasOwnProperty('discovered'));
+                    ].filter(obj => Object.prototype.hasOwnProperty.call(obj, 'discovered'));
                     this.chunkManager.restoreDiscoveryState(flattenedObjects);
                     
                     // Center stellar map on loaded position
@@ -1071,7 +1071,7 @@ export class Game {
                 ...activeObjects.roguePlanets,
                 ...activeObjects.darkNebulae,
                 ...activeObjects.protostars
-            ].filter(obj => obj.hasOwnProperty('discovered'));
+            ].filter(obj => Object.prototype.hasOwnProperty.call(obj, 'discovered'));
             this.chunkManager.restoreDiscoveryState(flattenedObjects);
 
             // Center stellar map on loaded position

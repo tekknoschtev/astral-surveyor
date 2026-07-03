@@ -522,7 +522,6 @@ export class SettingsMenu {
             ctx.lineTo(x + size/2, y + size - 4);
             ctx.lineTo(x + size - 4, y + 4);
             ctx.stroke();
-        } else {
         }
     }
 
