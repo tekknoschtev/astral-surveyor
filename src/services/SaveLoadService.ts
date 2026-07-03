@@ -233,7 +233,8 @@ export class SaveLoadService {
 
         // Check required top-level properties - all must exist
         if (!data.version || !data.timestamp || !data.player || !data.world ||
-            !data.hasOwnProperty('discoveries') || !data.hasOwnProperty('discoveredObjects')) {
+            !Object.prototype.hasOwnProperty.call(data, 'discoveries') ||
+            !Object.prototype.hasOwnProperty.call(data, 'discoveredObjects')) {
             console.log('Validation failed: missing required properties', JSON.stringify(data));
             return false;
         }
